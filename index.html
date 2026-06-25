@@ -7,12 +7,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  :root{--bg:#0f172a;--panel:#1e293b;--line:#334155;--txt:#e2e8f0;--mut:#94a3b8;
-        --acc:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;}
+  :root{--bg:#0f172a;--panel:#1e293b;--line:#334155;--txt:#e2e8f0;--mut:#94a3b8;--acc:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;}
   *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,sans-serif}
   body{margin:0;background:var(--bg);color:var(--txt);font-size:14px}
-  header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);
-         border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
   header h1{font-size:16px;margin:0;font-weight:600}
   .grow{flex:1}
   button{background:var(--acc);color:#06263a;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
@@ -38,8 +36,7 @@
   .fld{display:flex;flex-direction:column;gap:5px}
   .fld label{font-size:12px;color:var(--mut)}
   .big{font-size:22px;font-weight:700}
-  .mut{color:var(--mut)}
-  .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+  .mut{color:var(--mut)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
   .login{max-width:380px;margin:70px auto;text-align:center}
   .login .card{display:flex;flex-direction:column;gap:12px}
   .err{color:var(--bad);font-size:13px;min-height:18px}
@@ -50,20 +47,20 @@
   .autocomplete.show{display:block}
   .ac-item{display:flex;flex-direction:column;gap:2px;padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
   .ac-item:hover{background:#0b1220}
-  .ac-code{font-weight:700;color:var(--acc);font-size:13px}
-  .ac-name{font-size:12px;color:var(--mut)}
+  .ac-code{font-weight:700;color:var(--acc);font-size:13px}.ac-name{font-size:12px;color:var(--mut)}
   .msg{font-size:13px;margin-top:8px;min-height:18px;white-space:pre-wrap}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:#0b1220;border:1px solid var(--line);margin-left:6px}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px}
   .pill.aktif{background:#0c2f1a;color:var(--ok);border:1px solid #1f5236}
   .pill.pasif{background:#3b1d1d;color:var(--bad);border:1px solid #5b2a2a}
+  .prev{font-size:12px;border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:160px}
+  .prev table{margin:0}.prev td,.prev th{padding:4px 8px}
 </style>
 </head>
 <body>
 
 <div id="cfgWarn">⚠️ Supabase bilgileri girilmemiş.</div>
 
-<!-- GİRİŞ -->
 <div id="loginView" class="login" style="display:none">
   <h1>Fiyatiq</h1>
   <div class="card" id="loginCard">
@@ -85,7 +82,6 @@
   </div>
 </div>
 
-<!-- ONAY BEKLİYOR -->
 <div id="pendingView" class="login" style="display:none">
   <h1>Fiyatiq</h1>
   <div class="card">
@@ -97,7 +93,6 @@
 
 <div id="ac" class="autocomplete"></div>
 
-<!-- UYGULAMA -->
 <div id="appView" style="display:none">
   <header>
     <h1>Fiyatiq</h1>
@@ -111,87 +106,52 @@
     <button class="ghost sm" onclick="signOut()">Çıkış</button>
   </header>
 
-  <!-- BAYİ / TEKLİF EKRANI -->
   <main id="bayiView">
     <div class="card" id="bayiStokCard" style="display:none">
       <h2>Stoğum <span class="badge">kendi stok dosyan</span></h2>
-      <p class="mut" style="font-size:12px;margin:0 0 8px">İlk iki sütun: <code>ürün kodu</code> ve <code>adet</code> olan Excel/CSV dosyanı yükle. Yüklediğinde mevcut stoğunun yerine geçer.</p>
-      <div class="row">
-        <input id="bsFile" type="file" accept=".xlsx,.xls,.csv">
-        <button onclick="bayiStokYukle()">Stoğumu Yükle</button>
-        <span id="bsMsg" class="msg"></span>
-      </div>
+      <p class="mut" style="font-size:12px;margin:0 0 8px">İlk iki sütun: <code>ürün kodu</code> ve <code>adet</code> olan Excel/CSV. Yüklediğinde mevcut stoğunun yerine geçer.</p>
+      <div class="row"><input id="bsFile" type="file" accept=".xlsx,.xls,.csv"><button onclick="bayiStokYukle()">Stoğumu Yükle</button><span id="bsMsg" class="msg"></span></div>
     </div>
-
     <div class="card">
       <div class="row" style="margin-bottom:6px">
         <div class="fld"><label>Müşteri Adı</label><input id="mAd" placeholder="Ad Soyad"></div>
         <div class="fld"><label>Telefon</label><input id="mTel" placeholder="05.."></div>
-        <div class="grow"></div>
-        <button class="sm" onclick="addRow()">+ Ürün satırı</button>
+        <div class="grow"></div><button class="sm" onclick="addRow()">+ Ürün satırı</button>
       </div>
-      <table id="grid">
-        <thead><tr>
-          <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>
-          <th>Nakit Fiyat</th><th>Taksitli Fiyat</th>
-          <th>Net Maliyet</th><th>Kâr %</th><th id="thS1">Mars</th><th id="thS2">Horoz</th><th></th>
-        </tr></thead>
-        <tbody id="rows"></tbody>
-        <tfoot><tr>
-          <th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th>
-          <th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th>
-          <th class="num" id="tMaliyet">0</th><th colspan="4"></th>
-        </tr></tfoot>
-      </table>
+      <table id="grid"><thead><tr>
+        <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Nakit Fiyat</th><th>Taksitli Fiyat</th>
+        <th>Net Maliyet</th><th>Kâr %</th><th id="thS1">Mars</th><th id="thS2">Horoz</th><th></th>
+      </tr></thead><tbody id="rows"></tbody>
+      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tMaliyet">0</th><th colspan="4"></th></tr></tfoot></table>
     </div>
-    <div class="card">
-      <div class="row">
-        <div class="fld"><label>Satış Tutarı (hedef)</label><input id="satis" type="number" oninput="calcBank()" style="width:160px"></div>
-        <div class="fld"><label>Banka</label><select id="banka" onchange="loadTaksit()"></select></div>
-        <div class="fld"><label>Taksit</label><select id="taksit" onchange="calcBank()"></select></div>
-        <div class="grow"></div>
-        <div class="fld" style="text-align:right"><label>Aylık Taksit</label><span class="big" id="aylik">—</span></div>
-        <div class="fld" style="text-align:right"><label>Komisyon</label><span id="kom" class="mut">—</span></div>
-        <div class="fld" style="text-align:right"><label>Kâr</label><span class="big" id="karPct">—</span></div>
-      </div>
-    </div>
-    <div class="row" style="justify-content:flex-end">
-      <button onclick="saveQuote()">Teklifi Kaydet</button>
-      <span id="saveMsg" class="mut" style="align-self:center"></span>
-    </div>
+    <div class="card"><div class="row">
+      <div class="fld"><label>Satış Tutarı (hedef)</label><input id="satis" type="number" oninput="calcBank()" style="width:160px"></div>
+      <div class="fld"><label>Banka</label><select id="banka" onchange="loadTaksit()"></select></div>
+      <div class="fld"><label>Taksit</label><select id="taksit" onchange="calcBank()"></select></div>
+      <div class="grow"></div>
+      <div class="fld" style="text-align:right"><label>Aylık Taksit</label><span class="big" id="aylik">—</span></div>
+      <div class="fld" style="text-align:right"><label>Komisyon</label><span id="kom" class="mut">—</span></div>
+      <div class="fld" style="text-align:right"><label>Kâr</label><span class="big" id="karPct">—</span></div>
+    </div></div>
+    <div class="row" style="justify-content:flex-end"><button onclick="saveQuote()">Teklifi Kaydet</button><span id="saveMsg" class="mut" style="align-self:center"></span></div>
   </main>
 
-  <!-- YÖNETİM EKRANI -->
   <main id="adminView" style="display:none">
     <div class="card" id="bayilerCard">
       <h2>Bayiler <span class="badge">kayıt onayı / yönetim</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Yeni kayıtlar <b>pasif</b> gelir; "Aktif Yap" deyince veriyi görür.</p>
-      <table><thead><tr><th>Ad / Mağaza</th><th>Marka</th><th>Rol</th><th>Durum</th><th>İşlem</th></tr></thead>
-        <tbody id="bayiList"></tbody></table>
+      <table><thead><tr><th>Ad / Mağaza</th><th>Marka</th><th>Rol</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="bayiList"></tbody></table>
       <div id="bayiMsg" class="msg"></div>
     </div>
 
-    <div class="card">
-      <h2>Aylık Veri Güncelleme <span class="badge">BSH dosyası</span></h2>
-      <div class="row">
-        <div class="fld"><label>Marka</label><select id="admBrand"><option value="siemens">Siemens</option><option value="bosch">Bosch</option></select></div>
-        <div class="fld"><label>Dönem (ay)</label><input id="admMonth" type="month"></div>
-        <div class="fld"><label>Dosya .xlsx</label><input id="admFile" type="file" accept=".xlsx,.xls"></div>
-        <button class="sm" onclick="admRead()">Dosyayı Oku</button>
-      </div>
-      <div id="admSheets" class="mut" style="font-size:12px;margin-top:8px"></div>
-      <div class="row" style="margin-top:10px">
-        <div class="fld"><label>Perakende sayfası</label><select id="admPerSheet"></select></div>
-        <button onclick="admWrite()" id="admWriteBtn" disabled>DB'ye Yaz</button>
-      </div>
-      <div id="admMsg" class="msg"></div>
-    </div>
+    <h2 style="margin:4px 0 0">Merkezi Veri Yükleme <span class="badge">ayrı dosyalar</span></h2>
+    <p class="mut" style="font-size:13px;margin:4px 0 12px">Her veri türü için BSH'den gelen ham dosyayı ayrı yükle. Sistem sütunları otomatik tanır; yanlışsa açılır menüden düzelt.</p>
+    <div id="importers"></div>
 
     <div class="card">
-      <h2>Merkez Stok (senin mağazaların)</h2>
+      <h2>Ayrılmış / Emanet Stok (merkez)</h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Her satır: <code>MODEL [tab] mars [tab] horoz [tab] emanet</code></p>
-      <div class="row" style="margin-bottom:8px"><div class="fld"><label>Marka</label>
-        <select id="ayrBrand"><option value="siemens">Siemens</option><option value="bosch">Bosch</option></select></div></div>
+      <div class="row" style="margin-bottom:8px"><div class="fld"><label>Marka</label><select id="ayrBrand"><option value="siemens">Siemens</option><option value="bosch">Bosch</option></select></div></div>
       <textarea id="ayrText" placeholder="KG86PAXB0N	2	1	0"></textarea>
       <div class="row" style="margin-top:8px"><button onclick="admAyrilmis()">Kaydet</button><span id="ayrMsg" class="msg"></span></div>
     </div>
@@ -215,35 +175,49 @@
         <button onclick="admKampanya()">Ekle</button>
       </div>
       <div id="kMsg" class="msg"></div>
-      <table style="margin-top:12px"><thead><tr><th>Ad</th><th>Marka</th><th>Eşleşme</th><th>Müşteri ₺</th><th>Hakediş ₺</th><th>Bitiş</th><th></th></tr></thead>
-        <tbody id="kList"></tbody></table>
+      <table style="margin-top:12px"><thead><tr><th>Ad</th><th>Marka</th><th>Eşleşme</th><th>Müşteri ₺</th><th>Hakediş ₺</th><th>Bitiş</th><th></th></tr></thead><tbody id="kList"></tbody></table>
     </div>
   </main>
 </div>
 
 <script>
-// ====== AYAR ======
 const SUPABASE_URL = "https://xooknwhvxmkfoiaaosui.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Hq44fpVzfZfTvcPQZL-5xw_8kmLRl19";
-// ==================
 
 let sb, brand="siemens", quoteRows=[];
 let profil = {rol:"bayi", marka_erisimi:["siemens","bosch"], abonelik_durumu:"pasif"};
-let wbCache=null;
+let impState = {};
 
 function fmt(n){ if(n==null||isNaN(n)) return "—"; return Number(n).toLocaleString("tr-TR",{maximumFractionDigits:0}); }
 function isNum(v){ return v!==null&&v!==undefined&&v!==""&&!isNaN(parseFloat(v))&&isFinite(v); }
 function $(id){ return document.getElementById(id); }
 
-window.addEventListener("DOMContentLoaded", init);
+// ===== Ayrı yükleme kutuları tanımı =====
+const IMPORTERS = {
+  toptan:{ title:"Toptan Fiyat", target:"toptan_fiyatlar", conflict:"model_kodu,marka,donem", donem:true, alsoUrunler:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",kw:/KOD|MODEL|MALZEME/i,type:"text"},
+          {key:"urun_adi",label:"Ürün Adı (ops.)",kw:/TANIM|ADI|İS[İI]M|GRUP/i,type:"text",optional:true},
+          {key:"toptan_fiyat",label:"Toptan Fiyat",kw:/TOPTAN|F[İI]YAT|FIYAT/i,type:"num"}] },
+  perakende:{ title:"Perakende Fiyat", target:"perakende_fiyatlar", conflict:"model_kodu,marka,donem", donem:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",kw:/KOD|MODEL|TANIM/i,type:"text"},
+          {key:"nakit_fiyat",label:"Nakit / Peşin",kw:/NAK[İI]T|PE[ŞS][İI]N/i,type:"num"},
+          {key:"taksit_fiyat",label:"Taksitli (ops.)",kw:/TAKS[İI]T/i,type:"num",optional:true}] },
+  bip:{ title:"BİP", target:"bip", conflict:"model_kodu,marka,donem", donem:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",kw:/KOD|MODEL/i,type:"text"},
+          {key:"bip_tutar",label:"BİP Tutarı",kw:/B[İI]P|TUTAR|FARK/i,type:"num"}] },
+  stok:{ title:"Merkez Stok (mağazaların)", target:"stok", conflict:"model_kodu,marka,depo", depo:true, snapshot:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",kw:/KOD|MODEL|MALZEME|URUN/i,type:"text"},
+          {key:"adet",label:"Adet / Miktar",kw:/ADET|M[İI]KTAR|SATILAB[İI]L[İI]R|STOK/i,type:"num"}] }
+};
 
+window.addEventListener("DOMContentLoaded", init);
 async function init(){
   if(SUPABASE_URL.startsWith("BURAYA")||SUPABASE_ANON_KEY.startsWith("BURAYA")){ $("cfgWarn").style.display="block"; return; }
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const {data:{session}} = await sb.auth.getSession();
   session ? showApp(session) : show("loginView");
   sb.auth.onAuthStateChange((_e,s)=> s? showApp(s) : show("loginView"));
-  const mm=$("admMonth"); if(mm){ const d=new Date(); mm.value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+  buildImporters();
 }
 function show(id){ ["loginView","appView","pendingView"].forEach(v=> $(v).style.display = v===id?"block":"none"); }
 function showSignup(){ $("loginCard").style.display="none"; $("signupCard").style.display="flex"; }
@@ -259,29 +233,24 @@ async function signUp(){
   if(!ad||!email||pass.length<6){ $("suMsg").className="err"; $("suMsg").textContent="Ad, e-posta ve en az 6 karakter şifre gerekli."; return; }
   const {error}=await sb.auth.signUp({email, password:pass, options:{data:{ad, magaza, marka}}});
   if(error){ $("suMsg").className="err"; $("suMsg").textContent="Hata: "+error.message; return; }
-  $("suMsg").className="ok-msg";
-  $("suMsg").textContent="✓ Kaydın alındı. Yönetici onayından sonra giriş yapabilirsin.";
+  $("suMsg").className="ok-msg"; $("suMsg").textContent="✓ Kaydın alındı. Yönetici onayından sonra giriş yapabilirsin.";
 }
 async function signOut(){ await sb.auth.signOut(); quoteRows=[]; }
 
 async function showApp(session){
   await loadProfil(session.user.id);
-  // pasif bayi -> onay bekliyor
   if(profil.rol!=="admin" && profil.abonelik_durumu==="pasif"){ show("pendingView"); return; }
   show("appView");
   $("who").textContent = session.user.email;
   applyBrandAccess();
-  // rol bazlı görünürlük
   const editor = profil.rol==="admin" || profil.rol==="personel";
   $("adminBtn").style.display = editor ? "" : "none";
   $("bayilerCard").style.display = profil.rol==="admin" ? "" : "none";
   $("bayiStokCard").style.display = profil.rol==="bayi" ? "" : "none";
-  if(profil.rol==="bayi"){ $("thS1").textContent="Stoğum"; $("thS2").textContent=""; }
-  else { $("thS1").textContent="Mars"; $("thS2").textContent="Horoz"; }
+  if(profil.rol==="bayi"){ $("thS1").textContent="Stoğum"; $("thS2").textContent=""; } else { $("thS1").textContent="Mars"; $("thS2").textContent="Horoz"; }
   await loadBanks();
   if(quoteRows.length===0) addRow();
 }
-
 async function loadProfil(uid){
   const {data} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu").eq("id",uid).maybeSingle();
   if(data) profil = data;
@@ -307,13 +276,12 @@ function toggleAdmin(){
   if(showAdmin){ loadKampanyalar(); if(profil.rol==="admin") loadBayiler(); }
 }
 
-// ============ BAYİLER YÖNETİMİ (admin) ============
+// ===== BAYİLER =====
 async function loadBayiler(){
   const {data} = await sb.from("profiller").select("id,ad,magaza,rol,abonelik_durumu,marka_erisimi").order("created_at",{ascending:false});
   const tb=$("bayiList"); if(!tb) return;
   tb.innerHTML=(data||[]).map(p=>{
-    const aktif=p.abonelik_durumu==="aktif";
-    const mk=(p.marka_erisimi||[]).join(", ")||"—";
+    const aktif=p.abonelik_durumu==="aktif"; const mk=(p.marka_erisimi||[]).join(", ")||"—";
     return `<tr>
       <td><b>${p.ad||"—"}</b><div class="mut" style="font-size:12px">${p.magaza||""}</div></td>
       <td>${mk}</td><td>${p.rol}</td>
@@ -323,38 +291,40 @@ async function loadBayiler(){
         <button class="ghost sm" onclick="setBayiMarka('${p.id}','siemens')">Siemens</button>
         <button class="ghost sm" onclick="setBayiMarka('${p.id}','bosch')">Bosch</button>
         <button class="ghost sm" onclick="setBayiRol('${p.id}','${p.rol==='personel'?'bayi':'personel'}')">${p.rol==='personel'?'Bayi yap':'Personel yap'}</button>
+        <button class="bad sm" onclick="silBayi('${p.id}','${(p.ad||'').replace(/'/g,'')}')">Sil</button>
       </td></tr>`;
   }).join("");
 }
 async function setBayiDurum(id,durum){ await sb.from("profiller").update({abonelik_durumu:durum}).eq("id",id); loadBayiler(); }
 async function setBayiMarka(id,marka){ await sb.from("profiller").update({marka_erisimi:[marka]}).eq("id",id); loadBayiler(); }
 async function setBayiRol(id,rol){ await sb.from("profiller").update({rol:rol}).eq("id",id); loadBayiler(); }
+async function silBayi(id,ad){
+  if(!confirm((ad||"Bu bayi")+" silinsin mi? (Listeden kaldırılır. Hesabı tamamen silmek için Supabase > Authentication > Users)")) return;
+  await sb.from("bayi_stok").delete().eq("bayi_id",id);
+  await sb.from("profiller").delete().eq("id",id);
+  loadBayiler();
+}
 
-// ============ BAYİ STOK YÜKLEME ============
+// ===== BAYİ STOK =====
 async function bayiStokYukle(){
   try{
     const {data:{user}} = await sb.auth.getUser();
     const f=$("bsFile").files[0]; const msg=$("bsMsg");
     if(!f){ msg.className="msg bad"; msg.textContent="Dosya seç."; return; }
     msg.className="msg"; msg.textContent="Okunuyor...";
-    const buf=await f.arrayBuffer();
-    const wb=XLSX.read(buf,{type:"array"});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null});
     const out=[]; const seen=new Set();
-    for(const r of rows){ let m=r[0],a=r[1];
-      if(m==null||!isNum(a)) continue; m=(""+m).trim().toUpperCase();
-      if(seen.has(m))continue; seen.add(m);
-      out.push({bayi_id:user.id, model_kodu:m, marka:brand, adet:+a}); }
+    for(const r of rows){ let m=r[0],a=r[1]; if(m==null||!isNum(a))continue; m=(""+m).trim().toUpperCase(); if(seen.has(m))continue; seen.add(m); out.push({bayi_id:user.id,model_kodu:m,marka:brand,adet:+a}); }
     if(!out.length){ msg.className="msg bad"; msg.textContent="Geçerli satır yok (1.sütun kod, 2.sütun adet)."; return; }
     await sb.from("bayi_stok").delete().eq("bayi_id",user.id).eq("marka",brand);
-    await upsert("bayi_stok", out, "bayi_id,model_kodu,marka");
+    await upsert("bayi_stok",out,"bayi_id,model_kodu,marka");
     msg.className="msg ok"; msg.textContent=`✓ ${out.length} ürün stoğun yüklendi (${brand}).`;
     quoteRows.forEach(r=>refetch(r));
   }catch(e){ $("bsMsg").className="msg bad"; $("bsMsg").textContent="Hata: "+e.message; }
 }
 
-// ============ TEKLİF / ÜRÜN ============
+// ===== TEKLİF / ÜRÜN =====
 function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,nakit:null,taksit:null,maliyet:null,kar:null,s1:null,s2:null}); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function renderRows(){
@@ -379,7 +349,6 @@ function renderRows(){
   calcBank();
 }
 async function onCode(i,val){ quoteRows[i].kod=val.trim().toUpperCase(); await refetch(quoteRows[i]); }
-
 let acRow=-1, acTimer=null;
 function onCodeInput(i,val,el){ quoteRows[i].kod=val.toUpperCase(); clearTimeout(acTimer); acTimer=setTimeout(()=>showAC(i,val,el),150); }
 async function showAC(i,val,el){
@@ -388,15 +357,12 @@ async function showAC(i,val,el){
   const {data} = await sb.from("urunler").select("model_kodu,urun_adi").eq("marka",brand).or(`model_kodu.ilike.%${q}%,urun_adi.ilike.%${q}%`).limit(15);
   if(!data||!data.length){ ac.classList.remove("show"); return; }
   acRow=i;
-  ac.innerHTML=data.map(p=>{ const code=(p.model_kodu||"").replace(/'/g,"\\'");
-    return `<div class="ac-item" onmousedown="pickProduct('${code}')"><span class="ac-code">${p.model_kodu}</span><span class="ac-name">${p.urun_adi||""}</span></div>`; }).join("");
+  ac.innerHTML=data.map(p=>{ const code=(p.model_kodu||"").replace(/'/g,"\\'"); return `<div class="ac-item" onmousedown="pickProduct('${code}')"><span class="ac-code">${p.model_kodu}</span><span class="ac-name">${p.urun_adi||""}</span></div>`; }).join("");
   const rc=el.getBoundingClientRect();
-  ac.style.left=(rc.left+window.scrollX)+"px"; ac.style.top=(rc.bottom+window.scrollY+2)+"px"; ac.style.width=Math.max(rc.width,340)+"px";
-  ac.classList.add("show");
+  ac.style.left=(rc.left+window.scrollX)+"px"; ac.style.top=(rc.bottom+window.scrollY+2)+"px"; ac.style.width=Math.max(rc.width,340)+"px"; ac.classList.add("show");
 }
 function pickProduct(code){ if(acRow<0)return; quoteRows[acRow].kod=code; $("ac").classList.remove("show"); refetch(quoteRows[acRow]); }
 function hideAC(){ setTimeout(()=>$("ac").classList.remove("show"),180); }
-
 async function refetch(r){
   if(!r.kod){ renderRows(); return; }
   const {data:f} = await sb.rpc("urun_fiyat",{p_model_kodu:r.kod,p_marka:brand});
@@ -405,7 +371,6 @@ async function refetch(r){
     r.ad=row.urun_adi||r.kod; r.nakit=row.nakit_fiyat; r.taksit=row.taksit_fiyat; r.maliyet=row.net_maliyet;
     r.kar=(row.net_maliyet&&row.nakit_fiyat)?(row.nakit_fiyat/row.net_maliyet-1)*100:null;
   } else { r.ad="— bulunamadı —"; r.nakit=r.taksit=r.maliyet=r.kar=null; }
-  // STOK: bayi -> kendi stoğu (bayi_stok); admin/personel -> merkez (stok)
   r.s1=r.s2=null;
   if(profil.rol==="bayi"){
     const {data:bs}=await sb.from("bayi_stok").select("adet").eq("model_kodu",r.kod).eq("marka",brand).maybeSingle();
@@ -416,7 +381,6 @@ async function refetch(r){
   }
   renderRows();
 }
-
 async function loadBanks(){
   const {data}=await sb.from("banka_komisyonlari").select("banka").order("banka");
   const uniq=[...new Set((data||[]).map(x=>x.banka))];
@@ -447,75 +411,130 @@ async function saveQuote(){
   msg.textContent=error?"Hata: "+error.message:"✓ Teklif kaydedildi"; msg.className=error?"bad":"ok";
 }
 
-// ============ ADMIN VERİ ============
-function adminMsg(id,t,cls){ const e=$(id); e.textContent=t; e.className="msg "+(cls||""); }
+// ===== AYRI YÜKLEME KUTULARI =====
+function impMsg(k,t,cls){ const e=$(k+"_msg"); if(e){ e.textContent=t; e.className="msg "+(cls||""); } }
 async function upsert(table,rows,conflict){
   for(let i=0;i<rows.length;i+=400){ const {error}=await sb.from(table).upsert(rows.slice(i,i+400),{onConflict:conflict}); if(error) throw new Error(table+": "+error.message); }
 }
-function aoa(name){ const ws=wbCache.Sheets[name]; return ws?XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}):null; }
-function dstr(v){ return (v instanceof Date)?v.toISOString().slice(0,10):null; }
-async function admRead(){
-  const f=$("admFile").files[0];
-  if(!f){ adminMsg("admMsg","Önce dosya seç.","bad"); return; }
-  adminMsg("admMsg","Okunuyor...");
-  wbCache=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
-  const names=wbCache.SheetNames;
-  $("admSheets").textContent="Sayfalar: "+names.join(", ");
-  const sel=$("admPerSheet"); sel.innerHTML=names.map(n=>`<option>${n}</option>`).join("");
-  sel.value=names.find(n=>/PERAKENDE/i.test(n))||names.find(n=>/HAZİRAN|MAYIS|NİSAN|TEMMUZ|AĞUSTOS|EYLÜL|EKİM|KASIM|ARALIK|OCAK|ŞUBAT|MART|20\d\d/i.test(n))||names[0];
-  $("admWriteBtn").disabled=false;
-  adminMsg("admMsg","Dosya okundu. Marka, dönem, perakende sayfasını kontrol edip 'DB'ye Yaz'a bas.","ok");
+function colLetter(i){ return XLSX.utils.encode_col(i); }
+function buildImporters(){
+  const c=$("importers"); if(!c) return;
+  const ym=new Date(); const mon=ym.getFullYear()+"-"+String(ym.getMonth()+1).padStart(2,"0");
+  c.innerHTML=Object.entries(IMPORTERS).map(([k,cfg])=>`
+    <div class="card">
+      <h2>${cfg.title}</h2>
+      <div class="row">
+        <div class="fld"><label>Marka</label><select id="${k}_marka"><option value="siemens">Siemens</option><option value="bosch">Bosch</option></select></div>
+        ${cfg.donem?`<div class="fld"><label>Dönem</label><input id="${k}_donem" type="month" value="${mon}"></div>`:""}
+        ${cfg.depo?`<div class="fld"><label>Depo</label><select id="${k}_depo"><option value="mars">Mars</option><option value="horoz">Horoz</option><option value="kadikoy">Kadıköy</option></select></div>`:""}
+        <div class="fld"><label>Dosya</label><input id="${k}_file" type="file" accept=".xlsx,.xls,.csv"></div>
+        <button class="sm" onclick="impRead('${k}')">Oku</button>
+      </div>
+      <div id="${k}_map" class="row" style="margin-top:10px;display:none"></div>
+      <div id="${k}_prev" class="prev" style="margin-top:8px;display:none"></div>
+      <div class="row" style="margin-top:8px"><button id="${k}_write" onclick="impWrite('${k}')" disabled>DB'ye Yaz</button><span id="${k}_msg" class="msg"></span></div>
+    </div>`).join("");
 }
-async function admWrite(){
+function sheetAoa(wb,name){ return XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null}); }
+function autodetect(aoa,cols){
+  let best={hr:0,score:-1,cols:cols.map((_,i)=>i)};
+  for(let r=0;r<Math.min(aoa.length,15);r++){
+    const row=aoa[r]||[];
+    const found=cols.map(c=>{ for(let i=0;i<row.length;i++){ const v=row[i]; if(v!=null && c.kw.test(""+v)) return i; } return -1; });
+    const score=found.filter(x=>x>=0).length;
+    if(score>best.score) best={hr:r,score,cols:found};
+  }
+  best.cols=best.cols.map((x,i)=> x>=0?x:(cols[i].optional?-1:i));
+  return best;
+}
+async function impRead(k){
+  const cfg=IMPORTERS[k]; const f=$(k+"_file").files[0];
+  if(!f){ impMsg(k,"Dosya seç.","bad"); return; }
+  impMsg(k,"Okunuyor...");
+  impState[k]={ wb: XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true}) };
+  impState[k].sheet=null;
+  renderMap(k);
+  impMsg(k,"Sütunları kontrol et, sonra 'DB'ye Yaz'.","ok");
+}
+function renderMap(k){
+  const cfg=IMPORTERS[k], st=impState[k], wb=st.wb, names=wb.SheetNames;
+  if(!st.sheet||!names.includes(st.sheet)) st.sheet=names[0];
+  const aoa=sheetAoa(wb,st.sheet); st.aoa=aoa;
+  const det=autodetect(aoa,cfg.cols); st.hr=det.hr;
+  let maxc=1; aoa.slice(0,30).forEach(r=>{ if(r) maxc=Math.max(maxc,r.length); });
+  const opt=(sel,allowNone)=>{ let o=allowNone?`<option value="-1" ${sel<0?'selected':''}>(yok)</option>`:""; for(let i=0;i<maxc;i++){ o+=`<option value="${i}" ${i===sel?'selected':''}>${colLetter(i)}</option>`; } return o; };
+  const mapDiv=$(k+"_map"); mapDiv.style.display="flex";
+  mapDiv.innerHTML=
+    `<div class="fld"><label>Sayfa</label><select onchange="impSheet('${k}',this.value)">${names.map(n=>`<option ${n===st.sheet?'selected':''}>${n}</option>`).join("")}</select></div>`+
+    `<div class="fld"><label>Başlık satırı</label><input type="number" id="${k}_hr" value="${det.hr+1}" style="width:90px" onchange="impState['${k}'].hr=(+this.value-1);impPreview('${k}')"></div>`+
+    cfg.cols.map((c,ci)=>`<div class="fld"><label>${c.label}</label><select id="${k}_c${ci}" onchange="impPreview('${k}')">${opt(det.cols[ci],!!c.optional)}</select></div>`).join("");
+  $(k+"_write").disabled=false;
+  impPreview(k);
+}
+function impSheet(k,name){ impState[k].sheet=name; renderMap(k); }
+function impMapping(k){ const cfg=IMPORTERS[k]; return cfg.cols.map((c,ci)=>+$(k+"_c"+ci).value); }
+function impPreview(k){
+  const cfg=IMPORTERS[k], st=impState[k]; if(!st||!st.aoa) return;
+  const map=impMapping(k); const prev=$(k+"_prev"); prev.style.display="block";
+  let html="<table><thead><tr>"+cfg.cols.map(c=>`<th>${c.label}</th>`).join("")+"</tr></thead><tbody>";
+  let cnt=0;
+  for(let i=st.hr+1;i<st.aoa.length && cnt<5;i++){
+    const r=st.aoa[i]; if(!r) continue; let kod=r[map[0]]; if(kod==null||(""+kod).trim()==="") continue;
+    html+="<tr>"+cfg.cols.map((c,ci)=>{ const v= map[ci]<0? "" : r[map[ci]]; return `<td>${v==null?"":v}</td>`; }).join("")+"</tr>"; cnt++;
+  }
+  html+="</tbody></table>"; prev.innerHTML = cnt? html : "<div class='mut' style='padding:8px'>Önizlenecek satır bulunamadı — başlık satırı/sütunları kontrol et.</div>";
+}
+async function impWrite(k){
   try{
-    if(!wbCache){ adminMsg("admMsg","Önce dosya oku.","bad"); return; }
-    const mk=$("admBrand").value, mon=$("admMonth").value;
-    if(!mon){ adminMsg("admMsg","Dönem seç.","bad"); return; }
-    const donem=mon+"-01", perSheet=$("admPerSheet").value;
-    $("admWriteBtn").disabled=true; adminMsg("admMsg","Ayrıştırılıyor...");
-    const kod=aoa("KODLAR")||[]; const urunler=[],toptan=[]; const seen=new Set();
-    for(let i=2;i<kod.length;i++){ const r=kod[i]; let m=r[0]; if(m==null||(""+m).trim()==="")continue; m=(""+m).trim(); if(seen.has(m))continue; seen.add(m);
-      urunler.push({model_kodu:m,marka:mk,urun_adi:r[3],urun_grubu:r[2],marka_grubu:r[5],adet:isNum(r[4])?+r[4]:1});
-      if(isNum(r[1])) toptan.push({model_kodu:m,marka:mk,donem,toptan_fiyat:+r[1]}); }
-    const per=aoa(perSheet)||[]; const perak=[]; const ps=new Set();
-    for(let i=1;i<per.length;i++){ const r=per[i]; let m=r[0]; if(m==null)continue; const nak=r[2],tak=r[3]; if(!(isNum(nak)||isNum(tak)))continue; m=(""+m).trim(); if(ps.has(m))continue; ps.add(m);
-      perak.push({model_kodu:m,marka:mk,donem,nakit_fiyat:isNum(nak)?+nak:null,taksit_fiyat:isNum(tak)?+tak:null,adet:isNum(r[5])?+r[5]:1}); }
-    const bipS=aoa("BİP")||aoa("BiP")||[]; const bip=[]; const bs=new Set();
-    for(let i=1;i<bipS.length;i++){ const r=bipS[i]; let m=r[0]; if(m==null||!isNum(r[1]))continue; m=(""+m).trim(); if(bs.has(m))continue; bs.add(m); bip.push({model_kodu:m,marka:mk,donem,bip_tutar:+r[1]}); }
-    const stok=[];
-    [["MARS STOK","mars"],["HOROZ STOK","horoz"]].forEach(([sh,depo])=>{ const a=aoa(sh)||[]; const sset=new Set();
-      for(let i=0;i<a.length;i++){ const r=a[i]; let m=r[1],ad=r[2],tar=r[0]; if(m==null||m==="Malzeme Kodu"||m==="URUNKODU"||!isNum(ad))continue; m=(""+m).trim(); if(sset.has(m))continue; sset.add(m);
-        stok.push({model_kodu:m,marka:mk,depo,adet:+ad,stok_tarihi:dstr(tar)}); } });
-    const kad=aoa("KADIKÖY"); if(kad){ const kset=new Set(); for(let i=0;i<kad.length;i++){ const r=kad[i]; let m=r[0]; if(m==null||!isNum(r[1]))continue; m=(""+m).trim(); if(kset.has(m))continue; kset.add(m); stok.push({model_kodu:m,marka:mk,depo:"kadikoy",adet:+r[1],stok_tarihi:null}); } }
-    adminMsg("admMsg",`Yazılıyor... urunler:${urunler.length} toptan:${toptan.length} perakende:${perak.length} bip:${bip.length} stok:${stok.length}`);
-    await upsert("urunler",urunler,"model_kodu,marka");
-    await upsert("toptan_fiyatlar",toptan,"model_kodu,marka,donem");
-    await upsert("perakende_fiyatlar",perak,"model_kodu,marka,donem");
-    await upsert("bip",bip,"model_kodu,marka,donem");
-    await sb.from("stok").delete().eq("marka",mk);
-    await upsert("stok",stok,"model_kodu,marka,depo");
-    await sb.from("guncelleme_log").insert({donem,veri_turu:"aylik-import-"+mk,kayit_sayisi:urunler.length+toptan.length+perak.length+bip.length+stok.length});
-    adminMsg("admMsg",`✓ Tamam (${donem}). urunler:${urunler.length}, toptan:${toptan.length}, perakende:${perak.length}, bip:${bip.length}, stok:${stok.length}`,"ok");
-  }catch(e){ adminMsg("admMsg","Hata: "+e.message,"bad"); } finally{ $("admWriteBtn").disabled=false; }
+    const cfg=IMPORTERS[k], st=impState[k];
+    if(!st||!st.aoa){ impMsg(k,"Önce dosya oku.","bad"); return; }
+    const mk=$(k+"_marka").value; const map=impMapping(k);
+    let donem=null; if(cfg.donem){ const m=$(k+"_donem").value; if(!m){ impMsg(k,"Dönem seç.","bad"); return; } donem=m+"-01"; }
+    let depo=null; if(cfg.depo) depo=$(k+"_depo").value;
+    $(k+"_write").disabled=true; impMsg(k,"Yazılıyor...");
+    const seen=new Set(); const rows=[]; const urunler=[];
+    for(let i=st.hr+1;i<st.aoa.length;i++){
+      const r=st.aoa[i]; if(!r) continue;
+      let kod=r[map[0]]; if(kod==null||(""+kod).trim()==="") continue; kod=(""+kod).trim().toUpperCase();
+      const obj={model_kodu:kod, marka:mk};
+      cfg.cols.forEach((c,ci)=>{ if(ci===0) return; const v= map[ci]<0? null : r[map[ci]];
+        if(c.type==="num") obj[c.key]= isNum(v)? +v : null; else obj[c.key]= v==null?null:(""+v).trim(); });
+      if(donem) obj.donem=donem; if(depo) obj.depo=depo;
+      const hasVal=cfg.cols.slice(1).some(c=> obj[c.key]!=null && obj[c.key]!=="");
+      if(!hasVal) continue;
+      const dk=kod+"|"+(depo||""); if(seen.has(dk)) continue; seen.add(dk);
+      if(cfg.alsoUrunler) urunler.push({model_kodu:kod,marka:mk,urun_adi:obj.urun_adi||null});
+      const wr={...obj}; delete wr.urun_adi; rows.push(wr);
+    }
+    if(!rows.length){ impMsg(k,"Geçerli satır yok — sütun/başlık eşleşmesini kontrol et.","bad"); $(k+"_write").disabled=false; return; }
+    if(cfg.alsoUrunler) await upsert("urunler",urunler,"model_kodu,marka");
+    if(cfg.snapshot) await sb.from(cfg.target).delete().eq("marka",mk).eq("depo",depo);
+    await upsert(cfg.target,rows,cfg.conflict);
+    await sb.from("guncelleme_log").insert({donem:donem||new Date().toISOString().slice(0,10),veri_turu:k+"-"+mk,kayit_sayisi:rows.length});
+    impMsg(k,`✓ ${rows.length} satır yazıldı (${mk}${donem?", "+donem:""}${depo?", "+depo:""}).`,"ok");
+  }catch(e){ impMsg(k,"Hata: "+e.message,"bad"); } finally{ $(k+"_write").disabled=false; }
 }
+
+// ===== AYRILMIŞ + KAMPANYA =====
 function parseLines(txt){ return txt.split("\n").map(l=>l.trim()).filter(l=>l).map(l=>l.split(/\t|;|,/).map(c=>c.trim())); }
 async function admAyrilmis(){
   try{ const mk=$("ayrBrand").value;
     const rows=parseLines($("ayrText").value).map(c=>({model_kodu:c[0].toUpperCase(),marka:mk,mars:isNum(c[1])?+c[1]:0,horoz:isNum(c[2])?+c[2]:0,emanet:isNum(c[3])?+c[3]:0}));
-    if(!rows.length){ adminMsg("ayrMsg","Veri yok.","bad"); return; }
-    await upsert("ayrilmis",rows,"model_kodu,marka"); adminMsg("ayrMsg",`✓ ${rows.length} kayıt.`,"ok");
-  }catch(e){ adminMsg("ayrMsg","Hata: "+e.message,"bad"); }
+    if(!rows.length){ adminMsgEl("ayrMsg","Veri yok.","bad"); return; }
+    await upsert("ayrilmis",rows,"model_kodu,marka"); adminMsgEl("ayrMsg",`✓ ${rows.length} kayıt.`,"ok");
+  }catch(e){ adminMsgEl("ayrMsg","Hata: "+e.message,"bad"); }
 }
+function adminMsgEl(id,t,cls){ const e=$(id); e.textContent=t; e.className="msg "+(cls||""); }
 async function admKampanya(){
   try{
     const kat=$("kKat").value.split(",").map(s=>s.trim()).filter(s=>s);
     const mod=$("kMod").value.split(",").map(s=>s.trim().toUpperCase()).filter(s=>s);
     const rec={ad:$("kAd").value.trim(),marka:$("kMarka").value||null,match_type:$("kMatch").value,kategoriler:kat,secili_modeller:mod,
       musteri_indirimi:+$("kMus").value||0,hakedis:+$("kHak").value||0,kota:+$("kKota").value||null,bitis_tarihi:$("kBitis").value||null};
-    if(!rec.ad){ adminMsg("kMsg","Kampanya adı gir.","bad"); return; }
+    if(!rec.ad){ adminMsgEl("kMsg","Kampanya adı gir.","bad"); return; }
     const {error}=await sb.from("kampanyalar").insert(rec); if(error) throw new Error(error.message);
-    adminMsg("kMsg","✓ Kampanya eklendi.","ok"); $("kAd").value=""; loadKampanyalar();
-  }catch(e){ adminMsg("kMsg","Hata: "+e.message,"bad"); }
+    adminMsgEl("kMsg","✓ Kampanya eklendi.","ok"); $("kAd").value=""; loadKampanyalar();
+  }catch(e){ adminMsgEl("kMsg","Hata: "+e.message,"bad"); }
 }
 async function loadKampanyalar(){
   const {data}=await sb.from("kampanyalar").select("*").order("created_at",{ascending:false});
