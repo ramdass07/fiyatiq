@@ -601,9 +601,9 @@ function renderKampanyaPanel(){
   const indT=appliedIds.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
   const hakT=appliedIds.reduce((a,k)=>a+(k.hakedis||0),0);
   list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın — kampanya kotası/geçerliliği Diva'dan teyit edilmeden satışı tamamlamayın.</div>`
-    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Aşağıdaki kampanyalar bu sepete <b>uygun</b>. İndirim/hakediş ancak <b>"Uygula"</b> dediğinde işlenir.</div>`
-    +ks.map(k=>{ const on=secilenKampanya.has(k.id); return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0">
-      <div style="flex:1"><b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}</div>
+    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Aşağıdaki kampanyalar bu sepete <b>uygun</b>. İndirim/hakediş ancak <b>"Uygula"</b> dediğinde işlenir. <b>Set</b> kampanyalar birbiriyle <b>birleşmez</b> (birini seçince diğeri kalkar); <b>tekil/hediye</b> kampanyalar ayrıca eklenebilir.</div>`
+    +ks.map(k=>{ const on=secilenKampanya.has(k.id); const bndl=isBundleKamp(k); return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0">
+      <div style="flex:1"><span class="badge" style="font-size:9px;background:${bndl?'rgba(245,158,11,.2)':'rgba(34,197,94,.2)'}">${bndl?'SET':'TEKİL'}</span> <b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}</div>
       <div class="mut" style="font-size:13px;margin:0 14px">İndirim <b style="color:var(--ok)">${fmt(k.musteri_indirimi)} ₺</b> · Hakediş <b style="color:var(--acc)">${fmt(k.hakedis)} ₺</b></div>
       <button class="${on?'':'ghost '}sm" style="${on?'background:var(--ok);color:#06200f':''}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button>
     </div>`;}).join("")
@@ -613,7 +613,19 @@ function renderKampanyaPanel(){
       </div>`;
   panel.style.display="";
 }
-function toggleKampanya(id){ if(secilenKampanya.has(id)) secilenKampanya.delete(id); else secilenKampanya.add(id); renderRows(); }
+function isBundleKamp(k){ return ['all','all+any','any2'].includes(k&&k.match_type); }
+function toggleKampanya(id){
+  const k=aktifKampanyalar.find(x=>x.id===id);
+  if(secilenKampanya.has(id)){ secilenKampanya.delete(id); }
+  else {
+    // Set (bundle) kampanyalar birbiriyle birleşmez → yeni set seçilince eski set kalkar
+    if(isBundleKamp(k)){
+      [...secilenKampanya].forEach(sid=>{ const sk=aktifKampanyalar.find(x=>x.id===sid); if(sk&&isBundleKamp(sk)) secilenKampanya.delete(sid); });
+    }
+    secilenKampanya.add(id);
+  }
+  renderRows();
+}
 async function onCode(i,val){ quoteRows[i].kod=val.trim().toUpperCase(); await refetch(quoteRows[i]); }
 let acRow=-1, acTimer=null;
 function onCodeInput(i,val,el){ quoteRows[i].kod=val.toUpperCase(); clearTimeout(acTimer); acTimer=setTimeout(()=>showAC(i,val,el),150); }
