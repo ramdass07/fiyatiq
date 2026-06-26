@@ -148,6 +148,7 @@
       <div class="fld" style="text-align:right"><label>Peşin Toplam</label><span class="big" id="sumNakit">—</span></div>
       <div class="fld" style="text-align:right"><label>Taksitli Toplam</label><span class="big" id="sumTaksit">—</span></div>
       <div class="fld" style="text-align:right"><label>Aylık Taksit</label><span id="aylik" class="mut">—</span></div>
+      <div class="fld" style="text-align:right"><label>Komisyon</label><span id="komShow" class="mut">—</span></div>
       <div class="fld" style="text-align:right"><label>Kâr</label><span class="big" id="karPct">—</span></div>
     </div>
     <div class="row" id="kampInfoRow" style="margin-top:6px;display:none"><span id="kampInfo" class="mut" style="font-size:12px"></span></div>
@@ -521,6 +522,7 @@ function renderRows(){
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
   if($("sumTaksit")) $("sumTaksit").textContent= komis>0? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= (komis>0&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
+  if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.textContent=tBipli>0?karPct.toFixed(1)+'%':'—'; e.className="big "+(tBipli<=0?'':(karPct<3?'bad':karPct<8?'warn':'ok')); }
   const kr=$("kampInfoRow");
   if(kr){ if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygulandı: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.`; } else kr.style.display="none"; }
@@ -579,7 +581,12 @@ function matchKampanyalar(){
 function renderKampanyaPanel(){
   const panel=$("kampPanel"), list=$("kampList"); if(!panel||!list) return;
   const ks=matchKampanyalar();
-  if(!ks.length){ panel.style.display="none"; list.innerHTML=""; return; }
+  if(!ks.length){
+    panel.style.display="";
+    const markaAd=brand==='bosch'?'Bosch':'Siemens';
+    list.innerHTML=`<div class="mut" style="font-size:12px">Ürün ekledikçe <b>${markaAd}</b> için uygun kampanyalar burada otomatik çıkar.${aktifKampanyalar.length?'':` Şu an ${markaAd} markasında tanımlı aktif kampanya yok.`}</div>`;
+    return;
+  }
   const toplamNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
   const indT=ks.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
   const hakT=ks.reduce((a,k)=>a+(k.hakedis||0),0);
