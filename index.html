@@ -497,7 +497,7 @@ function renderRows(){
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC()"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
-      <td>${r.ad||""}${r.isET?' <span class="badge" style="font-size:9px">E.T.</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="Kadıköy deposunda ${r.sKadikoy} adet — ÖNCELİK buradan ver">KD</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+      <td>${r.ad||""}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="Kadıköy deposunda ${r.sKadikoy} adet — ÖNCELİK buradan ver">KD</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -505,7 +505,7 @@ function renderRows(){
       <td class="num">${fmt(taksitL)}</td>
       <td class="num ${!valid?'':(p.karPct<3?'bad':p.karPct<8?'warn':'ok')}">${valid?p.karPct.toFixed(1)+'%':'—'}</td>
       <td class="num">${stokCell(r.s1)}</td><td class="num">${stokCell(r.s2)}</td>
-      <td style="white-space:nowrap"><button class="ghost sm" title="Elle toptan gir (E.T.)" onclick="quoteRows[${i}].isET=!quoteRows[${i}].isET;recalc()">E.T.</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
+      <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan fiyat girişi" onclick="quoteRows[${i}].isET=!quoteRows[${i}].isET;recalc()">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
   const ks=matchKampanyalar();
