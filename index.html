@@ -161,14 +161,6 @@
     <div id="importers"></div>
 
     <div class="card">
-      <h2>Ayrılmış / Emanet Stok (merkez)</h2>
-      <p class="mut" style="font-size:12px;margin:0 0 8px">Her satır: <code>MODEL [tab] mars [tab] horoz [tab] emanet</code></p>
-      <div class="row" style="margin-bottom:8px"><div class="fld"><label>Marka</label><select id="ayrBrand"><option value="siemens">Siemens</option><option value="bosch">Bosch</option></select></div></div>
-      <textarea id="ayrText" placeholder="KG86PAXB0N	2	1	0"></textarea>
-      <div class="row" style="margin-top:8px"><button onclick="admAyrilmis()">Kaydet</button><span id="ayrMsg" class="msg"></span></div>
-    </div>
-
-    <div class="card">
       <h2>Kampanya / Paket Tanımla</h2>
       <div class="row">
         <div class="fld"><label>Kampanya adı</label><input id="kAd" placeholder="2'li Beyaz Eşya"></div>
@@ -203,6 +195,7 @@ let impState = {};
 function fmt(n){ if(n==null||isNaN(n)) return "—"; return Number(n).toLocaleString("tr-TR",{maximumFractionDigits:0}); }
 function isNum(v){ return v!==null&&v!==undefined&&v!==""&&!isNaN(parseFloat(v))&&isFinite(v); }
 function $(id){ return document.getElementById(id); }
+function araLink(code){ return "https://www.google.com/search?q="+encodeURIComponent(code+" "+(brand==="bosch"?"bosch":"siemens")+" home"); }
 
 // ===== Ayrı yükleme kutuları tanımı =====
 const IMPORTERS = {
@@ -218,9 +211,10 @@ const IMPORTERS = {
           {key:"bip_tutar",label:"BİP (kdv li)",type:"num",skw:["kdv","bip"],sneg:["haric"]}] },
   phaseout:{ title:"Phase-Out (üretimi biten)", target:"phaseout", conflict:"model_kodu,marka", codesOnly:true,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"}] },
-  stok:{ title:"Merkez Stok (mağazaların)", target:"stok", conflict:"model_kodu,marka,depo", depo:true, snapshot:true,
-    cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
-          {key:"adet",label:"Adet / Miktar",type:"num",skw:["adet","miktar","satilab","stok"]}] }
+  stok:{ title:"Mevcut Stok (Mars/Horoz/Kadıköy)", target:"stok", conflict:"model_kodu,marka,depo,tip", depo:true, tip:"mevcut", snapshot:true, stockMode:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},{key:"adet",label:"Adet",type:"num"}] },
+  ayrilmisstok:{ title:"Ayrılmış Stok (Mars/Horoz/Kadıköy)", target:"stok", conflict:"model_kodu,marka,depo,tip", depo:true, tip:"ayrilmis", snapshot:true, stockMode:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},{key:"adet",label:"Adet",type:"num"}] }
 };
 
 window.addEventListener("DOMContentLoaded", init);
@@ -351,7 +345,7 @@ function renderRows(){
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
       <td>${r.ad||""}</td>
       <td><input style="width:60px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;renderRows()"></td>
-      <td class="num">${fmt(r.nakit)}</td><td class="num">${fmt(r.taksit)}</td><td class="num">${fmt(r.maliyet)}</td>
+      <td class="num">${fmt(r.nakit)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="Ürünü ${brand==='bosch'?'Bosch':'Siemens'} sitesinde ara" style="text-decoration:none">🔍</a>`:""}</td><td class="num">${fmt(r.taksit)}</td><td class="num">${fmt(r.maliyet)}</td>
       <td class="num ${r.kar==null?'':(r.kar<3?'bad':r.kar<8?'warn':'ok')}">${r.kar==null?'—':r.kar.toFixed(1)+'%'}</td>
       <td class="num">${r.s1??'—'}</td><td class="num">${r.s2??'—'}</td>
       <td><button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
@@ -390,8 +384,10 @@ async function refetch(r){
     const {data:bs}=await sb.from("bayi_stok").select("adet").eq("model_kodu",r.kod).eq("marka",brand).maybeSingle();
     r.s1 = bs? bs.adet : 0;
   } else {
-    const {data:st}=await sb.from("stok").select("depo,adet").eq("model_kodu",r.kod).eq("marka",brand);
-    (st||[]).forEach(x=>{ if(x.depo==='mars')r.s1=x.adet; if(x.depo==='horoz')r.s2=x.adet; });
+    const {data:st}=await sb.from("stok").select("depo,tip,adet").eq("model_kodu",r.kod).eq("marka",brand);
+    const acc={mars:0,horoz:0,kadikoy:0};
+    (st||[]).forEach(x=>{ const sg=x.tip==='ayrilmis'?-1:1; acc[x.depo]=(acc[x.depo]||0)+sg*(x.adet||0); });
+    r.s1=acc.mars; r.s2=acc.horoz;
   }
   renderRows();
 }
@@ -497,6 +493,29 @@ function numFallback(aoa,dataStart,codeCol){
   const cnt={}; for(let i=dataStart;i<Math.min(aoa.length,dataStart+40);i++){ const r=aoa[i]||[]; for(let j=0;j<r.length;j++){ if(j!==codeCol && isNum(r[j])) cnt[j]=(cnt[j]||0)+1; } }
   let col=-1,mx=0; for(const j in cnt){ if(cnt[j]>mx){mx=cnt[j];col=+j;} } return col;
 }
+// BSH stok formatları: Mars (hacim), Horoz (satılabilir-bloke), Kadıköy (düz)
+function parseStockRows(aoa){
+  let hdr=-1;
+  for(let i=0;i<Math.min(aoa.length,5);i++){ const t=(aoa[i]||[]).map(tkey);
+    if(t.some(x=>x.includes("hacim")) || t.some(x=>x.includes("urunkodu")||x.includes("malzeme kodu")) || t.some(x=>x==="satilabilir")){ hdr=i; break; } }
+  const out=[], seen=new Set();
+  if(hdr>=0){
+    const H=(aoa[hdr]||[]).map(tkey);
+    const col=(keys,exact)=>{ for(let j=0;j<H.length;j++){ const h=H[j]; if(exact? keys.includes(h) : keys.some(k=>h.includes(k))) return j; } return -1; };
+    const cCode=col(["malzeme kodu","urunkodu","urun kodu"]);
+    const cBirim=col(["birim hacim"]), cToplam=col(["toplam hacim"]);
+    const cSat=col(["satilabilir"],true), cBloke=col(["bloke"],true);
+    for(let i=hdr+1;i<aoa.length;i++){ const r=aoa[i]||[]; if(cCode<0||!isCode(r[cCode])) continue; const kod=(""+r[cCode]).trim().toUpperCase(); if(seen.has(kod)) continue;
+      let adet=null;
+      if(cBirim>=0&&cToplam>=0){ const b=+r[cBirim],t=+r[cToplam]; if(isNum(b)&&isNum(t)&&b) adet=Math.round(t/b); }
+      else if(cSat>=0){ const s=isNum(r[cSat])?+r[cSat]:0; const bl=(cBloke>=0&&isNum(r[cBloke]))?+r[cBloke]:0; adet=Math.round(s-bl); }
+      if(adet!=null&&adet>0){ seen.add(kod); out.push({model_kodu:kod,adet}); }
+    }
+  } else {
+    for(const r of aoa){ if(!isCode((r||[])[0])) continue; const kod=(""+r[0]).trim().toUpperCase(); if(seen.has(kod)) continue; const a=isNum(r[1])?Math.round(+r[1]):null; if(a!=null){ seen.add(kod); out.push({model_kodu:kod,adet:a}); } }
+  }
+  return out;
+}
 function autodetect(aoa,cols){
   const valCols=cols.filter(c=>c.skw);
   let hr=-1,best=0;
@@ -522,6 +541,7 @@ async function smartScan(k){
     const all=[]; const seen=new Set(); const detail=[];
     wb.SheetNames.forEach(sn=>{
       const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+      if(cfg.stockMode){ const out=parseStockRows(aoa); out.forEach(o=>{ if(!seen.has(o.model_kodu)){ seen.add(o.model_kodu); all.push(o); } }); detail.push(`${sn}:${out.length}`); return; }
       let hr=-1,best=0;
       if(valCols.some(c=>c.skw)){ for(let r=0;r<Math.min(aoa.length,15);r++){ const row=aoa[r]||[]; let sc=0; valCols.forEach(c=>{ if(c.skw && row.some(cell=>colMatches(cell,c))) sc++; }); if(sc>best){best=sc;hr=r;} } }
       const dataStart= hr<0?0:hr+1;
@@ -608,11 +628,11 @@ async function impWrite(k){
     const urunler=[]; const rows=[];
     base.forEach(o=>{ const obj={model_kodu:o.model_kodu, marka:mk};
       cfg.cols.slice(1).forEach(c=>{ if(c.key!=="urun_adi") obj[c.key]=o[c.key]; });
-      if(donem) obj.donem=donem; if(depo) obj.depo=depo;
+      if(donem) obj.donem=donem; if(depo) obj.depo=depo; if(cfg.tip) obj.tip=cfg.tip;
       if(cfg.alsoUrunler) urunler.push({model_kodu:o.model_kodu,marka:mk,urun_adi:o.urun_adi||null});
       rows.push(obj); });
     if(cfg.alsoUrunler) await upsert("urunler",urunler,"model_kodu,marka");
-    if(cfg.snapshot) await sb.from(cfg.target).delete().eq("marka",mk).eq("depo",depo);
+    if(cfg.snapshot){ let dq=sb.from(cfg.target).delete().eq("marka",mk).eq("depo",depo); if(cfg.tip) dq=dq.eq("tip",cfg.tip); await dq; }
     await upsert(cfg.target,rows,cfg.conflict);
     await sb.from("guncelleme_log").insert({donem:donem||new Date().toISOString().slice(0,10),veri_turu:k+"-"+mk,kayit_sayisi:rows.length});
     impMsg(k,`✓ ${rows.length} satır yazıldı (${mk}${donem?", "+donem:""}${depo?", "+depo:""}).`,"ok");
