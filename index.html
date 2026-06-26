@@ -972,8 +972,23 @@ async function kampOku(){
   if(!adaylar.length){ adaylar=detectCampaigns(text); }
   const pdfBitis=(adaylar.find(a=>a.bitis)||{}).bitis;
   if(pdfBitis && $("kampGlobalBitis") && !$("kampGlobalBitis").value) $("kampGlobalBitis").value=pdfBitis;
+  // CARRY-OVER: aynı indirim/hakediş tutarlı önceki kampanyanın model listesi + kategorilerini taşı (her ay tekrar girmemek için)
+  try{
+    const {data:mevcut}=await sb.from("kampanyalar").select("musteri_indirimi,hakedis,secili_modeller,kategoriler").or(`marka.is.null,marka.eq.${brand}`);
+    let tasinan=0;
+    adaylar.forEach(a=>{
+      const hit=(mevcut||[]).find(e=>e.musteri_indirimi===a.musteri_indirimi && a.musteri_indirimi>0)
+             || (mevcut||[]).find(e=>e.hakedis===a.hakedis && a.hakedis>0);
+      if(hit){
+        if((!a.modeller||!a.modeller.length) && hit.secili_modeller && hit.secili_modeller.length){ a.modeller=hit.secili_modeller; tasinan++; }
+        if((!a.kategoriler||!a.kategoriler.length) && hit.kategoriler && hit.kategoriler.length) a.kategoriler=hit.kategoriler;
+      }
+    });
+    if(tasinan) { const mm=$("kampMsg"); if(mm) mm.dataset.tasinan=tasinan; }
+  }catch(e){}
   renderKampAday(adaylar);
-  msg.textContent=adaylar.length? `✓ ${adaylar.length} kampanya adayı bulundu. Kontrol edip Ekle.` : "Kampanya bulunamadı (indirimli satır yok).";
+  const tasinan=+(msg.dataset.tasinan||0); delete msg.dataset.tasinan;
+  msg.textContent=adaylar.length? `✓ ${adaylar.length} kampanya adayı bulundu${tasinan?`, ${tasinan} tanesinin model listesi geçen aydan taşındı`:''}. Kontrol edip Ekle.` : "Kampanya bulunamadı (indirimli satır yok).";
   msg.className="msg "+(adaylar.length?"ok":"bad");
 }
 function detectCampaignsExcel(cells){
@@ -1047,7 +1062,7 @@ function renderKampAday(list){
     </div>
     <div class="row" style="margin-top:8px">
       <div class="fld" style="flex:1"><label>Modeller (tablodan olduğu gibi yapıştır — virgül gerekmez) <span class="mut" id="ka_modc${i}"></span></label>
-        <textarea id="ka_mod${i}" rows="2" placeholder="KDN86AWE1N  SMP6ENC60T  WGK242Z0TR ..." style="width:100%;background:var(--field);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px" oninput="modSay(${i})"></textarea></div>
+        <textarea id="ka_mod${i}" rows="2" placeholder="KDN86AWE1N  SMP6ENC60T  WGK242Z0TR ..." style="width:100%;background:var(--field);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px" oninput="modSay(${i})">${(k.modeller||[]).join(' ')}</textarea></div>
     </div></div>`).join("");
 }
 function parseModeller(s){ return [...new Set((s||"").toUpperCase().split(/[^A-Z0-9]+/).filter(x=>x.length>=5 && /\d/.test(x)))]; }
