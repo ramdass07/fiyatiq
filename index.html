@@ -742,7 +742,7 @@ function renderKampAday(list){
     </div>
     <div class="row" style="margin-top:8px">
       <div class="fld"><label>Kategoriler (virgül)</label><input id="ka_kat${i}" placeholder="CAMASIR,KURUTMA" style="width:240px"></div>
-      <div class="fld"><label>Eşleşme</label><select id="ka_match${i}"><option value="all">all</option><option value="any2">any2</option><option value="model_list">model_list</option><option value="tumu">tumu</option></select></div>
+      <div class="fld"><label>Eşleşme</label><select id="ka_match${i}"><option value="all">all</option><option value="any2">any2</option><option value="all+any">all+any (1 zorunlu+diğerinden 1)</option><option value="model_list">model_list</option><option value="tumu">tumu</option></select></div>
       <button onclick="kampEkle(${i})">Ekle</button><span id="ka_msg${i}" class="msg"></span>
     </div></div>`).join("");
 }
