@@ -844,8 +844,9 @@ async function admKampanya(){
 async function loadKampanyalar(){
   const {data}=await sb.from("kampanyalar").select("*").order("created_at",{ascending:false});
   const tb=$("kList"); if(!tb) return;
-  tb.innerHTML=(data||[]).map(k=>`<tr><td>${k.ad}</td><td>${k.marka||"ikisi"}</td><td>${k.match_type}</td><td class="num">${fmt(k.musteri_indirimi)}</td><td class="num">${fmt(k.hakedis)}</td><td>${k.bitis_tarihi||"—"}</td><td><button class="ghost sm" onclick="delKampanya('${k.id}')">✕</button></td></tr>`).join("");
+  tb.innerHTML=(data||[]).map(k=>`<tr><td>${k.ad}</td><td><select onchange="kampMarkaSet('${k.id}',this.value)"><option value="bosch" ${k.marka==='bosch'?'selected':''}>Bosch</option><option value="siemens" ${k.marka==='siemens'?'selected':''}>Siemens</option><option value="" ${!k.marka?'selected':''}>İkisi</option></select></td><td>${k.match_type}</td><td class="num">${fmt(k.musteri_indirimi)}</td><td class="num">${fmt(k.hakedis)}</td><td>${k.bitis_tarihi||"—"}</td><td><button class="ghost sm" onclick="delKampanya('${k.id}')">✕</button></td></tr>`).join("");
 }
+async function kampMarkaSet(id,val){ await sb.from("kampanyalar").update({marka:val||null}).eq("id",id); }
 async function delKampanya(id){ await sb.from("kampanyalar").delete().eq("id",id); loadKampanyalar(); }
 
 // ===== KAMPANYA İÇE AKTAR (PDF/Excel, yarı-otomatik) =====
@@ -913,7 +914,8 @@ function renderKampAday(list){
       <div class="fld"><label>Bitiş</label><input id="ka_bitis${i}" type="date" value="${k.bitis||''}"></div>
     </div>
     <div class="row" style="margin-top:8px">
-      <div class="fld"><label>Kategoriler (boşluk/virgül)</label><input id="ka_kat${i}" placeholder="CAMASIR KURUTMA" style="width:240px"></div>
+      <div class="fld"><label>Marka</label><select id="ka_marka${i}"><option value="bosch" ${brand==='bosch'?'selected':''}>Bosch</option><option value="siemens" ${brand==='siemens'?'selected':''}>Siemens</option><option value="">İkisi</option></select></div>
+      <div class="fld"><label>Kategoriler (boşluk/virgül)</label><input id="ka_kat${i}" placeholder="CAMASIR KURUTMA" style="width:220px"></div>
       <div class="fld"><label>Eşleşme</label><select id="ka_match${i}"><option value="all">all</option><option value="any2">any2</option><option value="all+any">all+any (1 zorunlu+diğerinden 1)</option><option value="model_list">model_list</option><option value="tumu">tumu</option></select></div>
       <button onclick="kampEkle(${i})">Ekle</button><span id="ka_msg${i}" class="msg"></span>
     </div>
@@ -927,7 +929,7 @@ function modSay(i){ const el=$("ka_modc"+i); if(el) el.textContent="("+parseMode
 async function kampEkle(i){
   const kat=$("ka_kat"+i).value.split(/[\s,;]+/).map(s=>s.trim()).filter(s=>s);
   const mods=parseModeller($("ka_mod"+i).value);
-  const rec={ad:$("ka_ad"+i).value.trim(), marka:brand, match_type:$("ka_match"+i).value, kategoriler:kat, secili_modeller:mods,
+  const rec={ad:$("ka_ad"+i).value.trim(), marka:$("ka_marka"+i).value||null, match_type:$("ka_match"+i).value, kategoriler:kat, secili_modeller:mods,
     musteri_indirimi:+$("ka_mus"+i).value||0, hakedis:+$("ka_hak"+i).value||0, kota:+$("ka_kota"+i).value||null, bitis_tarihi:$("ka_bitis"+i).value||null};
   if(!rec.ad){ $("ka_msg"+i).textContent="Ad gerekli"; $("ka_msg"+i).className="msg bad"; return; }
   const {error}=await sb.from("kampanyalar").insert(rec);
