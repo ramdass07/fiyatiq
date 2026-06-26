@@ -975,20 +975,33 @@ async function kampOku(){
   // CARRY-OVER: aynı indirim/hakediş tutarlı önceki kampanyanın model listesi + kategorilerini taşı (her ay tekrar girmemek için)
   try{
     const {data:mevcut}=await sb.from("kampanyalar").select("musteri_indirimi,hakedis,secili_modeller,kategoriler").or(`marka.is.null,marka.eq.${brand}`);
-    let tasinan=0;
+    // Geçerlilik süzgeci: satışta olmayan (katalogda yok) / phase-out olmuş modelleri taşırken at
+    let validSet=null, phaseSet=null;
+    try{
+      const ur=await sb.from("urunler").select("model_kodu").eq("marka",brand);
+      const po=await sb.from("phaseout").select("model_kodu").eq("marka",brand);
+      validSet=new Set((ur.data||[]).map(x=>(x.model_kodu||"").toUpperCase()));
+      phaseSet=new Set((po.data||[]).map(x=>(x.model_kodu||"").toUpperCase()));
+    }catch(_){}
+    let tasinan=0, atilan=0;
     adaylar.forEach(a=>{
       const hit=(mevcut||[]).find(e=>e.musteri_indirimi===a.musteri_indirimi && a.musteri_indirimi>0)
              || (mevcut||[]).find(e=>e.hakedis===a.hakedis && a.hakedis>0);
       if(hit){
-        if((!a.modeller||!a.modeller.length) && hit.secili_modeller && hit.secili_modeller.length){ a.modeller=hit.secili_modeller; tasinan++; }
+        if((!a.modeller||!a.modeller.length) && hit.secili_modeller && hit.secili_modeller.length){
+          let list=hit.secili_modeller.map(s=>(s||"").toUpperCase());
+          if(validSet && validSet.size){ const before=list.length; list=list.filter(c=>validSet.has(c) && !(phaseSet&&phaseSet.has(c))); atilan+=before-list.length; }
+          a.modeller=list; tasinan++;
+        }
         if((!a.kategoriler||!a.kategoriler.length) && hit.kategoriler && hit.kategoriler.length) a.kategoriler=hit.kategoriler;
       }
     });
-    if(tasinan) { const mm=$("kampMsg"); if(mm) mm.dataset.tasinan=tasinan; }
+    const mm=$("kampMsg"); if(mm){ if(tasinan) mm.dataset.tasinan=tasinan; if(atilan) mm.dataset.atilan=atilan; }
   }catch(e){}
   renderKampAday(adaylar);
   const tasinan=+(msg.dataset.tasinan||0); delete msg.dataset.tasinan;
-  msg.textContent=adaylar.length? `✓ ${adaylar.length} kampanya adayı bulundu${tasinan?`, ${tasinan} tanesinin model listesi geçen aydan taşındı`:''}. Kontrol edip Ekle.` : "Kampanya bulunamadı (indirimli satır yok).";
+  const atilan=+(msg.dataset.atilan||0); delete msg.dataset.atilan;
+  msg.textContent=adaylar.length? `✓ ${adaylar.length} kampanya adayı bulundu${tasinan?`, ${tasinan} tanesinin modelleri geçen aydan taşındı`:''}${atilan?` (${atilan} satışta olmayan model çıkarıldı)`:''}. Yeni belgeye göre kontrol edip Ekle.` : "Kampanya bulunamadı (indirimli satır yok).";
   msg.className="msg "+(adaylar.length?"ok":"bad");
 }
 function detectCampaignsExcel(cells){
