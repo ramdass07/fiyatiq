@@ -933,7 +933,7 @@ async function kampOku(){
   const f=$("kampFile").files[0]; const msg=$("kampMsg");
   if(!f){ msg.textContent="Dosya seç."; msg.className="msg bad"; return; }
   msg.textContent="Okunuyor..."; msg.className="msg";
-  let text="";
+  let text="", excelCells=null;
   try{
     if(/\.pdf$/i.test(f.name)){
       const buf=await f.arrayBuffer();
@@ -946,16 +946,48 @@ async function kampOku(){
       }
     } else {
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
-      wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:""}); aoa.forEach(r=>{ const line=(r||[]).filter(c=>c).join(" | "); if(line) text+=line+"\n"; }); });
+      excelCells=[];
+      wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:""});
+        aoa.forEach(r=>{ const line=(r||[]).filter(c=>c).join(" | "); if(line) text+=line+"\n"; (r||[]).forEach(c=>{ const s=(c==null?"":String(c)).trim(); if(s) excelCells.push(s); }); }); });
     }
   }catch(e){ msg.textContent="Okuma hatası: "+e.message; msg.className="msg bad"; return; }
   text = text.replace(/([\d.])[ \t]+(?=[\d.])/g,"$1");
-  const adaylar=detectCampaigns(text);
+  let adaylar=[];
+  if(excelCells){ adaylar=detectCampaignsExcel(excelCells); }
+  if(!adaylar.length){ adaylar=detectCampaigns(text); }
   const pdfBitis=(adaylar.find(a=>a.bitis)||{}).bitis;
   if(pdfBitis && $("kampGlobalBitis") && !$("kampGlobalBitis").value) $("kampGlobalBitis").value=pdfBitis;
   renderKampAday(adaylar);
   msg.textContent=adaylar.length? `✓ ${adaylar.length} kampanya adayı bulundu. Kontrol edip Ekle.` : "Kampanya bulunamadı (indirimli satır yok).";
   msg.className="msg "+(adaylar.length?"ok":"bad");
+}
+function detectCampaignsExcel(cells){
+  const num=s=>parseInt(String(s).replace(/\./g,""),10);
+  const out=[], seen=new Set();
+  const titles=cells.filter(t=>/!/.test(t));
+  cells.forEach(txt=>{
+    if(!/hak\s*edi[şs]/i.test(txt)) return;
+    let hak=null, m=txt.match(/kdv\s*dahil\s*([0-9][0-9.]{2,})\s*₺?/i);
+    if(!m) m=txt.match(/([0-9][0-9.]{2,})\s*₺\s*(?:kdv\s*dahil\s*)?(?:fiyat\s*farkı\s*)?hak/i);
+    if(m) hak=num(m[1]);
+    let ind=null; const im=txt.match(/([0-9][0-9.]{2,})\s*(?:₺|TL)\s*[İIi]ndirim/i);
+    if(im) ind=num(im[1]);
+    if(!ind && !hak) return;
+    let ad=null;
+    if(ind){ const istr=ind.toLocaleString("tr-TR"); ad=(titles.find(t=>t.includes(istr)&&t!==txt)||"").replace(/\s+/g," ").trim(); }
+    if(!ad) ad=txt.replace(/^Uygulama koşulları\s*:?\s*/i,"").replace(/\s+/g," ").trim().slice(0,90);
+    const low=txt.toLowerCase().replace(/ş/g,"s").replace(/ç/g,"c").replace(/ı/g,"i").replace(/İ/g,"i").replace(/ğ/g,"g").replace(/ü/g,"u").replace(/ö/g,"o");
+    const kats=[];
+    if(/camasir/.test(low))kats.push("CAMASIR");
+    if(/kurutma/.test(low))kats.push("KURUTMA");
+    if(/derin dondurucu/.test(low))kats.push("DERINDONDURUCU");
+    if(/buzdolab/.test(low))kats.push("BUZDOLABI");
+    if(/bulasik/.test(low))kats.push("BULASIK");
+    if(/ankastre|firin|ocak|davlumbaz/.test(low))kats.push("ANKASTRE");
+    const key=(ad||"")+"|"+ind+"|"+hak; if(seen.has(key))return; seen.add(key);
+    out.push({ad:(ad||"").slice(0,120),musteri_indirimi:ind||0,hakedis:hak||0,kota:null,bitis:null,kategoriler:kats});
+  });
+  return out;
 }
 function detectCampaigns(text){
   const num=s=>parseInt(String(s).replace(/\./g,""),10);
@@ -994,7 +1026,7 @@ function renderKampAday(list){
     </div>
     <div class="row" style="margin-top:8px">
       <div class="fld"><label>Marka</label><select id="ka_marka${i}"><option value="bosch" ${brand==='bosch'?'selected':''}>Bosch</option><option value="siemens" ${brand==='siemens'?'selected':''}>Siemens</option><option value="">İkisi</option></select></div>
-      <div class="fld"><label>Kategoriler (boşluk/virgül)</label><input id="ka_kat${i}" placeholder="CAMASIR KURUTMA" style="width:220px"></div>
+      <div class="fld"><label>Kategoriler (boşluk/virgül)</label><input id="ka_kat${i}" value="${(k.kategoriler||[]).join(' ')}" placeholder="CAMASIR KURUTMA" style="width:220px"></div>
       <div class="fld"><label>Eşleşme</label><select id="ka_match${i}"><option value="all">all</option><option value="any2">any2</option><option value="all+any">all+any (1 zorunlu+diğerinden 1)</option><option value="model_list">model_list</option><option value="tumu">tumu</option></select></div>
       <button onclick="kampEkle(${i})">Ekle</button><span id="ka_msg${i}" class="msg"></span>
     </div>
