@@ -729,7 +729,7 @@ function renderKampAday(list){
     <div class="row">
       <div class="fld" style="flex:1"><label>Kampanya adı</label><input id="ka_ad${i}" value="${(k.ad||'').replace(/"/g,'&quot;')}" style="width:360px"></div>
       <div class="fld"><label>Müşteri ind. ₺</label><input id="ka_mus${i}" type="number" value="${k.musteri_indirimi||0}" style="width:120px"></div>
-      <div class="fld"><label>Hakediş ₺</label><input id="ka_hak${i}" type="number" value="0" style="width:110px"></div>
+      <div class="fld"><label>Hakediş ₺</label><input id="ka_hak${i}" type="number" value="${k.musteri_indirimi||0}" style="width:110px"></div>
       <div class="fld"><label>Bitiş</label><input id="ka_bitis${i}" type="date" value="${k.bitis||''}"></div>
     </div>
     <div class="row" style="margin-top:8px">
