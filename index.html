@@ -706,20 +706,27 @@ async function kampOku(){
   msg.className="msg "+(adaylar.length?"ok":"bad");
 }
 function detectCampaigns(text){
+  const num=s=>parseInt(String(s).replace(/\./g,""),10);
+  // Bitiş: "03-15 Haziran 2026" aralığının sonu, yoksa tekil tarih
+  let bitis=null;
+  const rg=text.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-zçğıöşüÇĞİÖŞÜ]+)\s+(\d{4})/);
+  if(rg) bitis=trDate(rg[2]+" "+rg[3]+" "+rg[4]);
+  if(!bitis){ const s1=text.match(/(\d{1,2}\s+[A-Za-zçğıöşüÇĞİÖŞÜ]+\s+\d{4})\s+tarih/); if(s1) bitis=trDate(s1[1]); }
+  // Bundle kampanyaları: "X TL (KDV Dahil) indirim" başlıklarını yakala
+  const indRe=/([0-9][0-9.]{2,})\s*TL\s*\(?\s*KDV\s*D[aâ]hil\s*\)?\s*(?:indirim|İndirim|Indirim)/g;
+  const inds=[]; let m;
+  while((m=indRe.exec(text))) inds.push({pos:m.index, ind:num(m[1])});
   const out=[], seen=new Set();
-  const dM=text.match(/(\d{1,2}\s+[A-Za-zçğıöşüÇĞİÖŞÜ]+\s+\d{4})\s+tarihine kadar/);
-  const bitis=dM? trDate(dM[1]) : null;
-  const re=/([0-9][0-9.]{3,})\s*(?:TL|₺)/g; let m;
-  while((m=re.exec(text))){
-    const tutar=parseFloat(m[1].replace(/\./g,""));
-    if(!isNum(tutar)||tutar<1000||tutar>300000) continue;
-    const after=text.slice(m.index, m.index+45);
-    if(!/İndirim|indirim|Hediye|hediye/.test(after)) continue;
-    let pre=text.slice(Math.max(0,m.index-220),m.index).replace(/[ \t]+/g," ").trim();
-    const segs=pre.split(/\n|[|.!]/).map(s=>s.trim()).filter(s=>s.length>8);
-    const ad=[...segs].reverse().find(s=>/Fırsat|Set|Alımınd|Buzdolab|Çamaşır|Kurutma|Dondurucu|Ankastre|Beyaz/i.test(s)) || segs.slice(-1)[0] || pre.slice(-90);
-    const key=ad+"|"+tutar; if(seen.has(key)) continue; seen.add(key);
-    out.push({ad:ad.slice(0,110), musteri_indirimi:tutar, bitis});
+  for(let i=0;i<inds.length;i++){
+    const pos=inds[i].pos, nxt=(i+1<inds.length)? inds[i+1].pos : pos+6000;
+    const seg=text.slice(pos,nxt);
+    const hM=seg.match(/([0-9][0-9.]{2,})\s*(?:TL)?\s*\(?\s*KDV\s*D[aâ]hil\s*\)?\s*hakk?\s*e?\s*di[şs]/i);
+    const kM=seg.match(/([0-9][0-9.]{2,})\s*adet\s*ile\s*s[ıi]n[ıi]rl[ıi]/i);
+    const nM=seg.match(/[“"”'„]([^“"”'„]{8,150})[“"”'„]\s*kampanya/);
+    let ad= nM? nM[1].replace(/\s+/g," ").trim()
+          : text.slice(Math.max(0,pos-180),pos).replace(/\s+/g," ").trim().slice(-90);
+    const key=ad+"|"+inds[i].ind; if(seen.has(key)) continue; seen.add(key);
+    out.push({ad:ad.slice(0,150), musteri_indirimi:inds[i].ind, hakedis:hM?num(hM[1]):0, kota:kM?num(kM[1]):null, bitis});
   }
   return out;
 }
@@ -729,7 +736,8 @@ function renderKampAday(list){
     <div class="row">
       <div class="fld" style="flex:1"><label>Kampanya adı</label><input id="ka_ad${i}" value="${(k.ad||'').replace(/"/g,'&quot;')}" style="width:360px"></div>
       <div class="fld"><label>Müşteri ind. ₺</label><input id="ka_mus${i}" type="number" value="${k.musteri_indirimi||0}" style="width:120px"></div>
-      <div class="fld"><label>Hakediş ₺</label><input id="ka_hak${i}" type="number" value="${k.musteri_indirimi||0}" style="width:110px"></div>
+      <div class="fld"><label>Hakediş ₺</label><input id="ka_hak${i}" type="number" value="${k.hakedis||0}" style="width:110px"></div>
+      <div class="fld"><label>Kota (adet)</label><input id="ka_kota${i}" type="number" value="${k.kota||''}" style="width:100px"></div>
       <div class="fld"><label>Bitiş</label><input id="ka_bitis${i}" type="date" value="${k.bitis||''}"></div>
     </div>
     <div class="row" style="margin-top:8px">
@@ -741,7 +749,7 @@ function renderKampAday(list){
 async function kampEkle(i){
   const kat=$("ka_kat"+i).value.split(",").map(s=>s.trim()).filter(s=>s);
   const rec={ad:$("ka_ad"+i).value.trim(), marka:brand, match_type:$("ka_match"+i).value, kategoriler:kat, secili_modeller:[],
-    musteri_indirimi:+$("ka_mus"+i).value||0, hakedis:+$("ka_hak"+i).value||0, bitis_tarihi:$("ka_bitis"+i).value||null};
+    musteri_indirimi:+$("ka_mus"+i).value||0, hakedis:+$("ka_hak"+i).value||0, kota:+$("ka_kota"+i).value||null, bitis_tarihi:$("ka_bitis"+i).value||null};
   if(!rec.ad){ $("ka_msg"+i).textContent="Ad gerekli"; $("ka_msg"+i).className="msg bad"; return; }
   const {error}=await sb.from("kampanyalar").insert(rec);
   $("ka_msg"+i).textContent=error?"Hata: "+error.message:"✓ Eklendi";
