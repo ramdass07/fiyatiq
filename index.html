@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  :root{--bg:#f0f4f8;--panel:#ffffff;--line:#e2e8f0;--txt:#1e293b;--mut:#64748b;--acc:#1e40af;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--field:#f1f5f9;}
+  :root{--bg:#0f172a;--panel:#1e293b;--line:#334155;--txt:#e2e8f0;--mut:#94a3b8;--acc:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--field:#0b1220;}
   *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,sans-serif}
   body{margin:0;background:var(--bg);color:var(--txt);font-size:14px}
   header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
@@ -140,9 +140,9 @@
       <div class="fld" style="text-align:right"><label>Kâr</label><span class="big" id="karPct">—</span></div>
     </div></div>
     <div class="row" style="justify-content:flex-end">
-      <button class="ghost" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
-      <button class="ghost" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
-      <button style="background:#16a34a;color:#fff" onclick="shareWhatsApp()">WhatsApp</button>
+      <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
+      <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
+      <button style="background:#22c55e;color:#06200f" onclick="shareWhatsApp()">WhatsApp</button>
       <button onclick="saveQuote()">Teklifi Kaydet</button>
       <span id="saveMsg" class="mut" style="align-self:center"></span>
     </div>
