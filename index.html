@@ -211,11 +211,12 @@ const IMPORTERS = {
           {key:"bip_tutar",label:"BİP (kdv li)",type:"num",skw:["kdv","bip"],sneg:["haric"]}] },
   phaseout:{ title:"Phase-Out (üretimi biten)", target:"phaseout", conflict:"model_kodu,marka", codesOnly:true,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"}] },
-  stok:{ title:"Mevcut Stok (Mars/Horoz/Kadıköy)", target:"stok", conflict:"model_kodu,marka,depo,tip", depo:true, tip:"mevcut", snapshot:true, stockMode:true,
-    cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},{key:"adet",label:"Adet",type:"num"}] },
-  ayrilmisstok:{ title:"Ayrılmış Stok (Mars/Horoz/Kadıköy)", target:"stok", conflict:"model_kodu,marka,depo,tip", depo:true, tip:"ayrilmis", snapshot:true, stockMode:true,
-    cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},{key:"adet",label:"Adet",type:"num"}] }
 };
+["mevcut","ayrilmis"].forEach(tp=>["mars","horoz","kadikoy"].forEach(dp=>{
+  IMPORTERS["stok_"+tp+"_"+dp]={ title:(tp==="mevcut"?"Mevcut":"Ayrılmış")+" Stok · "+(dp==="mars"?"Mars":dp==="horoz"?"Horoz":"Kadıköy"),
+    target:"stok", conflict:"model_kodu,marka,depo,tip", depo:dp, tip:tp, snapshot:true, stockMode:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},{key:"adet",label:"Adet",type:"num"}] };
+}));
 
 window.addEventListener("DOMContentLoaded", init);
 async function init(){
@@ -470,7 +471,7 @@ function buildImporters(){
       <h2>${cfg.title}</h2>
       <div class="row">
         ${cfg.donem?`<div class="fld"><label>Dönem</label><input id="${k}_donem" type="month" value="${mon}"></div>`:""}
-        ${cfg.depo?`<div class="fld"><label>Depo</label><select id="${k}_depo"><option value="mars">Mars</option><option value="horoz">Horoz</option><option value="kadikoy">Kadıköy</option></select></div>`:""}
+        ${cfg.depo===true?`<div class="fld"><label>Depo</label><select id="${k}_depo"><option value="mars">Mars</option><option value="horoz">Horoz</option><option value="kadikoy">Kadıköy</option></select></div>`:""}
         <div class="fld"><label>Dosya</label><input id="${k}_file" type="file" accept=".xlsx,.xls,.csv"></div>
         <button class="sm" onclick="smartScan('${k}')">Akıllı Tara</button>
         <button class="ghost sm" onclick="impRead('${k}')">Elle eşle</button>
@@ -609,7 +610,7 @@ async function impWrite(k){
     if(!st || (!st.aoa && !st.rows)){ impMsg(k,"Önce dosya tara/oku.","bad"); return; }
     const mk=brand;
     let donem=null; if(cfg.donem){ const m=$(k+"_donem").value; if(!m){ impMsg(k,"Dönem seç.","bad"); return; } donem=m+"-01"; }
-    let depo=null; if(cfg.depo) depo=$(k+"_depo").value;
+    let depo=null; if(cfg.depo) depo=(typeof cfg.depo==="string"? cfg.depo : $(k+"_depo").value);
     $(k+"_write").disabled=true; impMsg(k,"Yazılıyor...");
     let base=[];
     if(st.rows){ base=st.rows; }
