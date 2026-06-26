@@ -569,13 +569,16 @@ async function loadAktifKampanyalar(){
 function matchKampanyalar(){
   const items=quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —");
   if(!items.length) return [];
-  const catSet=new Set(), modelSet=new Set();
-  items.forEach(r=>{ modelSet.add((r.kod||"").toUpperCase()); kategoriOf(r.kod).forEach(t=>catSet.add(t)); });
-  const has=c=>catSet.has(katNorm(c));
+  const modelSet=new Set(items.map(r=>(r.kod||"").toUpperCase()));
   const out=[];
   aktifKampanyalar.forEach(k=>{
     const cats=(k.kategoriler||[]).map(katNorm).filter(Boolean);
     const mods=(k.secili_modeller||[]).map(m=>(m||"").toUpperCase());
+    const gated=mods.length>0; const modSet=new Set(mods);
+    // Model listesi varsa: kategori kümesi SADECE listedeki ürünlerden türetilir (liste dışı ürün kampanyaya saymaz)
+    const catSet=new Set();
+    items.forEach(r=>{ const code=(r.kod||"").toUpperCase(); if(gated && !modSet.has(code)) return; kategoriOf(code).forEach(t=>catSet.add(t)); });
+    const has=c=>catSet.has(katNorm(c));
     let ok=false;
     switch(k.match_type){
       case "any2": ok=cats.filter(has).length>=2; break;
