@@ -156,8 +156,8 @@
       <div id="bayiMsg" class="msg"></div>
     </div>
 
-    <h2 style="margin:4px 0 0">Merkezi Veri Yükleme <span class="badge">ayrı dosyalar</span></h2>
-    <p class="mut" style="font-size:13px;margin:4px 0 12px">Her veri türü için BSH'den gelen ham dosyayı ayrı yükle. Sistem sütunları otomatik tanır; yanlışsa açılır menüden düzelt.</p>
+    <h2 style="margin:4px 0 0">Merkezi Veri Yükleme <span id="aktifMarka" class="badge">Aktif: Siemens</span></h2>
+    <p class="mut" style="font-size:13px;margin:4px 0 12px">Yüklemeler <b>üstten seçili markaya</b> yazılır (Siemens/Bosch). Ham dosyayı at, "Akıllı Tara" sütunları otomatik tanır.</p>
     <div id="importers"></div>
 
     <div class="card">
@@ -280,6 +280,7 @@ function setBrand(b){
   if(!allowedBrands().includes(b)) return;
   brand=b;
   document.querySelectorAll("#brandSeg button").forEach(x=>x.classList.toggle("on",x.dataset.b===b));
+  const am=$("aktifMarka"); if(am) am.textContent="Aktif: "+(b==="bosch"?"Bosch":"Siemens");
   quoteRows.forEach(r=>refetch(r)); loadBanks();
 }
 function toggleAdmin(){
@@ -472,7 +473,6 @@ function buildImporters(){
     <div class="card">
       <h2>${cfg.title}</h2>
       <div class="row">
-        <div class="fld"><label>Marka</label><select id="${k}_marka"><option value="siemens">Siemens</option><option value="bosch">Bosch</option></select></div>
         ${cfg.donem?`<div class="fld"><label>Dönem</label><input id="${k}_donem" type="month" value="${mon}"></div>`:""}
         ${cfg.depo?`<div class="fld"><label>Depo</label><select id="${k}_depo"><option value="mars">Mars</option><option value="horoz">Horoz</option><option value="kadikoy">Kadıköy</option></select></div>`:""}
         <div class="fld"><label>Dosya</label><input id="${k}_file" type="file" accept=".xlsx,.xls,.csv"></div>
@@ -587,7 +587,7 @@ async function impWrite(k){
   try{
     const cfg=IMPORTERS[k], st=impState[k];
     if(!st || (!st.aoa && !st.rows)){ impMsg(k,"Önce dosya tara/oku.","bad"); return; }
-    const mk=$(k+"_marka").value;
+    const mk=brand;
     let donem=null; if(cfg.donem){ const m=$(k+"_donem").value; if(!m){ impMsg(k,"Dönem seç.","bad"); return; } donem=m+"-01"; }
     let depo=null; if(cfg.depo) depo=$(k+"_depo").value;
     $(k+"_write").disabled=true; impMsg(k,"Yazılıyor...");
