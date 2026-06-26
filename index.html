@@ -131,6 +131,10 @@
       </tr></thead><tbody id="rows"></tbody>
       <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tMaliyet">0</th><th colspan="4"></th></tr></tfoot></table>
     </div>
+    <div class="card" id="kampPanel" style="display:none;border:1px solid var(--ok)">
+      <h2 style="margin-top:0">🎁 Uygulanabilir Kampanyalar <span class="badge">otomatik</span></h2>
+      <div id="kampList"></div>
+    </div>
     <div class="card"><div class="row">
       <div class="fld"><label>Satış Tutarı (hedef)</label><input id="satis" type="number" oninput="calcBank()" style="width:160px"></div>
       <div class="fld"><label>Banka</label><select id="banka" onchange="loadTaksit()"></select></div>
@@ -265,6 +269,7 @@ async function showApp(session){
   $("bayiStokCard").style.display = profil.rol==="bayi" ? "" : "none";
   if(profil.rol==="bayi"){ $("thS1").textContent="Stoğum"; $("thS2").textContent=""; } else { $("thS1").textContent="Mars"; $("thS2").textContent="Horoz"; }
   await loadBanks();
+  await loadAktifKampanyalar();
   if(quoteRows.length===0) addRow();
 }
 async function loadProfil(uid){
@@ -285,6 +290,7 @@ function setBrand(b){
   document.querySelectorAll("#brandSeg button").forEach(x=>x.classList.toggle("on",x.dataset.b===b));
   const am=$("aktifMarka"); if(am) am.textContent="Aktif: "+(b==="bosch"?"Bosch":"Siemens");
   quoteRows.forEach(r=>refetch(r)); loadBanks();
+  loadAktifKampanyalar().then(renderKampanyaPanel);
 }
 function toggleAdmin(){
   const a=$("adminView"), b=$("bayiView");
@@ -363,7 +369,75 @@ function renderRows(){
   const s=(f)=>quoteRows.reduce((a,r)=>a+(r[f]||0)*(r.adet||1),0);
   $("tAdet").textContent=fmt(quoteRows.reduce((a,r)=>a+(+r.adet||0),0));
   $("tNakit").textContent=fmt(s('nakit')); $("tTaksit").textContent=fmt(s('taksit')); $("tMaliyet").textContent=fmt(s('maliyet'));
+  renderKampanyaPanel();
   calcBank();
+}
+// ===== KAMPANYA OTOMATİK UYGULAMA (teklif ekranı) =====
+let aktifKampanyalar=[];
+function katNorm(s){ return (s||"").toString().toUpperCase()
+  .replace(/İ/g,"I").replace(/Ş/g,"S").replace(/Ğ/g,"G").replace(/Ü/g,"U").replace(/Ö/g,"O").replace(/Ç/g,"C").replace(/ı/g,"I").trim(); }
+function kategoriOf(code){
+  const c=(code||"").toUpperCase().trim();
+  if(!c) return [];
+  if(/^G/.test(c)) return ["DERINDONDURUCU"];
+  if(/^K/.test(c)) return ["BUZDOLABI"];
+  if(/^W[QTD]/.test(c)) return ["KURUTMA"];
+  if(/^W/.test(c)) return ["CAMASIR"];
+  if(/^S/.test(c)) return ["BULASIK"];
+  if(/^A[SC]/.test(c)) return ["KLIMA"];
+  if(/^H/.test(c)) return ["FIRIN","ANKASTRE"];
+  if(/^P/.test(c)) return ["OCAK","ANKASTRE"];
+  if(/^(LC|LB|LH|D)/.test(c)) return ["DAVLUMBAZ","ANKASTRE"];
+  if(/^(BE|BF|CM|CF|FE|FC)/.test(c)) return ["MIKRODALGA","ANKASTRE"];
+  if(/^(BC|BG|BB)/.test(c)) return ["SUPURGE"];
+  if(/^(T|MS|MC|MF|MM|MU)/.test(c)) return ["KEA"];
+  return [];
+}
+async function loadAktifKampanyalar(){
+  try{
+    const today=new Date().toISOString().slice(0,10);
+    const {data}=await sb.from("kampanyalar").select("*").or(`marka.is.null,marka.eq.${brand}`);
+    aktifKampanyalar=(data||[]).filter(k=>!k.bitis_tarihi || k.bitis_tarihi>=today);
+  }catch(e){ aktifKampanyalar=[]; }
+}
+function matchKampanyalar(){
+  const items=quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —");
+  if(!items.length) return [];
+  const catSet=new Set(), modelSet=new Set();
+  items.forEach(r=>{ modelSet.add((r.kod||"").toUpperCase()); kategoriOf(r.kod).forEach(t=>catSet.add(t)); });
+  const has=c=>catSet.has(katNorm(c));
+  const out=[];
+  aktifKampanyalar.forEach(k=>{
+    const cats=(k.kategoriler||[]).map(katNorm).filter(Boolean);
+    const mods=(k.secili_modeller||[]).map(m=>(m||"").toUpperCase());
+    let ok=false;
+    switch(k.match_type){
+      case "any2": ok=cats.filter(has).length>=2; break;
+      case "all+any": ok=cats.length>=2 && has(cats[0]) && cats.slice(1).some(has); break;
+      case "model_list": ok=mods.some(m=>modelSet.has(m)); break;
+      case "tumu": ok=true; break;
+      default: ok=cats.length>0 && cats.every(has); // "all"
+    }
+    if(ok) out.push(k);
+  });
+  return out;
+}
+function renderKampanyaPanel(){
+  const panel=$("kampPanel"), list=$("kampList"); if(!panel||!list) return;
+  const ks=matchKampanyalar();
+  if(!ks.length){ panel.style.display="none"; list.innerHTML=""; return; }
+  const toplamNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
+  const indT=ks.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
+  const hakT=ks.reduce((a,k)=>a+(k.hakedis||0),0);
+  list.innerHTML=ks.map(k=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
+      <div><b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}</div>
+      <div class="mut" style="font-size:13px">İndirim <b style="color:var(--ok)">${fmt(k.musteri_indirimi)} ₺</b> · Hakediş <b style="color:var(--acc)">${fmt(k.hakedis)} ₺</b></div>
+    </div>`).join("")
+    +`<div class="row" style="justify-content:flex-end;margin-top:10px;gap:22px">
+        <span class="mut">Kampanyalı net: <b class="big" style="color:var(--ok)">${fmt(Math.max(0,toplamNakit-indT))} ₺</b></span>
+        <span class="mut">Toplam hakediş (size iade): <b style="color:var(--acc)">${fmt(hakT)} ₺</b></span>
+      </div>`;
+  panel.style.display="";
 }
 async function onCode(i,val){ quoteRows[i].kod=val.trim().toUpperCase(); await refetch(quoteRows[i]); }
 let acRow=-1, acTimer=null;
