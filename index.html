@@ -204,6 +204,11 @@
         <button class="sm" onclick="bankaEkle()">Ekle / Güncelle</button>
         <span id="bkMsg" class="msg"></span>
       </div>
+      <div class="row" style="margin-bottom:8px;align-items:center">
+        <input id="bkFile" type="file" accept=".xlsx,.xls">
+        <button class="sm" onclick="bankaExcelYukle()">📥 Banka Excel'inden İçe Aktar</button>
+        <span class="mut" style="font-size:11px">"Banka Oranları" sayfasından <b>2–9 taksit Toplam Kesinti</b> oranlarını çeker. Tek çekime dokunmaz.</span>
+      </div>
       <div id="bankaGrid"></div>
     </div>
   </main>
@@ -349,6 +354,47 @@ async function bankaSilBanka(b){
   const {error}=await sb.from("banka_komisyonlari").delete().eq("banka",b);
   $("bkMsg").textContent=error?"Hata: "+error.message:"✓ "+b+" silindi"; $("bkMsg").className="msg "+(error?"bad":"ok");
   loadBankaPanel(); loadBanks();
+}
+function parseBankaKomisyon(wb){
+  const ws=wb.Sheets["Banka Oranları"]; if(!ws) return [];
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+  const S=x=>(x==null?"":String(x)).trim();
+  const heads=[];
+  aoa.forEach((r,i)=>{ if(r && S(r[0]) && S(r[1]).toUpperCase().includes("BLOKEL")) heads.push(i); });
+  heads.push(aoa.length);
+  const out=[];
+  for(let bi=0;bi<heads.length-1;bi++){
+    const start=heads[bi], end=heads[bi+1];
+    let name=S(aoa[start][0]); const base=name.split("(")[0].trim();
+    if(/bireysel/i.test(name)) name=base+" (Bireysel)";
+    else if(/ticari/i.test(name)) name=base+" (Ticari)";
+    else name=base;
+    let tcols={};
+    for(let i=start;i<end;i++){ const r=aoa[i]||[]; r.forEach((v,ci)=>{ const m=S(v).toLowerCase().match(/^(\d+)\s*taksit/); if(m) tcols[+m[1]]=ci; }); if(Object.keys(tcols).length) break; }
+    let toprow=-1;
+    for(let i=start;i<end;i++){ if(S((aoa[i]||[])[0]).toLowerCase().startsWith("toplam")) toprow=i; }
+    if(toprow>=0 && Object.keys(tcols).length){
+      Object.keys(tcols).map(Number).sort((a,b)=>a-b).forEach(t=>{
+        const ci=tcols[t], v=(aoa[toprow]||[])[ci];
+        if(typeof v==="number") out.push({banka:name, taksit_sayisi:t, oran:Math.round(v*10000)/100});
+      });
+    }
+  }
+  return out;
+}
+async function bankaExcelYukle(){
+  const f=$("bkFile").files[0], msg=$("bkMsg");
+  if(!f){ msg.textContent="Excel seç."; msg.className="msg bad"; return; }
+  msg.textContent="Okunuyor..."; msg.className="msg";
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
+    const rows=parseBankaKomisyon(wb).filter(r=>r.taksit_sayisi>=2); // tek çekim (1) korunur
+    if(!rows.length){ msg.textContent="'Banka Oranları' sayfasından oran çıkarılamadı. Sayfa adını kontrol et."; msg.className="msg bad"; return; }
+    const {error}=await sb.from("banka_komisyonlari").upsert(rows,{onConflict:"banka,taksit_sayisi"});
+    if(error) throw new Error(error.message);
+    msg.textContent=`✓ ${rows.length} oran yüklendi (${new Set(rows.map(r=>r.banka)).size} banka, 2–9 taksit). Tek çekim korundu.`; msg.className="msg ok";
+    $("bkFile").value=""; loadBankaPanel(); loadBanks();
+  }catch(e){ msg.textContent="Hata: "+e.message; msg.className="msg bad"; }
 }
 
 // ===== BAYİLER =====
