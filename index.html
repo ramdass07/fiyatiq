@@ -56,6 +56,11 @@
   .ac-code{font-weight:700;color:var(--acc);font-size:13px}.ac-name{font-size:12px;color:var(--mut)}
   .msg{font-size:13px;margin-top:8px;min-height:18px;white-space:pre-wrap}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:var(--field);border:1px solid var(--line);margin-left:6px}
+  @keyframes fqblink{0%,100%{opacity:1}50%{opacity:.2}}
+  .blink{animation:fqblink .85s steps(1,end) infinite;color:var(--bad);font-weight:800}
+  .kd{display:inline-block;background:var(--warn);color:#3b2600;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:800;margin-left:5px}
+  .nostock{display:inline-block;color:var(--bad);font-weight:800;margin-left:6px;font-size:11px}
+  .diva-uyari{background:rgba(245,158,11,.15);border:1px solid var(--warn);color:var(--warn);padding:7px 11px;border-radius:8px;margin-bottom:10px;font-weight:700;font-size:13px}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px}
   .pill.aktif{background:#0c2f1a;color:var(--ok);border:1px solid #1f5236}
   .pill.pasif{background:#3b1d1d;color:var(--bad);border:1px solid #5b2a2a}
@@ -126,24 +131,27 @@
         <div class="grow"></div><button class="sm" onclick="addRow()">+ Ürün satırı</button>
       </div>
       <table id="grid"><thead><tr>
-        <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Nakit Fiyat</th><th>Taksitli Fiyat</th>
-        <th>Net Maliyet</th><th>Kâr %</th><th id="thS1">Mars</th><th id="thS2">Horoz</th><th></th>
+        <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Maliyet</th><th>BİP</th><th>Peşin Fiyat</th><th>Taksitli Fiyat</th>
+        <th>Kâr %</th><th id="thS1">Mars</th><th id="thS2">Horoz</th><th></th>
       </tr></thead><tbody id="rows"></tbody>
-      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tMaliyet">0</th><th colspan="4"></th></tr></tfoot></table>
+      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="2"></th></tr></tfoot></table>
     </div>
     <div class="card" id="kampPanel" style="display:none;border:1px solid var(--ok)">
       <h2 style="margin-top:0">🎁 Uygulanabilir Kampanyalar <span class="badge">otomatik</span></h2>
       <div id="kampList"></div>
     </div>
     <div class="card"><div class="row">
-      <div class="fld"><label>Satış Tutarı (hedef)</label><input id="satis" type="number" oninput="calcBank()" style="width:160px"></div>
-      <div class="fld"><label>Banka</label><select id="banka" onchange="loadTaksit()"></select></div>
-      <div class="fld"><label>Taksit</label><select id="taksit" onchange="calcBank()"></select></div>
+      <div class="fld"><label>Kâr Oranı %</label><input id="karOrani" type="number" step="0.5" value="4" style="width:100px" oninput="recalc()"></div>
+      <div class="fld"><label>Banka</label><select id="banka" onchange="onBankChange()"></select></div>
+      <div class="fld"><label>Taksit</label><select id="taksit" onchange="onTaksitChange()"></select></div>
       <div class="grow"></div>
-      <div class="fld" style="text-align:right"><label>Aylık Taksit</label><span class="big" id="aylik">—</span></div>
-      <div class="fld" style="text-align:right"><label>Komisyon</label><span id="kom" class="mut">—</span></div>
+      <div class="fld" style="text-align:right"><label>Peşin Toplam</label><span class="big" id="sumNakit">—</span></div>
+      <div class="fld" style="text-align:right"><label>Taksitli Toplam</label><span class="big" id="sumTaksit">—</span></div>
+      <div class="fld" style="text-align:right"><label>Aylık Taksit</label><span id="aylik" class="mut">—</span></div>
       <div class="fld" style="text-align:right"><label>Kâr</label><span class="big" id="karPct">—</span></div>
-    </div></div>
+    </div>
+    <div class="row" id="kampInfoRow" style="margin-top:6px;display:none"><span id="kampInfo" class="mut" style="font-size:12px"></span></div>
+    </div>
     <div class="row" style="justify-content:flex-end">
       <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
       <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
@@ -446,29 +454,77 @@ async function bayiStokYukle(){
 }
 
 // ===== TEKLİF / ÜRÜN =====
-function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,nakit:null,taksit:null,maliyet:null,kar:null,s1:null,s2:null}); renderRows(); }
+let komisOran=0, lastTot=null;
+function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,nakit:null,taksit:null,maliyet:null,kar:null,s1:null,s2:null,sKadikoy:0,netStok:null}); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
+function recalc(){ renderRows(); }
+function stokCell(v){ if(v==null) return '<span class="mut">—</span>'; if(v<=0) return '<span class="mut">0</span>'; if(v<=3) return `<span class="blink" title="Az stok!">${v}</span>`; return v; }
+function calcParts(r,kar,komis){
+  const adet=r.adet??1;
+  const unitToptan = r.isET ? (+r.etToptan||0) : (+r.toptan||0);
+  const unitBip = r.isET ? 0 : (+r.bip||0);
+  const unitBipli = unitToptan - unitBip;
+  const unitNakit = unitBipli*(1+kar/100);
+  const km = komis>0 ? (1+kar/100)*komis/100 : 0;
+  const unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
+  const unitNetTaksit = unitTaksit*(1-komis/100);
+  const karPct = unitBipli>0 ? ((komis>0?unitNetTaksit:unitNakit)/unitBipli -1)*100 : 0;
+  return {adet,unitToptan,unitBip,unitBipli,unitNakit,unitTaksit,karPct};
+}
 function renderRows(){
-  const tb=$("rows"); if(!tb) return; tb.innerHTML="";
+  const tb=$("rows"); if(!tb) return;
+  const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
+  tb.innerHTML="";
+  let tMaliyet=0,tBip=0,tBipli=0,tAdet=0;
   quoteRows.forEach((r,i)=>{
+    const p=calcParts(r,kar,komis);
+    r.nakit=p.unitNakit; r.taksit=p.unitTaksit; r.maliyet=p.unitToptan; r.kar=p.karPct;
+    const maliyetL=p.unitToptan*p.adet, bipL=p.unitBip*p.adet, nakitL=p.unitNakit*p.adet, taksitL=p.unitTaksit*p.adet;
+    const valid = r.kod && r.ad!=="— bulunamadı —" && (r.isET? (+r.etToptan>0) : (+r.toptan>0));
+    if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0); }
+    const maliyetCell = r.isET
+      ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:90px" oninput="quoteRows[${i}].etToptan=+this.value;recalc()">`
+      : fmt(maliyetL);
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC()"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
-      <td>${r.ad||""}</td>
-      <td><input style="width:60px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;renderRows()"></td>
-      <td class="num">${fmt(r.nakit)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="Ürünü ${brand==='bosch'?'Bosch':'Siemens'} sitesinde ara" style="text-decoration:none">🔍</a>`:""}</td><td class="num">${fmt(r.taksit)}</td><td class="num">${fmt(r.maliyet)}</td>
-      <td class="num ${r.kar==null?'':(r.kar<3?'bad':r.kar<8?'warn':'ok')}">${r.kar==null?'—':r.kar.toFixed(1)+'%'}</td>
-      <td class="num">${r.s1??'—'}</td><td class="num">${r.s2??'—'}</td>
-      <td><button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
+      <td>${r.ad||""}${r.isET?' <span class="badge" style="font-size:9px">E.T.</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="Kadıköy deposunda ${r.sKadikoy} adet — ÖNCELİK buradan ver">KD</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+      <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
+      <td class="num">${maliyetCell}</td>
+      <td class="num">${r.isET?'—':fmt(bipL)}</td>
+      <td class="num">${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}</td>
+      <td class="num">${fmt(taksitL)}</td>
+      <td class="num ${!valid?'':(p.karPct<3?'bad':p.karPct<8?'warn':'ok')}">${valid?p.karPct.toFixed(1)+'%':'—'}</td>
+      <td class="num">${stokCell(r.s1)}</td><td class="num">${stokCell(r.s2)}</td>
+      <td style="white-space:nowrap"><button class="ghost sm" title="Elle toptan gir (E.T.)" onclick="quoteRows[${i}].isET=!quoteRows[${i}].isET;recalc()">E.T.</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
-  const s=(f)=>quoteRows.reduce((a,r)=>a+(r[f]||0)*(r.adet||1),0);
-  $("tAdet").textContent=fmt(quoteRows.reduce((a,r)=>a+(+r.adet||0),0));
-  $("tNakit").textContent=fmt(s('nakit')); $("tTaksit").textContent=fmt(s('taksit')); $("tMaliyet").textContent=fmt(s('maliyet'));
+  const ks=matchKampanyalar();
+  const hakedis=ks.reduce((a,k)=>a+(+k.hakedis||0),0);
+  const musteriInd=ks.reduce((a,k)=>a+(+k.musteri_indirimi||0),0);
+  const dip=Math.max(0,tBipli-hakedis);
+  const finalNakit=dip*(1+kar/100);
+  const km=komis>0?(1+kar/100)*komis/100:0;
+  const finalTaksit=(km>0&&km<1)?(1+kar/100)*dip/(1-km):finalNakit;
+  const netTaksit=finalTaksit*(1-komis/100);
+  const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
+  const tk=+(($("taksit")||{}).value)||0;
+  lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip};
+  $("tAdet").textContent=fmt(tAdet);
+  $("tMaliyet").textContent=fmt(tMaliyet);
+  $("tBip").textContent=fmt(tBip);
+  $("tNakit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0));
+  $("tTaksit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0));
+  const tKarEl=$("tKar"); if(tKarEl){ tKarEl.textContent=tBipli>0?karPct.toFixed(1)+'%':'—'; tKarEl.className="num "+(tBipli<=0?'':(karPct<3?'bad':karPct<8?'warn':'ok')); }
+  if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
+  if($("sumTaksit")) $("sumTaksit").textContent= komis>0? fmt(finalTaksit) : '—';
+  if($("aylik")) $("aylik").textContent= (komis>0&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
+  if($("karPct")){ const e=$("karPct"); e.textContent=tBipli>0?karPct.toFixed(1)+'%':'—'; e.className="big "+(tBipli<=0?'':(karPct<3?'bad':karPct<8?'warn':'ok')); }
+  const kr=$("kampInfoRow");
+  if(kr){ if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygulandı: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.`; } else kr.style.display="none"; }
   renderKampanyaPanel();
-  calcBank();
 }
 // ===== KAMPANYA OTOMATİK UYGULAMA (teklif ekranı) =====
 let aktifKampanyalar=[];
@@ -527,7 +583,7 @@ function renderKampanyaPanel(){
   const toplamNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
   const indT=ks.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
   const hakT=ks.reduce((a,k)=>a+(k.hakedis||0),0);
-  list.innerHTML=ks.map(k=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
+  list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın — kampanya kotası/geçerliliği Diva'dan teyit edilmeden satışı tamamlamayın.</div>`+ks.map(k=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
       <div><b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}</div>
       <div class="mut" style="font-size:13px">İndirim <b style="color:var(--ok)">${fmt(k.musteri_indirimi)} ₺</b> · Hakediş <b style="color:var(--acc)">${fmt(k.hakedis)} ₺</b></div>
     </div>`).join("")
@@ -556,58 +612,58 @@ async function refetch(r){
   if(!r.kod){ renderRows(); return; }
   const {data:f} = await sb.rpc("urun_fiyat",{p_model_kodu:r.kod,p_marka:brand});
   const row=f&&f[0];
-  if(row && (row.urun_adi || row.nakit_fiyat!=null)){
-    r.ad=row.urun_adi||r.kod; r.nakit=row.nakit_fiyat; r.taksit=row.taksit_fiyat; r.maliyet=row.net_maliyet;
-    r.kar=(row.net_maliyet&&row.nakit_fiyat)?(row.nakit_fiyat/row.net_maliyet-1)*100:null;
-  } else { r.ad="— bulunamadı —"; r.nakit=r.taksit=r.maliyet=r.kar=null; }
-  r.s1=r.s2=null;
+  if(row && (row.urun_adi || row.toptan_fiyat!=null)){
+    r.ad=row.urun_adi||r.kod; r.toptan=row.toptan_fiyat; r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
+    if(row.toptan_fiyat!=null) r.isET=false;
+  } else { r.ad="— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; }
+  r.s1=r.s2=null; r.sKadikoy=0; r.netStok=null;
   if(profil.rol==="bayi"){
     const {data:bs}=await sb.from("bayi_stok").select("adet").eq("model_kodu",r.kod).eq("marka",brand).maybeSingle();
-    r.s1 = bs? bs.adet : 0;
+    r.s1 = bs? bs.adet : 0; r.netStok=r.s1;
   } else {
     const {data:st}=await sb.from("stok").select("depo,tip,adet").eq("model_kodu",r.kod).eq("marka",brand);
     const acc={mars:0,horoz:0,kadikoy:0};
     (st||[]).forEach(x=>{ const sg=x.tip==='ayrilmis'?-1:1; acc[x.depo]=(acc[x.depo]||0)+sg*(x.adet||0); });
-    r.s1=acc.mars; r.s2=acc.horoz;
+    r.s1=acc.mars; r.s2=acc.horoz; r.sKadikoy=acc.kadikoy; r.netStok=acc.mars+acc.horoz+acc.kadikoy;
   }
   renderRows();
 }
 async function loadBanks(){
   const {data}=await sb.from("banka_komisyonlari").select("banka").order("banka");
   const uniq=[...new Set((data||[]).map(x=>x.banka))];
-  $("banka").innerHTML=uniq.map(b=>`<option>${b}</option>`).join(""); await loadTaksit();
+  $("banka").innerHTML='<option value="">— peşin —</option>'+uniq.map(b=>`<option>${b}</option>`).join(""); await loadTaksit();
 }
 async function loadTaksit(){
-  const {data}=await sb.from("banka_komisyonlari").select("taksit_sayisi").eq("banka",$("banka").value).order("taksit_sayisi");
-  $("taksit").innerHTML=(data||[]).map(x=>`<option>${x.taksit_sayisi}</option>`).join(""); calcBank();
+  const bk=$("banka").value;
+  if(!bk){ $("taksit").innerHTML='<option value="">—</option>'; await setKomis(); return; }
+  const {data}=await sb.from("banka_komisyonlari").select("taksit_sayisi").eq("banka",bk).order("taksit_sayisi");
+  $("taksit").innerHTML=(data||[]).map(x=>`<option>${x.taksit_sayisi}</option>`).join(""); await setKomis();
 }
-async function calcBank(){
-  const satisV=+$("satis").value||0, bk=$("banka").value, tk=+$("taksit").value;
-  const aylik=$("aylik"),kom=$("kom"),karPct=$("karPct");
-  if(!satisV||!bk||!tk){ aylik.textContent="—";kom.textContent="—";karPct.textContent="—";karPct.className="big";return; }
+async function setKomis(){
+  const bk=$("banka").value, tk=+$("taksit").value;
+  if(!bk||!tk){ komisOran=0; renderRows(); return; }
   const {data}=await sb.from("banka_komisyonlari").select("oran").eq("banka",bk).eq("taksit_sayisi",tk).maybeSingle();
-  const oran=data?data.oran:0, komT=satisV*oran/100;
-  aylik.textContent=fmt(satisV/tk); kom.textContent=`%${oran} = ${fmt(komT)} ₺`;
-  const netM=quoteRows.reduce((a,r)=>a+(r.maliyet||0)*(r.adet||1),0);
-  const kar=netM?((satisV-komT)/netM-1)*100:null;
-  karPct.textContent=kar==null?"—":kar.toFixed(1)+"%"; karPct.className="big "+(kar==null?"":(kar<3?"bad":kar<8?"warn":"ok"));
+  komisOran = data? +data.oran : 0; renderRows();
 }
+function onBankChange(){ loadTaksit(); }
+function onTaksitChange(){ setKomis(); }
+function calcBank(){ renderRows(); }
 async function saveQuote(){
   const {data:{user}}=await sb.auth.getUser();
   const satirlar=quoteRows.filter(r=>r.kod&&r.ad!=="— bulunamadı —").map(r=>({model:r.kod,ad:r.ad,adet:r.adet,nakit:r.nakit,taksit:r.taksit,maliyet:r.maliyet}));
   const msg=$("saveMsg");
   if(!satirlar.length){ msg.textContent="Geçerli ürün yok."; msg.className="bad"; return; }
-  const toplam=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
-  const {error}=await sb.from("teklifler").insert({bayi_id:user.id,marka:brand,musteri_ad:$("mAd").value,musteri_tel:$("mTel").value,satirlar,toplam,satis_tutari:+$("satis").value||null});
+  const toplam=lastTot?Math.round(lastTot.finalNakit):quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
+  const {error}=await sb.from("teklifler").insert({bayi_id:user.id,marka:brand,musteri_ad:$("mAd").value,musteri_tel:$("mTel").value,satirlar,toplam,satis_tutari:toplam});
   msg.textContent=error?"Hata: "+error.message:"✓ Teklif kaydedildi"; msg.className=error?"bad":"ok";
 }
 function teklifItems(){ return quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —"); }
-function teklifToplam(items){ const s=+$("satis").value||0; return s>0? s : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0); }
+function teklifToplam(items){ return lastTot? Math.round((komisOran>0?lastTot.finalTaksit:lastTot.finalNakit)) : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0); }
 function shareWhatsApp(){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   const toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
   let m="*FİYAT TEKLİFİ*\n"+"═".repeat(16)+"\n\n";
-  items.forEach((r,i)=>{ m+=`${i+1}. *${r.kod}*${r.ad?(" - "+r.ad):""} × ${r.adet}\n   Fiyat: ${fmt(r.nakit)} ₺\n\n`; });
+  items.forEach((r,i)=>{ const kd=r.sKadikoy>0?" [KD]":""; m+=`${i+1}. *${r.kod}*${kd}${r.ad?(" - "+r.ad):""} × ${r.adet}\n   Fiyat: ${fmt((r.nakit||0)*(r.adet||1))} ₺\n\n`; });
   m+="─".repeat(16)+`\n*TOPLAM:* ${fmt(toplam)} ₺\n`;
   if(tk>1) m+=`💳 ${bk} ${tk} Taksit | Aylık: ${fmt(toplam/tk)} ₺\n`;
   m+="\n_Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlıdır._";
@@ -619,7 +675,7 @@ function printDoc(kind){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   const ad=$("mAd").value||"", tel=$("mTel").value||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
   const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
-  const tr=items.map((r,i)=>`<tr><td>${i+1}</td><td>${r.kod}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(r.nakit)} ₺</td><td style="text-align:right">${fmt((r.nakit||0)*(r.adet||1))} ₺</td></tr>`).join("");
+  const tr=items.map((r,i)=>`<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(r.nakit)} ₺</td><td style="text-align:right">${fmt((r.nakit||0)*(r.adet||1))} ₺</td></tr>`).join("");
   const imza= kind==="siparis"?`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px"><div>Müşteri İmza<br><br>____________________</div><div>Mağaza İmza<br><br>____________________</div></div>`:"";
   const w=window.open("","_blank"); if(!w){ alert("Açılır pencere engellendi."); return; }
   w.document.write(`<html><head><meta charset="utf-8"><title>${baslik}</title>
