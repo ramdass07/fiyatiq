@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  :root{--bg:#0f172a;--panel:#1e293b;--line:#334155;--txt:#e2e8f0;--mut:#94a3b8;--acc:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;}
+  :root{--bg:#f0f4f8;--panel:#ffffff;--line:#e2e8f0;--txt:#1e293b;--mut:#64748b;--acc:#1e40af;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--field:#f1f5f9;}
   *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,sans-serif}
   body{margin:0;background:var(--bg);color:var(--txt);font-size:14px}
   header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
@@ -18,7 +18,7 @@
   button.sm{padding:5px 10px;font-size:13px}
   button.bad{background:var(--bad);color:#fff}
   button:disabled{opacity:.5;cursor:not-allowed}
-  select,input,textarea{background:#0b1220;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
+  select,input,textarea{background:var(--field);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
   .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg button{background:transparent;color:var(--mut);border:0;border-radius:0;padding:7px 16px}
   .seg button.on{background:var(--acc);color:#06263a}
@@ -38,6 +38,11 @@
   .big{font-size:22px;font-weight:700}
   .mut{color:var(--mut)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
   .login{max-width:380px;margin:70px auto;text-align:center}
+  .brand{font-weight:800;letter-spacing:1px;color:var(--acc)}
+  .brand .q{color:var(--ok)}
+  .login .brand{font-size:40px;letter-spacing:2px;margin-bottom:6px;display:block}
+  .login .slogan{color:var(--mut);font-size:13px;margin-bottom:18px}
+  header .brand{font-size:22px}
   .login .card{display:flex;flex-direction:column;gap:12px}
   .err{color:var(--bad);font-size:13px;min-height:18px}
   .ok-msg{color:var(--ok);font-size:13px;min-height:18px}
@@ -46,10 +51,10 @@
   .autocomplete{position:absolute;z-index:9999;background:var(--panel);border:1px solid var(--acc);border-radius:8px;max-height:280px;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
   .autocomplete.show{display:block}
   .ac-item{display:flex;flex-direction:column;gap:2px;padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
-  .ac-item:hover{background:#0b1220}
+  .ac-item:hover{background:var(--field)}
   .ac-code{font-weight:700;color:var(--acc);font-size:13px}.ac-name{font-size:12px;color:var(--mut)}
   .msg{font-size:13px;margin-top:8px;min-height:18px;white-space:pre-wrap}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:#0b1220;border:1px solid var(--line);margin-left:6px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:var(--field);border:1px solid var(--line);margin-left:6px}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px}
   .pill.aktif{background:#0c2f1a;color:var(--ok);border:1px solid #1f5236}
   .pill.pasif{background:#3b1d1d;color:var(--bad);border:1px solid #5b2a2a}
@@ -62,7 +67,8 @@
 <div id="cfgWarn">⚠️ Supabase bilgileri girilmemiş.</div>
 
 <div id="loginView" class="login" style="display:none">
-  <h1>Fiyatiq</h1>
+  <h1 class="brand">fiyat<span class="q">iq</span></h1>
+  <div class="slogan">Çok bayili fiyat & teklif sistemi</div>
   <div class="card" id="loginCard">
     <input id="email" type="email" placeholder="E-posta">
     <input id="pass" type="password" placeholder="Şifre">
@@ -83,7 +89,7 @@
 </div>
 
 <div id="pendingView" class="login" style="display:none">
-  <h1>Fiyatiq</h1>
+  <h1 class="brand">fiyat<span class="q">iq</span></h1>
   <div class="card">
     <p>Kaydın alındı. ✓</p>
     <p class="mut">Hesabın <b>yönetici onayı</b> bekliyor. Onaylandığında fiyat ve teklif ekranını kullanabileceksin.</p>
@@ -95,7 +101,7 @@
 
 <div id="appView" style="display:none">
   <header>
-    <h1>Fiyatiq</h1>
+    <h1 class="brand">fiyat<span class="q">iq</span></h1>
     <div class="seg" id="brandSeg">
       <button data-b="siemens" class="on" onclick="setBrand('siemens')">Siemens</button>
       <button data-b="bosch" onclick="setBrand('bosch')">Bosch</button>
@@ -133,7 +139,13 @@
       <div class="fld" style="text-align:right"><label>Komisyon</label><span id="kom" class="mut">—</span></div>
       <div class="fld" style="text-align:right"><label>Kâr</label><span class="big" id="karPct">—</span></div>
     </div></div>
-    <div class="row" style="justify-content:flex-end"><button onclick="saveQuote()">Teklifi Kaydet</button><span id="saveMsg" class="mut" style="align-self:center"></span></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="ghost" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
+      <button class="ghost" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
+      <button style="background:#16a34a;color:#fff" onclick="shareWhatsApp()">WhatsApp</button>
+      <button onclick="saveQuote()">Teklifi Kaydet</button>
+      <span id="saveMsg" class="mut" style="align-self:center"></span>
+    </div>
   </main>
 
   <main id="adminView" style="display:none">
@@ -410,6 +422,41 @@ async function saveQuote(){
   const toplam=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
   const {error}=await sb.from("teklifler").insert({bayi_id:user.id,marka:brand,musteri_ad:$("mAd").value,musteri_tel:$("mTel").value,satirlar,toplam,satis_tutari:+$("satis").value||null});
   msg.textContent=error?"Hata: "+error.message:"✓ Teklif kaydedildi"; msg.className=error?"bad":"ok";
+}
+function teklifItems(){ return quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —"); }
+function teklifToplam(items){ const s=+$("satis").value||0; return s>0? s : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0); }
+function shareWhatsApp(){
+  const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
+  const toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
+  let m="*FİYAT TEKLİFİ*\n"+"═".repeat(16)+"\n\n";
+  items.forEach((r,i)=>{ m+=`${i+1}. *${r.kod}*${r.ad?(" - "+r.ad):""} × ${r.adet}\n   Fiyat: ${fmt(r.nakit)} ₺\n\n`; });
+  m+="─".repeat(16)+`\n*TOPLAM:* ${fmt(toplam)} ₺\n`;
+  if(tk>1) m+=`💳 ${bk} ${tk} Taksit | Aylık: ${fmt(toplam/tk)} ₺\n`;
+  m+="\n_Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlıdır._";
+  let phone=($("mTel").value||"").replace(/\D/g,""); if(phone.startsWith("0")) phone="90"+phone.slice(1); else if(phone.length===10) phone="90"+phone;
+  const url= phone? `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(m)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(m)}`;
+  window.open(url,"_blank");
+}
+function printDoc(kind){
+  const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
+  const ad=$("mAd").value||"", tel=$("mTel").value||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
+  const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
+  const tr=items.map((r,i)=>`<tr><td>${i+1}</td><td>${r.kod}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(r.nakit)} ₺</td><td style="text-align:right">${fmt((r.nakit||0)*(r.adet||1))} ₺</td></tr>`).join("");
+  const imza= kind==="siparis"?`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px"><div>Müşteri İmza<br><br>____________________</div><div>Mağaza İmza<br><br>____________________</div></div>`:"";
+  const w=window.open("","_blank"); if(!w){ alert("Açılır pencere engellendi."); return; }
+  w.document.write(`<html><head><meta charset="utf-8"><title>${baslik}</title>
+  <style>body{font-family:Arial;color:#1e293b;padding:24px}h1{color:#1e40af;text-align:center;margin:0;letter-spacing:3px;font-weight:800}
+  .sub{text-align:center;color:#64748b;margin:2px 0 16px;font-size:12px;letter-spacing:1px}
+  .info{display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
+  table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px}th{background:#eff6ff;color:#1e40af}
+  .tot{text-align:right;font-size:18px;font-weight:800;color:#1e40af;margin-top:12px}.foot{margin-top:18px;font-size:11px;color:#64748b}</style></head>
+  <body><h1>fiyatiq</h1><div class="sub">${baslik}</div>
+  <div class="info"><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div><div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
+  <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Birim</th><th>Tutar</th></tr></thead><tbody>${tr}</tbody></table>
+  <div class="tot">TOPLAM: ${fmt(toplam)} ₺${tk>1?` &nbsp;|&nbsp; ${bk} ${tk} Taksit — Aylık ${fmt(toplam/tk)} ₺`:""}</div>
+  ${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
+  <script>window.onload=function(){window.print()}<\/script></body></html>`);
+  w.document.close();
 }
 
 // ===== AYRI YÜKLEME KUTULARI =====
