@@ -193,6 +193,19 @@
       <div id="kMsg" class="msg"></div>
       <table style="margin-top:12px"><thead><tr><th>Ad</th><th>Marka</th><th>Eşleşme</th><th>Müşteri ₺</th><th>Hakediş ₺</th><th>Bitiş</th><th></th></tr></thead><tbody id="kList"></tbody></table>
     </div>
+
+    <div class="card" id="bankaCard">
+      <h2>Banka Komisyonları <span class="badge">taksit oranları</span></h2>
+      <p class="mut" style="font-size:12px;margin:0 0 8px">Her banka–taksit için komisyon oranı (%). Teklif ekranındaki <b>kâr hesabı</b> bunu kullanır. Matris hücresini değiştir → otomatik kaydolur. Yeni banka/taksit için aşağıdan ekle.</p>
+      <div class="row" style="margin-bottom:8px">
+        <div class="fld"><label>Banka</label><input id="bkBanka" placeholder="Garanti" style="width:160px"></div>
+        <div class="fld"><label>Taksit</label><input id="bkTaksit" type="number" placeholder="3" style="width:90px"></div>
+        <div class="fld"><label>Oran %</label><input id="bkOran" type="number" step="0.01" placeholder="5.5" style="width:90px"></div>
+        <button class="sm" onclick="bankaEkle()">Ekle / Güncelle</button>
+        <span id="bkMsg" class="msg"></span>
+      </div>
+      <div id="bankaGrid"></div>
+    </div>
   </main>
 </div>
 
@@ -296,7 +309,46 @@ function toggleAdmin(){
   const a=$("adminView"), b=$("bayiView");
   const showAdmin = a.style.display==="none";
   a.style.display = showAdmin?"block":"none"; b.style.display = showAdmin?"none":"block";
-  if(showAdmin){ loadKampanyalar(); if(profil.rol==="admin") loadBayiler(); }
+  if(showAdmin){ loadKampanyalar(); loadBankaPanel(); if(profil.rol==="admin") loadBayiler(); }
+}
+// ===== BANKA KOMİSYONLARI (yönetim) =====
+async function loadBankaPanel(){
+  const g=$("bankaGrid"); if(!g) return;
+  const {data}=await sb.from("banka_komisyonlari").select("*");
+  const rows=(data||[]).sort((a,b)=> a.banka===b.banka? a.taksit_sayisi-b.taksit_sayisi : a.banka.localeCompare(b.banka,"tr"));
+  if(!rows.length){ g.innerHTML='<p class="mut" style="font-size:12px">Henüz oran yok. Yukarıdan banka–taksit–oran ekle.</p>'; return; }
+  const banks=[...new Set(rows.map(r=>r.banka))];
+  const taksitler=[...new Set(rows.map(r=>r.taksit_sayisi))].sort((a,b)=>a-b);
+  let h='<table><thead><tr><th>Banka \\ Taksit</th>'+taksitler.map(t=>`<th class="num">${t}</th>`).join("")+'<th></th></tr></thead><tbody>';
+  banks.forEach(b=>{
+    const be=b.replace(/'/g,"\\'");
+    h+=`<tr><td><b>${b}</b></td>`;
+    taksitler.forEach(t=>{
+      const r=rows.find(x=>x.banka===b&&x.taksit_sayisi===t);
+      h+=`<td class="num"><input type="number" step="0.01" value="${r?r.oran:""}" placeholder="—" style="width:62px;text-align:right" onchange="bankaKaydet('${be}',${t},this.value)"></td>`;
+    });
+    h+=`<td><button class="ghost sm" onclick="bankaSilBanka('${be}')">✕</button></td></tr>`;
+  });
+  g.innerHTML=h+"</tbody></table>";
+}
+async function bankaEkle(){
+  const b=$("bkBanka").value.trim(), t=+$("bkTaksit").value, o=+$("bkOran").value||0, msg=$("bkMsg");
+  if(!b||!t){ msg.textContent="Banka ve taksit gir."; msg.className="msg bad"; return; }
+  const {error}=await sb.from("banka_komisyonlari").upsert({banka:b,taksit_sayisi:t,oran:o},{onConflict:"banka,taksit_sayisi"});
+  msg.textContent=error?"Hata: "+error.message:"✓ Kaydedildi"; msg.className="msg "+(error?"bad":"ok");
+  if(!error){ $("bkTaksit").value=""; $("bkOran").value=""; loadBankaPanel(); loadBanks(); }
+}
+async function bankaKaydet(b,t,val){
+  const msg=$("bkMsg");
+  if(val===""||val==null){ const {error}=await sb.from("banka_komisyonlari").delete().eq("banka",b).eq("taksit_sayisi",t); msg.textContent=error?"Hata: "+error.message:"✓ "+b+" "+t+" taksit silindi"; msg.className="msg "+(error?"bad":"ok"); loadBankaPanel(); loadBanks(); return; }
+  const {error}=await sb.from("banka_komisyonlari").upsert({banka:b,taksit_sayisi:t,oran:+val},{onConflict:"banka,taksit_sayisi"});
+  msg.textContent=error?"Hata: "+error.message:"✓ "+b+" "+t+" taksit → %"+val; msg.className="msg "+(error?"bad":"ok"); loadBanks();
+}
+async function bankaSilBanka(b){
+  if(!confirm(b+" bankasının tüm taksit oranları silinsin mi?")) return;
+  const {error}=await sb.from("banka_komisyonlari").delete().eq("banka",b);
+  $("bkMsg").textContent=error?"Hata: "+error.message:"✓ "+b+" silindi"; $("bkMsg").className="msg "+(error?"bad":"ok");
+  loadBankaPanel(); loadBanks();
 }
 
 // ===== BAYİLER =====
