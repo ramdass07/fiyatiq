@@ -177,7 +177,13 @@
     <div class="card">
       <h2>Kampanya İçe Aktar <span class="badge">Bosch PDF / Siemens Excel</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Üstten markayı seç, dosyayı at → sistem indirimli kampanyaları çıkarır → her birini kontrol edip "Ekle"ye bas.</p>
-      <div class="row"><input id="kampFile" type="file" accept=".pdf,.xlsx,.xls"><button class="sm" onclick="kampOku()">Oku</button><span id="kampMsg" class="msg"></span></div>
+      <div class="row" style="align-items:flex-end">
+        <input id="kampFile" type="file" accept=".pdf,.xlsx,.xls"><button class="sm" onclick="kampOku()">Oku</button>
+        <div class="fld"><label>Geçerlilik bitişi (tümü)</label><input id="kampGlobalBitis" type="date"></div>
+        <button class="ghost sm" onclick="applyGlobalBitis()" title="Tüm aday kampanyaların bitiş tarihini bu yapar">Tümüne uygula</button>
+        <span id="kampMsg" class="msg"></span>
+      </div>
+      <p class="mut" style="font-size:11px;margin:4px 0 0">Tarih PDF'ten otomatik dolar; uzatıldıysa burada değiştir → "Tümüne uygula" de. Her ay tek yerden ayarlarsın.</p>
       <div id="kampAday"></div>
     </div>
 
@@ -503,8 +509,9 @@ function renderRows(){
     tb.appendChild(tr);
   });
   const ks=matchKampanyalar();
-  const hakedis=ks.reduce((a,k)=>a+(+k.hakedis||0),0);
-  const musteriInd=ks.reduce((a,k)=>a+(+k.musteri_indirimi||0),0);
+  const applied=ks.filter(k=>secilenKampanya.has(k.id));
+  const hakedis=applied.reduce((a,k)=>a+(+k.hakedis||0),0);
+  const musteriInd=applied.reduce((a,k)=>a+(+k.musteri_indirimi||0),0);
   const dip=Math.max(0,tBipli-hakedis);
   const finalNakit=dip*(1+kar/100);
   const km=komis>0?(1+kar/100)*komis/100:0;
@@ -525,11 +532,14 @@ function renderRows(){
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.textContent=tBipli>0?karPct.toFixed(1)+'%':'—'; e.className="big "+(tBipli<=0?'':(karPct<3?'bad':karPct<8?'warn':'ok')); }
   const kr=$("kampInfoRow");
-  if(kr){ if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygulandı: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.`; } else kr.style.display="none"; }
+  if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.`; }
+    else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya <b>önerildi</b> — uygulamak için yukarıdaki yeşil panelden <b>"Uygula"</b> de.`; }
+    else kr.style.display="none"; }
   renderKampanyaPanel();
 }
 // ===== KAMPANYA OTOMATİK UYGULAMA (teklif ekranı) =====
 let aktifKampanyalar=[];
+let secilenKampanya=new Set();
 function katNorm(s){ return (s||"").toString().toUpperCase()
   .replace(/İ/g,"I").replace(/Ş/g,"S").replace(/Ğ/g,"G").replace(/Ü/g,"U").replace(/Ö/g,"O").replace(/Ç/g,"C").replace(/ı/g,"I").trim(); }
 function kategoriOf(code){
@@ -587,19 +597,23 @@ function renderKampanyaPanel(){
     list.innerHTML=`<div class="mut" style="font-size:12px">Ürün ekledikçe <b>${markaAd}</b> için uygun kampanyalar burada otomatik çıkar.${aktifKampanyalar.length?'':` Şu an ${markaAd} markasında tanımlı aktif kampanya yok.`}</div>`;
     return;
   }
-  const toplamNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
-  const indT=ks.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
-  const hakT=ks.reduce((a,k)=>a+(k.hakedis||0),0);
-  list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın — kampanya kotası/geçerliliği Diva'dan teyit edilmeden satışı tamamlamayın.</div>`+ks.map(k=>`<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
-      <div><b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}</div>
-      <div class="mut" style="font-size:13px">İndirim <b style="color:var(--ok)">${fmt(k.musteri_indirimi)} ₺</b> · Hakediş <b style="color:var(--acc)">${fmt(k.hakedis)} ₺</b></div>
-    </div>`).join("")
+  const appliedIds=ks.filter(k=>secilenKampanya.has(k.id));
+  const indT=appliedIds.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
+  const hakT=appliedIds.reduce((a,k)=>a+(k.hakedis||0),0);
+  list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın — kampanya kotası/geçerliliği Diva'dan teyit edilmeden satışı tamamlamayın.</div>`
+    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Aşağıdaki kampanyalar bu sepete <b>uygun</b>. İndirim/hakediş ancak <b>"Uygula"</b> dediğinde işlenir.</div>`
+    +ks.map(k=>{ const on=secilenKampanya.has(k.id); return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0">
+      <div style="flex:1"><b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}</div>
+      <div class="mut" style="font-size:13px;margin:0 14px">İndirim <b style="color:var(--ok)">${fmt(k.musteri_indirimi)} ₺</b> · Hakediş <b style="color:var(--acc)">${fmt(k.hakedis)} ₺</b></div>
+      <button class="${on?'':'ghost '}sm" style="${on?'background:var(--ok);color:#06200f':''}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button>
+    </div>`;}).join("")
     +`<div class="row" style="justify-content:flex-end;margin-top:10px;gap:22px">
-        <span class="mut">Kampanyalı net: <b class="big" style="color:var(--ok)">${fmt(Math.max(0,toplamNakit-indT))} ₺</b></span>
-        <span class="mut">Toplam hakediş (size iade): <b style="color:var(--acc)">${fmt(hakT)} ₺</b></span>
+        <span class="mut">Uygulanan müşteri indirimi: <b style="color:var(--ok)">${fmt(indT)} ₺</b></span>
+        <span class="mut">Uygulanan hakediş (size iade): <b class="big" style="color:var(--acc)">${fmt(hakT)} ₺</b></span>
       </div>`;
   panel.style.display="";
 }
+function toggleKampanya(id){ if(secilenKampanya.has(id)) secilenKampanya.delete(id); else secilenKampanya.add(id); renderRows(); }
 async function onCode(i,val){ quoteRows[i].kod=val.trim().toUpperCase(); await refetch(quoteRows[i]); }
 let acRow=-1, acTimer=null;
 function onCodeInput(i,val,el){ quoteRows[i].kod=val.toUpperCase(); clearTimeout(acTimer); acTimer=setTimeout(()=>showAC(i,val,el),150); }
@@ -937,6 +951,8 @@ async function kampOku(){
   }catch(e){ msg.textContent="Okuma hatası: "+e.message; msg.className="msg bad"; return; }
   text = text.replace(/([\d.])[ \t]+(?=[\d.])/g,"$1");
   const adaylar=detectCampaigns(text);
+  const pdfBitis=(adaylar.find(a=>a.bitis)||{}).bitis;
+  if(pdfBitis && $("kampGlobalBitis") && !$("kampGlobalBitis").value) $("kampGlobalBitis").value=pdfBitis;
   renderKampAday(adaylar);
   msg.textContent=adaylar.length? `✓ ${adaylar.length} kampanya adayı bulundu. Kontrol edip Ekle.` : "Kampanya bulunamadı (indirimli satır yok).";
   msg.className="msg "+(adaylar.length?"ok":"bad");
@@ -974,7 +990,7 @@ function renderKampAday(list){
       <div class="fld"><label>Müşteri ind. ₺</label><input id="ka_mus${i}" type="number" value="${k.musteri_indirimi||0}" style="width:120px"></div>
       <div class="fld"><label>Hakediş ₺</label><input id="ka_hak${i}" type="number" value="${k.hakedis||0}" style="width:110px"></div>
       <div class="fld"><label>Kota (adet)</label><input id="ka_kota${i}" type="number" value="${k.kota||''}" style="width:100px"></div>
-      <div class="fld"><label>Bitiş</label><input id="ka_bitis${i}" type="date" value="${k.bitis||''}"></div>
+      <div class="fld"><label>Bitiş</label><input id="ka_bitis${i}" type="date" value="${(($("kampGlobalBitis")||{}).value)||k.bitis||''}"></div>
     </div>
     <div class="row" style="margin-top:8px">
       <div class="fld"><label>Marka</label><select id="ka_marka${i}"><option value="bosch" ${brand==='bosch'?'selected':''}>Bosch</option><option value="siemens" ${brand==='siemens'?'selected':''}>Siemens</option><option value="">İkisi</option></select></div>
@@ -989,11 +1005,12 @@ function renderKampAday(list){
 }
 function parseModeller(s){ return [...new Set((s||"").toUpperCase().split(/[^A-Z0-9]+/).filter(x=>x.length>=5 && /\d/.test(x)))]; }
 function modSay(i){ const el=$("ka_modc"+i); if(el) el.textContent="("+parseModeller($("ka_mod"+i).value).length+" model)"; }
+function applyGlobalBitis(){ const v=($("kampGlobalBitis")||{}).value; if(!v) return; document.querySelectorAll('[id^="ka_bitis"]').forEach(el=>el.value=v); }
 async function kampEkle(i){
   const kat=$("ka_kat"+i).value.split(/[\s,;]+/).map(s=>s.trim()).filter(s=>s);
   const mods=parseModeller($("ka_mod"+i).value);
   const rec={ad:$("ka_ad"+i).value.trim(), marka:$("ka_marka"+i).value||null, match_type:$("ka_match"+i).value, kategoriler:kat, secili_modeller:mods,
-    musteri_indirimi:+$("ka_mus"+i).value||0, hakedis:+$("ka_hak"+i).value||0, kota:+$("ka_kota"+i).value||null, bitis_tarihi:$("ka_bitis"+i).value||null};
+    musteri_indirimi:+$("ka_mus"+i).value||0, hakedis:+$("ka_hak"+i).value||0, kota:+$("ka_kota"+i).value||null, bitis_tarihi:$("ka_bitis"+i).value||(($("kampGlobalBitis")||{}).value)||null};
   if(!rec.ad){ $("ka_msg"+i).textContent="Ad gerekli"; $("ka_msg"+i).className="msg bad"; return; }
   const {error}=await sb.from("kampanyalar").insert(rec);
   $("ka_msg"+i).textContent=error?"Hata: "+error.message:"✓ Eklendi";
