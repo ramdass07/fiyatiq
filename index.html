@@ -735,7 +735,7 @@ function adminMsgEl(id,t,cls){ const e=$(id); e.textContent=t; e.className="msg 
 async function admKampanya(){
   try{
     const kat=$("kKat").value.split(",").map(s=>s.trim()).filter(s=>s);
-    const mod=$("kMod").value.split(",").map(s=>s.trim().toUpperCase()).filter(s=>s);
+    const mod=parseModeller($("kMod").value);
     const rec={ad:$("kAd").value.trim(),marka:$("kMarka").value||null,match_type:$("kMatch").value,kategoriler:kat,secili_modeller:mod,
       musteri_indirimi:+$("kMus").value||0,hakedis:+$("kHak").value||0,kota:+$("kKota").value||null,bitis_tarihi:$("kBitis").value||null};
     if(!rec.ad){ adminMsgEl("kMsg","Kampanya adı gir.","bad"); return; }
@@ -815,14 +815,21 @@ function renderKampAday(list){
       <div class="fld"><label>Bitiş</label><input id="ka_bitis${i}" type="date" value="${k.bitis||''}"></div>
     </div>
     <div class="row" style="margin-top:8px">
-      <div class="fld"><label>Kategoriler (virgül)</label><input id="ka_kat${i}" placeholder="CAMASIR,KURUTMA" style="width:240px"></div>
+      <div class="fld"><label>Kategoriler (boşluk/virgül)</label><input id="ka_kat${i}" placeholder="CAMASIR KURUTMA" style="width:240px"></div>
       <div class="fld"><label>Eşleşme</label><select id="ka_match${i}"><option value="all">all</option><option value="any2">any2</option><option value="all+any">all+any (1 zorunlu+diğerinden 1)</option><option value="model_list">model_list</option><option value="tumu">tumu</option></select></div>
       <button onclick="kampEkle(${i})">Ekle</button><span id="ka_msg${i}" class="msg"></span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div class="fld" style="flex:1"><label>Modeller (tablodan olduğu gibi yapıştır — virgül gerekmez) <span class="mut" id="ka_modc${i}"></span></label>
+        <textarea id="ka_mod${i}" rows="2" placeholder="KDN86AWE1N  SMP6ENC60T  WGK242Z0TR ..." style="width:100%;background:var(--field);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px" oninput="modSay(${i})"></textarea></div>
     </div></div>`).join("");
 }
+function parseModeller(s){ return [...new Set((s||"").toUpperCase().split(/[^A-Z0-9]+/).filter(x=>x.length>=5 && /\d/.test(x)))]; }
+function modSay(i){ const el=$("ka_modc"+i); if(el) el.textContent="("+parseModeller($("ka_mod"+i).value).length+" model)"; }
 async function kampEkle(i){
-  const kat=$("ka_kat"+i).value.split(",").map(s=>s.trim()).filter(s=>s);
-  const rec={ad:$("ka_ad"+i).value.trim(), marka:brand, match_type:$("ka_match"+i).value, kategoriler:kat, secili_modeller:[],
+  const kat=$("ka_kat"+i).value.split(/[\s,;]+/).map(s=>s.trim()).filter(s=>s);
+  const mods=parseModeller($("ka_mod"+i).value);
+  const rec={ad:$("ka_ad"+i).value.trim(), marka:brand, match_type:$("ka_match"+i).value, kategoriler:kat, secili_modeller:mods,
     musteri_indirimi:+$("ka_mus"+i).value||0, hakedis:+$("ka_hak"+i).value||0, kota:+$("ka_kota"+i).value||null, bitis_tarihi:$("ka_bitis"+i).value||null};
   if(!rec.ad){ $("ka_msg"+i).textContent="Ad gerekli"; $("ka_msg"+i).className="msg bad"; return; }
   const {error}=await sb.from("kampanyalar").insert(rec);
