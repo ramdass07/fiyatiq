@@ -466,7 +466,7 @@ async function bayiStokYukle(){
 
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
-function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,netStok:null}); renderRows(); }
+function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,netStok:null}); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
 function toggleManuel(i){
@@ -508,16 +508,14 @@ function calcParts(r,kar,komis){
   const unitToptan = r.isET ? (+r.etToptan||0) : (+r.toptan||0);
   const unitBip = r.isET ? 0 : (+r.bip||0);
   const unitBipli = unitToptan - unitBip;
-  const manuel = r.isET && (+r.manuelFiyat>0);   // Manuel satışta peşin fiyatı elle gir → kâr buna göre
   const km = komis>0 ? (1+kar/100)*komis/100 : 0;
+  const manuelP = r.isET && (+r.manuelFiyat>0);   // Manuel peşin
+  const manuelT = r.isET && (+r.manuelTaksit>0);  // Manuel taksitli
   let unitNakit, unitTaksit;
-  if(manuel){
-    unitNakit = +r.manuelFiyat;
-    unitTaksit = komis>0 ? unitNakit/(1-komis/100) : unitNakit;
-  } else {
-    unitNakit = unitBipli*(1+kar/100);
-    unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
-  }
+  unitNakit = manuelP ? (+r.manuelFiyat) : unitBipli*(1+kar/100);
+  if(manuelT) unitTaksit = +r.manuelTaksit;
+  else if(manuelP) unitTaksit = komis>0 ? unitNakit/(1-komis/100) : unitNakit;
+  else unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
   const unitNetTaksit = unitTaksit*(1-komis/100);
   const karPct = unitBipli>0 ? ((komis>0?unitNetTaksit:unitNakit)/unitBipli -1)*100 : 0;
   return {adet,unitToptan,unitBip,unitBipli,unitNakit,unitTaksit,karPct};
@@ -537,8 +535,11 @@ function renderRows(){
       ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:90px" onchange="quoteRows[${i}].etToptan=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(maliyetL);
     const pesinCell = r.isET
-      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="oto: ${fmt(p.unitNakit)}" title="Boş = kâr oranından otomatik fiyat. Elle yazarsan o fiyat geçerli olur." style="width:120px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="oto: ${fmt(p.unitNakit)}" title="Boş = kâr oranından otomatik peşin. Elle yazarsan o fiyat geçerli olur." style="width:120px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : `${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}`;
+    const taksitCell = r.isET
+      ? `<input type="number" value="${r.manuelTaksit||''}" placeholder="oto: ${fmt(p.unitTaksit)}" title="Boş = otomatik taksitli. Elle yazarsan o taksitli fiyat geçerli olur." style="width:120px" onchange="quoteRows[${i}].manuelTaksit=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      : fmt(taksitL);
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off"
@@ -549,7 +550,7 @@ function renderRows(){
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
       <td class="num">${pesinCell}</td>
-      <td class="num">${fmt(taksitL)}</td>
+      <td class="num">${taksitCell}</td>
       <td class="num ${!valid?'':(p.karPct<3?'bad':p.karPct<8?'warn':'ok')}">${valid?p.karPct.toFixed(1)+'%':'—'}</td>
       <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
       <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
