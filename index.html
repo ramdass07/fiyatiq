@@ -27,6 +27,10 @@
   main{padding:20px;max-width:1200px;margin:0 auto}
   table{width:100%;border-collapse:collapse;margin-top:8px}
   th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  #gridWrap{overflow-x:auto;margin-top:8px}
+  #grid{font-size:13px}
+  #grid th,#grid td{padding:6px 7px}
+  #grid input{padding:5px 6px}
   th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
   td input{width:130px;text-align:left}
@@ -133,11 +137,11 @@
       <div class="row" style="margin-bottom:6px">
         <div class="grow"></div><button class="sm" onclick="addRow()">+ Ürün satırı</button>
       </div>
-      <table id="grid"><thead><tr>
+      <div id="gridWrap"><table id="grid"><thead><tr>
         <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Maliyet</th><th>BİP</th><th>Peşin Fiyat</th><th>Taksitli Fiyat</th>
         <th>Kâr %</th><th id="thStok1">Mars</th><th id="thStok2">Horoz</th><th id="thStok3">Kadıköy</th><th id="thStok4" title="Ayrılan Mars">Ayr.M</th><th id="thStok5" title="Ayrılan Horoz">Ayr.H</th><th></th>
       </tr></thead><tbody id="rows"></tbody>
-      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="6"></th></tr></tfoot></table>
+      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="6"></th></tr></tfoot></table></div>
     </div>
     <div class="card" id="kampPanel" style="display:none;border:1px solid var(--ok)">
       <h2 style="margin-top:0">🎁 Uygulanabilir Kampanyalar <span class="badge">otomatik</span></h2>
@@ -535,19 +539,19 @@ function renderRows(){
     const valid = r.kod && r.ad!=="— bulunamadı —" && (r.isET? (+r.etToptan>0) : (+r.toptan>0));
     if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0); }
     const maliyetCell = r.isET
-      ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:90px" onchange="quoteRows[${i}].etToptan=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:78px" onchange="quoteRows[${i}].etToptan=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(maliyetL);
     const pesinCell = r.isET
-      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="oto: ${fmt(p.unitNakit)}" title="Boş = kâr oranından otomatik peşin. Elle yazarsan o fiyat geçerli olur." style="width:120px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="oto:${fmt(p.unitNakit)}" title="Boş = kâr oranından otomatik peşin. Elle yazarsan o fiyat geçerli olur." style="width:92px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : `${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}`;
     const taksitCell = r.isET
-      ? `<input type="number" value="${r.manuelTaksit||''}" placeholder="oto: ${fmt(p.unitTaksit)}" title="Boş = otomatik taksitli. Elle yazarsan o taksitli fiyat geçerli olur." style="width:120px" onchange="quoteRows[${i}].manuelTaksit=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="number" value="${r.manuelTaksit||''}" placeholder="oto:${fmt(p.unitTaksit)}" title="Boş = otomatik taksitli. Elle yazarsan o taksitli fiyat geçerli olur." style="width:92px" onchange="quoteRows[${i}].manuelTaksit=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(taksitL);
     const satirTaksitVar = komis>0 || (r.isET && +r.manuelTaksit>0);
     const karCell = !valid ? '<span class="mut">—</span>' : ('P '+karBadge(p.karPesin) + (satirTaksitVar? '<br>T '+karBadge(p.karTaksit):''));
     const tr=document.createElement("tr");
     tr.innerHTML=`
-      <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off"
+      <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC()"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
       <td>${r.ad||""}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="Kadıköy deposunda ${r.sKadikoy} adet — ÖNCELİK buradan ver">KD</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
