@@ -119,6 +119,11 @@
   </header>
 
   <main id="bayiView">
+    <div class="card">
+      <h2>🔎 Hızlı Stok Sorgu <span class="badge">satış ekranına girmeden bak</span></h2>
+      <div class="row"><input id="stokSorguInput" placeholder="Ürün kodu (ör: KGN56VWD0N)" style="width:300px" autocomplete="off" onkeydown="if(event.key==='Enter')stokSorgula()"><button class="sm" onclick="stokSorgula()">Sorgula</button></div>
+      <div id="stokSorguSonuc" style="margin-top:10px"></div>
+    </div>
     <div class="card" id="bayiStokCard" style="display:none">
       <h2>Stoğum <span class="badge">kendi stok dosyan</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">İlk iki sütun: <code>ürün kodu</code> ve <code>adet</code> olan Excel/CSV. Yüklediğinde mevcut stoğunun yerine geçer.</p>
@@ -466,6 +471,33 @@ let komisOran=0, lastTot=null;
 function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,netStok:null}); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
+async function stokSorgula(){
+  const q=($("stokSorguInput").value||"").trim().toUpperCase(); const box=$("stokSorguSonuc");
+  if(!q){ box.innerHTML=""; return; }
+  box.innerHTML='<span class="mut">Sorgulanıyor...</span>';
+  const {data:f}=await sb.rpc("urun_fiyat",{p_model_kodu:q,p_marka:brand});
+  const row=f&&f[0];
+  let stokHtml="";
+  if(profil.rol==="bayi"){
+    const {data:bs}=await sb.from("bayi_stok").select("adet").eq("model_kodu",q).eq("marka",brand).maybeSingle();
+    stokHtml=`<div style="margin-top:6px">Stoğum: <b style="font-size:18px">${bs?bs.adet:0}</b> adet</div>`;
+  } else {
+    const {data:st}=await sb.from("stok").select("depo,tip,adet").eq("model_kodu",q).eq("marka",brand);
+    const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
+    (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); });
+    const net=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
+    stokHtml=`<table style="margin-top:6px;width:auto"><thead><tr><th>Depo</th><th class="num">Mevcut</th><th class="num">Ayrılan</th></tr></thead><tbody>
+      <tr><td>Mars</td><td class="num">${stokCell(acc.mars.m)}</td><td class="num">${ayrCell(acc.mars.a)}</td></tr>
+      <tr><td>Horoz</td><td class="num">${stokCell(acc.horoz.m)}</td><td class="num">${ayrCell(acc.horoz.a)}</td></tr>
+      <tr><td>Kadıköy ${acc.kadikoy.m>0?'<span class="kd">KD</span>':''}</td><td class="num">${stokCell(acc.kadikoy.m)}</td><td class="num">${ayrCell(acc.kadikoy.a)}</td></tr>
+      </tbody><tfoot><tr><th>NET satılabilir</th><th class="num ${net<=0?'bad':net<=3?'warn':'ok'}" colspan="2">${net}</th></tr></tfoot></table>
+      ${net<=0?'<div class="nostock" style="margin-top:4px">⚠ BU ÜRÜNDE STOK YOK</div>':''}`;
+  }
+  const ad=row&&row.urun_adi?row.urun_adi:q;
+  const fiyat=row&&row.nakit_fiyat?` · <span class="mut">Etiket peşin:</span> <b>${fmt(row.nakit_fiyat)} ₺</b>`:'';
+  const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
+  box.innerHTML=`<div class="card" style="background:var(--field);margin:0;padding:12px"><div><b style="font-size:15px">${ad}</b> <span class="badge" style="font-size:9px">${brand}</span>${fiyat}${yok}</div>${stokHtml}</div>`;
+}
 function stokCell(v){ if(v==null) return '<span class="mut">—</span>'; if(v<=0) return '<span class="mut">0</span>'; if(v<=3) return `<span class="blink" title="Az stok!">${v}</span>`; return v; }
 function ayrCell(v){ if(v==null||v<=0) return '<span class="mut">—</span>'; return `<span style="color:var(--warn)" title="Ayrılan/emanet">${v}</span>`; }
 function calcParts(r,kar,komis){
@@ -520,10 +552,10 @@ function renderRows(){
       <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan fiyat girişi" onclick="quoteRows[${i}].isET=!quoteRows[${i}].isET;recalc()">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
-  const ks=matchKampanyalar();
-  // Seçili ama artık sepete uymayan kampanyaları otomatik düşür (indirim ancak uygun olan + seçilende işler)
-  [...secilenKampanya].forEach(id=>{ if(!ks.find(k=>k.id===id)) secilenKampanya.delete(id); });
-  const applied=ks.filter(k=>secilenKampanya.has(k.id));
+  const ks=matchKampanyalar(); const matchIds=new Set(ks.map(k=>k.id));
+  // Satışçı uygun OLMAYAN kampanyayı da elle uygulayabilir (sorumluluk + Diva uyarısıyla)
+  const applied=aktifKampanyalar.filter(k=>secilenKampanya.has(k.id));
+  const uygunsuzSecili=applied.filter(k=>!matchIds.has(k.id));
   const hakedis=applied.reduce((a,k)=>a+(+k.hakedis||0),0);
   const musteriInd=applied.reduce((a,k)=>a+(+k.musteri_indirimi||0),0);
   const dip=Math.max(0,tBipli-hakedis);
@@ -546,8 +578,8 @@ function renderRows(){
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.textContent=tBipli>0?karPct.toFixed(1)+'%':'—'; e.className="big "+(tBipli<=0?'':(karPct<3?'bad':karPct<8?'warn':'ok')); }
   const kr=$("kampInfoRow");
-  if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.`; }
-    else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya <b>önerildi</b> — uygulamak için yukarıdaki yeşil panelden <b>"Uygula"</b> de.`; }
+  if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}`; }
+    else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygun olabilir — panelden <b>"Uygula"</b> de.`; }
     else kr.style.display="none"; }
   renderKampanyaPanel();
 }
@@ -617,17 +649,20 @@ function renderKampanyaPanel(){
   const indT=applied.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
   const hakT=applied.reduce((a,k)=>a+(k.hakedis||0),0);
   list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın.</div>`
-    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Tüm aktif kampanyalar listeleniyor. <b style="color:var(--warn)">⚠ uygun olabilir</b> işaretliler bu sepete uyuyor; uygulamak için <b>"Uygula"</b> de. <b>Set</b> kampanyalar birbiriyle birleşmez; <b>tekil/hediye</b> eklenebilir.</div>`
+    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Tüm aktif kampanyalar listeleniyor. Hepsinde <b>"Uygula"</b> var; ama sepete uymayan birini işaretlersen <b style="color:var(--bad)">kırmızı uyarı</b> çıkar. <b>Set</b> kampanyalar birbiriyle birleşmez; <b>tekil/hediye</b> eklenebilir.</div>`
     +all.map(k=>{ const on=secilenKampanya.has(k.id); const bndl=isBundleKamp(k); const uygun=matchIds.has(k.id); const mk=k.marka||'ikisi';
-      return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;${uygun?'':'opacity:.6'}">
+      let uyari="";
+      if(uygun) uyari=`<div style="color:var(--warn);font-size:11px;font-weight:700;margin-top:2px">⚠ Bu kampanya uygun olabilir — Diva kontrolü tavsiye edilir</div>`;
+      else if(on) uyari=`<div style="color:var(--bad);font-size:11px;font-weight:700;margin-top:2px">⚠ Bu kampanya sepete UYGUN OLMAYABİLİR — Diva kontrolü tavsiye edilir</div>`;
+      return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;${uygun?'':'opacity:.78'}">
       <div style="flex:1">
         <span class="badge" style="font-size:9px;background:${bndl?'rgba(245,158,11,.2)':'rgba(34,197,94,.2)'}">${bndl?'SET':'TEKİL'}</span>
         <span class="badge" style="font-size:9px">${mk}</span>
         <b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}
-        ${uygun?`<div style="color:var(--warn);font-size:11px;font-weight:700;margin-top:2px">⚠ Bu kampanya uygun olabilir — Diva kontrolü tavsiye edilir</div>`:''}
+        ${uyari}
       </div>
       <div class="mut" style="font-size:13px;margin:0 14px">İnd <b style="color:var(--ok)">${fmt(k.musteri_indirimi)}</b> · Hak <b style="color:var(--acc)">${fmt(k.hakedis)}</b></div>
-      ${uygun?`<button class="${on?'':'ghost '}sm" style="${on?'background:var(--ok);color:#06200f':''}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button>`:`<span class="mut" style="font-size:11px;width:80px;text-align:center">sepete uymuyor</span>`}
+      <button class="${on?'':'ghost '}sm" style="${on?(uygun?'background:var(--ok);color:#06200f':'background:var(--bad);color:#fff'):''}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button>
     </div>`;}).join("")
     +`<div class="row" style="justify-content:flex-end;margin-top:10px;gap:22px">
         <span class="mut">Uygulanan indirim: <b style="color:var(--ok)">${fmt(indT)} ₺</b></span>
@@ -734,6 +769,18 @@ function printDoc(kind){
   const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
   const tr=items.map((r,i)=>`<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(r.nakit)} ₺</td><td style="text-align:right">${fmt((r.nakit||0)*(r.adet||1))} ₺</td></tr>`).join("");
   const imza= kind==="siparis"?`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px"><div>Müşteri İmza<br><br>____________________</div><div>Mağaza İmza<br><br>____________________</div></div>`:"";
+  const bilgi= kind==="siparis"?`<div style="margin-top:18px;font-size:11.5px;line-height:1.55;border-top:1px solid #e2e8f0;padding-top:10px">
+    <b>Değerli Müşterimiz,</b><br>Satın almış olduğunuz ürünlerin teslimat ve montaj sürecinde herhangi bir aksaklık yaşanmaması için aşağıdaki bilgilendirmeleri dikkatle incelemenizi rica ederiz.
+    <ul style="margin:8px 0 0;padding-left:18px">
+      <li>Ürünlerin kullanılacağı alana uygun olup olmadığının tarafınızca kontrol edilmesini rica ederiz.</li>
+      <li>Ürün ölçüleri, güncel ürün kataloglarında ve markanın resmi web sitesinde yer almaktadır.</li>
+      <li>Teslimat günü ve saati için randevu planlamasının sağlıklı yapılabilmesi adına, teslimat talebinizi en az 4 gün önceden mağazamıza bildirmenizi rica ederiz.</li>
+      <li>Solo fırın, ocak, davlumbaz ve aspiratör ürünlerinde; ocak ile aspiratör/davlumbaz arasında en az 65 cm mesafe bulunması gerekmektedir. Bu mesafe uygun değilse yetkili servis montaj işlemini gerçekleştiremeyebilir.</li>
+      <li>Ankastre ocak montajlarında, tezgâh kesim alanının arka duvar ve ön bordüre uzaklığı en az 5 cm, sağ ve sol duvarlara uzaklığı ise en az 15 cm olmalıdır. Ölçülerin uygun olmaması durumunda yetkili servis montaj yapamayabilir.</li>
+      <li>Bulaşık makinelerimizin kurulumu için, bulaşık makinesinin kurulacağı alan üzerinde evye veya ocak olmaması önemle rica edilir.</li>
+      <li>Satışı yapılan ürünlerin belirtilen teslim tarihinde teslim alınması önem taşımaktadır.</li>
+      <li>Teslim sırasında ürünlerin ambalajını açarak ve kontrol ederek teslim almanızı önemle rica ederiz.</li>
+    </ul></div>`:"";
   const w=window.open("","_blank"); if(!w){ alert("Açılır pencere engellendi."); return; }
   w.document.write(`<html><head><meta charset="utf-8"><title>${baslik}</title>
   <style>body{font-family:Arial;color:#1e293b;padding:24px}h1{color:#1e40af;text-align:center;margin:0;letter-spacing:3px;font-weight:800}
@@ -745,7 +792,7 @@ function printDoc(kind){
   <div class="info"><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div><div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
   <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Birim</th><th>Tutar</th></tr></thead><tbody>${tr}</tbody></table>
   <div class="tot">TOPLAM: ${fmt(toplam)} ₺${tk>1?` &nbsp;|&nbsp; ${bk} ${tk} Taksit — Aylık ${fmt(toplam/tk)} ₺`:""}</div>
-  ${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
+  ${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();
 }
