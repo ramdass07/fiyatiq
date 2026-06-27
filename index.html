@@ -503,6 +503,7 @@ async function stokSorgula(){
 }
 function stokCell(v){ if(v==null) return '<span class="mut">—</span>'; if(v<=0) return '<span class="mut">0</span>'; if(v<=3) return `<span class="blink" title="Az stok!">${v}</span>`; return v; }
 function ayrCell(v){ if(v==null||v<=0) return '<span class="mut">—</span>'; return `<span style="color:var(--warn)" title="Ayrılan/emanet">${v}</span>`; }
+function karBadge(p){ if(p==null||isNaN(p)) return '<span class="mut">—</span>'; if(p<0) return '<span class="blink">ZARAR '+p.toFixed(1)+'%</span>'; const c=p<3?'bad':p<8?'warn':'ok'; return '<span class="'+c+'">'+p.toFixed(1)+'%</span>'; }
 function calcParts(r,kar,komis){
   const adet=r.adet??1;
   const unitToptan = r.isET ? (+r.etToptan||0) : (+r.toptan||0);
@@ -517,8 +518,10 @@ function calcParts(r,kar,komis){
   else if(manuelP) unitTaksit = komis>0 ? unitNakit/(1-komis/100) : unitNakit;
   else unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
   const unitNetTaksit = unitTaksit*(1-komis/100);
-  const karPct = unitBipli>0 ? ((komis>0?unitNetTaksit:unitNakit)/unitBipli -1)*100 : 0;
-  return {adet,unitToptan,unitBip,unitBipli,unitNakit,unitTaksit,karPct};
+  const karPesin = unitBipli>0 ? (unitNakit/unitBipli -1)*100 : 0;
+  const karTaksit = unitBipli>0 ? (unitNetTaksit/unitBipli -1)*100 : 0;
+  const karPct = komis>0?karTaksit:karPesin;
+  return {adet,unitToptan,unitBip,unitBipli,unitNakit,unitTaksit,karPct,karPesin,karTaksit};
 }
 function renderRows(){
   const tb=$("rows"); if(!tb) return;
@@ -540,6 +543,8 @@ function renderRows(){
     const taksitCell = r.isET
       ? `<input type="number" value="${r.manuelTaksit||''}" placeholder="oto: ${fmt(p.unitTaksit)}" title="Boş = otomatik taksitli. Elle yazarsan o taksitli fiyat geçerli olur." style="width:120px" onchange="quoteRows[${i}].manuelTaksit=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(taksitL);
+    const satirTaksitVar = komis>0 || (r.isET && +r.manuelTaksit>0);
+    const karCell = !valid ? '<span class="mut">—</span>' : ('P '+karBadge(p.karPesin) + (satirTaksitVar? '<br>T '+karBadge(p.karTaksit):''));
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off"
@@ -551,7 +556,7 @@ function renderRows(){
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
       <td class="num">${pesinCell}</td>
       <td class="num">${taksitCell}</td>
-      <td class="num ${!valid?'':(p.karPct<3?'bad':p.karPct<8?'warn':'ok')}">${valid?p.karPct.toFixed(1)+'%':'—'}</td>
+      <td class="num" style="font-size:12px;line-height:1.3">${karCell}</td>
       <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
       <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
@@ -571,6 +576,9 @@ function renderRows(){
   const dip=Math.max(0,tBipli-hakedis);
   const netTaksit=finalTaksit*(1-komis/100);
   const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
+  const karPesinTot=dip>0?(finalNakit/dip-1)*100:0;
+  const karTaksitTot=dip>0?(netTaksit/dip-1)*100:0;
+  const hasTaksitTot=komis>0||quoteRows.some(r=>r.isET && +r.manuelTaksit>0);
   const tk=+(($("taksit")||{}).value)||0;
   lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip,appliedNames:applied.map(k=>k.ad),baseNakit};
   $("tAdet").textContent=fmt(tAdet);
@@ -578,13 +586,13 @@ function renderRows(){
   $("tBip").textContent=fmt(tBip);
   $("tNakit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0));
   $("tTaksit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0));
-  const tKarEl=$("tKar"); if(tKarEl){ if(tBipli<=0){ tKarEl.textContent='—'; tKarEl.className="num"; } else if(karPct<0){ tKarEl.innerHTML='<span class="blink">⚠ ZARAR '+karPct.toFixed(1)+'%</span>'; tKarEl.className="num"; } else { tKarEl.textContent=karPct.toFixed(1)+'%'; tKarEl.className="num "+(karPct<3?'bad':karPct<8?'warn':'ok'); } }
-  const anyMT=quoteRows.some(r=>r.isET && +r.manuelTaksit>0);
+  const tKarEl=$("tKar"); if(tKarEl){ tKarEl.className="num"; tKarEl.style.fontSize="12px"; tKarEl.style.lineHeight="1.3"; tKarEl.innerHTML = tBipli<=0?'—':('P '+karBadge(karPesinTot)+(hasTaksitTot?'<br>T '+karBadge(karTaksitTot):'')); }
+  const anyMT=hasTaksitTot;
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
   if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||anyMT)? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= (komis>0&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
-  if($("karPct")){ const e=$("karPct"); if(tBipli<=0){ e.textContent='—'; e.className="big"; } else if(karPct<0){ e.innerHTML='<span class="blink">⚠ ZARAR '+karPct.toFixed(1)+'%</span>'; e.className="big"; } else { e.textContent=karPct.toFixed(1)+'%'; e.className="big "+(karPct<3?'bad':karPct<8?'warn':'ok'); } }
+  if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px"; e.innerHTML = tBipli<=0?'—':('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):'')); }
   const kr=$("kampInfoRow");
   if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}`; }
     else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygun olabilir — panelden <b>"Uygula"</b> de.`; }
