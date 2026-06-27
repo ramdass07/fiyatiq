@@ -330,8 +330,9 @@ function setBrand(b){
   brand=b;
   document.querySelectorAll("#brandSeg button").forEach(x=>x.classList.toggle("on",x.dataset.b===b));
   const am=$("aktifMarka"); if(am) am.textContent="Aktif: "+(b==="bosch"?"Bosch":"Siemens");
+  if(typeof secilenKampanya!=='undefined') secilenKampanya.clear(); // marka değişince diğer markanın seçimleri kalkar
   quoteRows.forEach(r=>refetch(r)); loadBanks();
-  loadAktifKampanyalar().then(renderKampanyaPanel);
+  loadAktifKampanyalar().then(()=>renderRows());
 }
 function toggleAdmin(){
   const a=$("adminView"), b=$("bayiView");
@@ -631,9 +632,9 @@ function kategoriOf(code){
 async function loadAktifKampanyalar(){
   try{
     const today=new Date().toISOString().slice(0,10);
-    const allowed=allowedBrands();
     const {data}=await sb.from("kampanyalar").select("*");
-    aktifKampanyalar=(data||[]).filter(k=>(!k.bitis_tarihi || k.bitis_tarihi>=today) && (!k.marka || allowed.includes(k.marka)));
+    // Üstte seçili markanın (+ "ikisi") kampanyaları — Bosch'tayken Bosch, Siemens'teyken Siemens
+    aktifKampanyalar=(data||[]).filter(k=>(!k.bitis_tarihi || k.bitis_tarihi>=today) && (!k.marka || k.marka===brand));
   }catch(e){ aktifKampanyalar=[]; }
 }
 function matchKampanyalar(){
