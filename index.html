@@ -581,8 +581,9 @@ function renderRows(){
   $("tNakit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0));
   $("tTaksit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0));
   const tKarEl=$("tKar"); if(tKarEl){ if(tBipli<=0){ tKarEl.textContent='—'; tKarEl.className="num"; } else if(karPct<0){ tKarEl.innerHTML='<span class="blink">⚠ ZARAR '+karPct.toFixed(1)+'%</span>'; tKarEl.className="num"; } else { tKarEl.textContent=karPct.toFixed(1)+'%'; tKarEl.className="num "+(karPct<3?'bad':karPct<8?'warn':'ok'); } }
+  const anyMT=quoteRows.some(r=>r.isET && +r.manuelTaksit>0);
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
-  if($("sumTaksit")) $("sumTaksit").textContent= komis>0? fmt(finalTaksit) : '—';
+  if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||anyMT)? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= (komis>0&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); if(tBipli<=0){ e.textContent='—'; e.className="big"; } else if(karPct<0){ e.innerHTML='<span class="blink">⚠ ZARAR '+karPct.toFixed(1)+'%</span>'; e.className="big"; } else { e.textContent=karPct.toFixed(1)+'%'; e.className="big "+(karPct<3?'bad':karPct<8?'warn':'ok'); } }
