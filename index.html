@@ -131,8 +131,6 @@
     </div>
     <div class="card">
       <div class="row" style="margin-bottom:6px">
-        <div class="fld"><label>Müşteri Adı</label><input id="mAd" placeholder="Ad Soyad"></div>
-        <div class="fld"><label>Telefon</label><input id="mTel" placeholder="05.."></div>
         <div class="grow"></div><button class="sm" onclick="addRow()">+ Ürün satırı</button>
       </div>
       <table id="grid"><thead><tr>
@@ -745,7 +743,7 @@ async function saveQuote(){
   const msg=$("saveMsg");
   if(!satirlar.length){ msg.textContent="Geçerli ürün yok."; msg.className="bad"; return; }
   const toplam=lastTot?Math.round(lastTot.finalNakit):quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
-  const {error}=await sb.from("teklifler").insert({bayi_id:user.id,marka:brand,musteri_ad:$("mAd").value,musteri_tel:$("mTel").value,satirlar,toplam,satis_tutari:toplam});
+  const {error}=await sb.from("teklifler").insert({bayi_id:user.id,marka:brand,musteri_ad:(($("mAd")||{}).value)||null,musteri_tel:(($("mTel")||{}).value)||null,satirlar,toplam,satis_tutari:toplam});
   msg.textContent=error?"Hata: "+error.message:"✓ Teklif kaydedildi"; msg.className=error?"bad":"ok";
 }
 function teklifItems(){ return quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —"); }
@@ -758,13 +756,13 @@ function shareWhatsApp(){
   m+="─".repeat(16)+`\n*TOPLAM:* ${fmt(toplam)} ₺\n`;
   if(tk>1) m+=`💳 ${bk} ${tk} Taksit | Aylık: ${fmt(toplam/tk)} ₺\n`;
   m+="\n_Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlıdır._";
-  let phone=($("mTel").value||"").replace(/\D/g,""); if(phone.startsWith("0")) phone="90"+phone.slice(1); else if(phone.length===10) phone="90"+phone;
+  let phone=((($("mTel")||{}).value)||"").replace(/\D/g,""); if(phone.startsWith("0")) phone="90"+phone.slice(1); else if(phone.length===10) phone="90"+phone;
   const url= phone? `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(m)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(m)}`;
   window.open(url,"_blank");
 }
 function printDoc(kind){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
-  const ad=$("mAd").value||"", tel=$("mTel").value||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
+  const ad=(($("mAd")||{}).value)||"", tel=(($("mTel")||{}).value)||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
   const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
   const tr=items.map((r,i)=>`<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(r.nakit)} ₺</td><td style="text-align:right">${fmt((r.nakit||0)*(r.adet||1))} ₺</td></tr>`).join("");
   const imza= kind==="siparis"?`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px"><div>Müşteri İmza<br><br>____________________</div><div>Mağaza İmza<br><br>____________________</div></div>`:"";
