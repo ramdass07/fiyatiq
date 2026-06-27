@@ -306,9 +306,8 @@ async function showApp(session){
   const editor = profil.rol==="admin" || profil.rol==="personel";
   $("adminBtn").style.display = editor ? "" : "none";
   $("bayilerCard").style.display = profil.rol==="admin" ? "" : "none";
-  $("bayiStokCard").style.display = profil.rol==="bayi" ? "" : "none";
-  if(profil.rol==="bayi"){ $("thStok1").textContent="Stoğum"; ["thStok2","thStok3","thStok4","thStok5"].forEach(id=>$(id).textContent=""); }
-  else { $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent="Kadıköy"; $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H"; }
+  $("bayiStokCard").style.display = "none"; // şimdilik tüm mağazalar merkez stoğu görüyor; kendi-stok yükleme ileride
+  $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent="Kadıköy"; $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H";
   await loadBanks();
   await loadAktifKampanyalar();
   if(quoteRows.length===0) addRow();
@@ -487,10 +486,7 @@ async function stokSorgula(){
   const {data:f}=await sb.rpc("urun_fiyat",{p_model_kodu:q,p_marka:brand});
   const row=f&&f[0];
   let stokHtml="";
-  if(profil.rol==="bayi"){
-    const {data:bs}=await sb.from("bayi_stok").select("adet").eq("model_kodu",q).eq("marka",brand).maybeSingle();
-    stokHtml=`<div style="margin-top:6px">Stoğum: <b style="font-size:18px">${bs?bs.adet:0}</b> adet</div>`;
-  } else {
+  {
     const {data:st}=await sb.from("stok").select("depo,tip,adet").eq("model_kodu",q).eq("marka",brand);
     const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
     (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); });
@@ -721,10 +717,8 @@ async function refetch(r){
     if(row.toptan_fiyat!=null) r.isET=false;
   } else { r.ad="— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; }
   r.marsMevcut=r.horozMevcut=r.kadikoyMevcut=r.marsAyrilan=r.horozAyrilan=null; r.sKadikoy=0; r.netStok=null;
-  if(profil.rol==="bayi"){
-    const {data:bs}=await sb.from("bayi_stok").select("adet").eq("model_kodu",r.kod).eq("marka",brand).maybeSingle();
-    r.marsMevcut = bs? bs.adet : 0; r.netStok=r.marsMevcut; r.sKadikoy=0;
-  } else {
+  {
+    // Tüm kullanıcılar MERKEZ stoğu görür (Mars/Horoz/Kadıköy + ayrılan)
     const {data:st}=await sb.from("stok").select("depo,tip,adet").eq("model_kodu",r.kod).eq("marka",brand);
     const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
     (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); });
