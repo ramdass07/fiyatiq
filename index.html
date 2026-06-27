@@ -565,11 +565,9 @@ function renderRows(){
   // Alt kart satırlardaki GERÇEK fiyatları (manuel dahil) baz alır; hakediş üstüne uygulanır
   const baseNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
   const baseTaksit=quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
-  const km=komis>0?(1+kar/100)*komis/100:0;
-  const hakNakit=hakedis*(1+kar/100);
-  const hakTaksit=(km>0&&km<1)?hakNakit/(1-km):hakNakit;
-  const finalNakit=Math.max(0,baseNakit-hakNakit);
-  const finalTaksit=Math.max(0,baseTaksit-hakTaksit);
+  // Hakediş DÜZ TL olarak düşülür (8.000 → tam 8.000), kâr oranıyla çarpılmaz
+  const finalNakit=Math.max(0,baseNakit-hakedis);
+  const finalTaksit=Math.max(0,baseTaksit-hakedis);
   const dip=Math.max(0,tBipli-hakedis);
   const netTaksit=finalTaksit*(1-komis/100);
   const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
