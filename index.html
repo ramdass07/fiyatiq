@@ -475,7 +475,8 @@ function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
 function toggleManuel(i){
   const r=quoteRows[i]; r.isET=!r.isET;
-  if(r.isET && (r.etToptan==null||r.etToptan==="") && (+r.toptan>0)) r.etToptan=r.toptan; // mevcut toptanı koru, satır boşalmasın
+  if(r.isET){ if((r.etToptan==null||r.etToptan==="") && (+r.toptan>0)) r.etToptan=r.toptan; } // aç: mevcut toptanı koru
+  else { r.etToptan=null; r.manuelFiyat=null; r.manuelTaksit=null; } // vazgeç: eski otomatik değerlere dön
   recalc();
 }
 async function stokSorgula(){
@@ -598,7 +599,9 @@ function renderRows(){
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px"; e.innerHTML = tBipli<=0?'—':('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):'')); }
   const kr=$("kampInfoRow");
-  if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}`; }
+  const setSayisi=applied.filter(k=>isBundleKamp(k)).length;
+  const setUyari=setSayisi>1?` <span class="blink" style="color:var(--bad)">⚠ ${setSayisi} SET kampanyası birlikte uygulandı — set'ler normalde birleşmez, mutlaka Diva kontrolü yapın!</span>`:'';
+  if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}${setUyari}`; }
     else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygun olabilir — panelden <b>"Uygula"</b> de.`; }
     else kr.style.display="none"; }
   renderKampanyaPanel();
@@ -690,16 +693,8 @@ function renderKampanyaPanel(){
 }
 function isBundleKamp(k){ return ['all','all+any','any2'].includes(k&&k.match_type); }
 function toggleKampanya(id){
-  const k=aktifKampanyalar.find(x=>x.id===id);
-  if(secilenKampanya.has(id)){ secilenKampanya.delete(id); }
-  else {
-    // Set (bundle) kampanyalar birbiriyle birleşmez → yeni set seçilince eski set kalkar
-    if(isBundleKamp(k)){
-      [...secilenKampanya].forEach(sid=>{ const sk=aktifKampanyalar.find(x=>x.id===sid); if(sk&&isBundleKamp(sk)) secilenKampanya.delete(sid); });
-    }
-    secilenKampanya.add(id);
-  }
-  renderRows();
+  if(secilenKampanya.has(id)) secilenKampanya.delete(id); else secilenKampanya.add(id);
+  renderRows(); // istediğin kadar uygulanabilir; birden fazla SET olursa aşağıda uyarı çıkar
 }
 async function onCode(i,val){ quoteRows[i].kod=val.trim().toUpperCase(); await refetch(quoteRows[i]); }
 let acRow=-1, acTimer=null;
