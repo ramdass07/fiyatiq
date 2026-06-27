@@ -561,10 +561,15 @@ function renderRows(){
   const uygunsuzSecili=applied.filter(k=>!matchIds.has(k.id));
   const hakedis=applied.reduce((a,k)=>a+(+k.hakedis||0),0);
   const musteriInd=applied.reduce((a,k)=>a+(+k.musteri_indirimi||0),0);
-  const dip=Math.max(0,tBipli-hakedis);
-  const finalNakit=dip*(1+kar/100);
+  // Alt kart satırlardaki GERÇEK fiyatları (manuel dahil) baz alır; hakediş üstüne uygulanır
+  const baseNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
+  const baseTaksit=quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
   const km=komis>0?(1+kar/100)*komis/100:0;
-  const finalTaksit=(km>0&&km<1)?(1+kar/100)*dip/(1-km):finalNakit;
+  const hakNakit=hakedis*(1+kar/100);
+  const hakTaksit=(km>0&&km<1)?hakNakit/(1-km):hakNakit;
+  const finalNakit=Math.max(0,baseNakit-hakNakit);
+  const finalTaksit=Math.max(0,baseTaksit-hakTaksit);
+  const dip=Math.max(0,tBipli-hakedis);
   const netTaksit=finalTaksit*(1-komis/100);
   const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
   const tk=+(($("taksit")||{}).value)||0;
@@ -574,12 +579,12 @@ function renderRows(){
   $("tBip").textContent=fmt(tBip);
   $("tNakit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0));
   $("tTaksit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0));
-  const tKarEl=$("tKar"); if(tKarEl){ tKarEl.textContent=tBipli>0?karPct.toFixed(1)+'%':'—'; tKarEl.className="num "+(tBipli<=0?'':(karPct<3?'bad':karPct<8?'warn':'ok')); }
+  const tKarEl=$("tKar"); if(tKarEl){ if(tBipli<=0){ tKarEl.textContent='—'; tKarEl.className="num"; } else if(karPct<0){ tKarEl.innerHTML='<span class="blink">⚠ ZARAR '+karPct.toFixed(1)+'%</span>'; tKarEl.className="num"; } else { tKarEl.textContent=karPct.toFixed(1)+'%'; tKarEl.className="num "+(karPct<3?'bad':karPct<8?'warn':'ok'); } }
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
   if($("sumTaksit")) $("sumTaksit").textContent= komis>0? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= (komis>0&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
-  if($("karPct")){ const e=$("karPct"); e.textContent=tBipli>0?karPct.toFixed(1)+'%':'—'; e.className="big "+(tBipli<=0?'':(karPct<3?'bad':karPct<8?'warn':'ok')); }
+  if($("karPct")){ const e=$("karPct"); if(tBipli<=0){ e.textContent='—'; e.className="big"; } else if(karPct<0){ e.innerHTML='<span class="blink">⚠ ZARAR '+karPct.toFixed(1)+'%</span>'; e.className="big"; } else { e.textContent=karPct.toFixed(1)+'%'; e.className="big "+(karPct<3?'bad':karPct<8?'warn':'ok'); } }
   const kr=$("kampInfoRow");
   if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}`; }
     else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygun olabilir — panelden <b>"Uygula"</b> de.`; }
