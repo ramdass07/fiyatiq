@@ -469,6 +469,11 @@ let komisOran=0, lastTot=null;
 function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,netStok:null}); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
+function toggleManuel(i){
+  const r=quoteRows[i]; r.isET=!r.isET;
+  if(r.isET && (r.etToptan==null||r.etToptan==="") && (+r.toptan>0)) r.etToptan=r.toptan; // mevcut toptanı koru, satır boşalmasın
+  recalc();
+}
 async function stokSorgula(){
   const q=($("stokSorguInput").value||"").trim().toUpperCase(); const box=$("stokSorguSonuc");
   if(!q){ box.innerHTML=""; return; }
@@ -547,7 +552,7 @@ function renderRows(){
       <td class="num">${fmt(taksitL)}</td>
       <td class="num ${!valid?'':(p.karPct<3?'bad':p.karPct<8?'warn':'ok')}">${valid?p.karPct.toFixed(1)+'%':'—'}</td>
       <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
-      <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan fiyat girişi" onclick="quoteRows[${i}].isET=!quoteRows[${i}].isET;recalc()">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
+      <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
   const ks=matchKampanyalar(); const matchIds=new Set(ks.map(k=>k.id));
