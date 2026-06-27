@@ -532,7 +532,7 @@ function renderRows(){
       ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:90px" onchange="quoteRows[${i}].etToptan=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(maliyetL);
     const pesinCell = r.isET
-      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="satış/adet" style="width:95px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="oto: ${fmt(p.unitNakit)}" title="Boş = kâr oranından otomatik fiyat. Elle yazarsan o fiyat geçerli olur." style="width:120px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : `${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}`;
     const tr=document.createElement("tr");
     tr.innerHTML=`
