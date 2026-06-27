@@ -240,7 +240,7 @@
 const SUPABASE_URL = "https://xooknwhvxmkfoiaaosui.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Hq44fpVzfZfTvcPQZL-5xw_8kmLRl19";
 
-let sb, brand="siemens", quoteRows=[];
+let sb, brand="siemens", quoteRows=[], appReady=false;
 let profil = {rol:"bayi", marka_erisimi:["siemens","bosch"], abonelik_durumu:"pasif"};
 let impState = {};
 
@@ -276,7 +276,11 @@ async function init(){
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const {data:{session}} = await sb.auth.getSession();
   session ? showApp(session) : show("loginView");
-  sb.auth.onAuthStateChange((_e,s)=> s? showApp(s) : show("loginView"));
+  // Sekme odağı / token tazelenmesi ekranı sıfırlamasın: uygulama açıkken showApp tekrar çalışmaz
+  sb.auth.onAuthStateChange((e,s)=>{
+    if(!s){ appReady=false; show("loginView"); return; }
+    if(!appReady) showApp(s); // sadece ilk girişte / yeniden girişte
+  });
   buildImporters();
 }
 function show(id){ ["loginView","appView","pendingView"].forEach(v=> $(v).style.display = v===id?"block":"none"); }
@@ -300,7 +304,7 @@ async function signOut(){ await sb.auth.signOut(); quoteRows=[]; }
 async function showApp(session){
   await loadProfil(session.user.id);
   if(profil.rol!=="admin" && profil.abonelik_durumu==="pasif"){ show("pendingView"); return; }
-  show("appView");
+  show("appView"); appReady=true;
   $("who").textContent = session.user.email;
   applyBrandAccess();
   const editor = profil.rol==="admin" || profil.rol==="personel";
