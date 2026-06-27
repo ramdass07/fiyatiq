@@ -132,9 +132,9 @@
       </div>
       <table id="grid"><thead><tr>
         <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Maliyet</th><th>BİP</th><th>Peşin Fiyat</th><th>Taksitli Fiyat</th>
-        <th>Kâr %</th><th id="thS1">Mars</th><th id="thS2">Horoz</th><th></th>
+        <th>Kâr %</th><th id="thStok1">Mars</th><th id="thStok2">Horoz</th><th id="thStok3">Kadıköy</th><th id="thStok4" title="Ayrılan Mars">Ayr.M</th><th id="thStok5" title="Ayrılan Horoz">Ayr.H</th><th></th>
       </tr></thead><tbody id="rows"></tbody>
-      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="2"></th></tr></tfoot></table>
+      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="6"></th></tr></tfoot></table>
     </div>
     <div class="card" id="kampPanel" style="display:none;border:1px solid var(--ok)">
       <h2 style="margin-top:0">🎁 Uygulanabilir Kampanyalar <span class="badge">otomatik</span></h2>
@@ -300,7 +300,8 @@ async function showApp(session){
   $("adminBtn").style.display = editor ? "" : "none";
   $("bayilerCard").style.display = profil.rol==="admin" ? "" : "none";
   $("bayiStokCard").style.display = profil.rol==="bayi" ? "" : "none";
-  if(profil.rol==="bayi"){ $("thS1").textContent="Stoğum"; $("thS2").textContent=""; } else { $("thS1").textContent="Mars"; $("thS2").textContent="Horoz"; }
+  if(profil.rol==="bayi"){ $("thStok1").textContent="Stoğum"; ["thStok2","thStok3","thStok4","thStok5"].forEach(id=>$(id).textContent=""); }
+  else { $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent="Kadıköy"; $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H"; }
   await loadBanks();
   await loadAktifKampanyalar();
   if(quoteRows.length===0) addRow();
@@ -462,18 +463,26 @@ async function bayiStokYukle(){
 
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
-function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,nakit:null,taksit:null,maliyet:null,kar:null,s1:null,s2:null,sKadikoy:0,netStok:null}); renderRows(); }
+function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,netStok:null}); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
 function stokCell(v){ if(v==null) return '<span class="mut">—</span>'; if(v<=0) return '<span class="mut">0</span>'; if(v<=3) return `<span class="blink" title="Az stok!">${v}</span>`; return v; }
+function ayrCell(v){ if(v==null||v<=0) return '<span class="mut">—</span>'; return `<span style="color:var(--warn)" title="Ayrılan/emanet">${v}</span>`; }
 function calcParts(r,kar,komis){
   const adet=r.adet??1;
   const unitToptan = r.isET ? (+r.etToptan||0) : (+r.toptan||0);
   const unitBip = r.isET ? 0 : (+r.bip||0);
   const unitBipli = unitToptan - unitBip;
-  const unitNakit = unitBipli*(1+kar/100);
+  const manuel = r.isET && (+r.manuelFiyat>0);   // Manuel satışta peşin fiyatı elle gir → kâr buna göre
   const km = komis>0 ? (1+kar/100)*komis/100 : 0;
-  const unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
+  let unitNakit, unitTaksit;
+  if(manuel){
+    unitNakit = +r.manuelFiyat;
+    unitTaksit = komis>0 ? unitNakit/(1-komis/100) : unitNakit;
+  } else {
+    unitNakit = unitBipli*(1+kar/100);
+    unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
+  }
   const unitNetTaksit = unitTaksit*(1-komis/100);
   const karPct = unitBipli>0 ? ((komis>0?unitNetTaksit:unitNakit)/unitBipli -1)*100 : 0;
   return {adet,unitToptan,unitBip,unitBipli,unitNakit,unitTaksit,karPct};
@@ -492,6 +501,9 @@ function renderRows(){
     const maliyetCell = r.isET
       ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:90px" oninput="quoteRows[${i}].etToptan=+this.value;recalc()">`
       : fmt(maliyetL);
+    const pesinCell = r.isET
+      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="satış/adet" style="width:95px" oninput="quoteRows[${i}].manuelFiyat=+this.value;recalc()">`
+      : `${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}`;
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off"
@@ -501,14 +513,16 @@ function renderRows(){
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
-      <td class="num">${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}</td>
+      <td class="num">${pesinCell}</td>
       <td class="num">${fmt(taksitL)}</td>
       <td class="num ${!valid?'':(p.karPct<3?'bad':p.karPct<8?'warn':'ok')}">${valid?p.karPct.toFixed(1)+'%':'—'}</td>
-      <td class="num">${stokCell(r.s1)}</td><td class="num">${stokCell(r.s2)}</td>
+      <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
       <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan fiyat girişi" onclick="quoteRows[${i}].isET=!quoteRows[${i}].isET;recalc()">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
   const ks=matchKampanyalar();
+  // Seçili ama artık sepete uymayan kampanyaları otomatik düşür (indirim ancak uygun olan + seçilende işler)
+  [...secilenKampanya].forEach(id=>{ if(!ks.find(k=>k.id===id)) secilenKampanya.delete(id); });
   const applied=ks.filter(k=>secilenKampanya.has(k.id));
   const hakedis=applied.reduce((a,k)=>a+(+k.hakedis||0),0);
   const musteriInd=applied.reduce((a,k)=>a+(+k.musteri_indirimi||0),0);
@@ -562,8 +576,9 @@ function kategoriOf(code){
 async function loadAktifKampanyalar(){
   try{
     const today=new Date().toISOString().slice(0,10);
-    const {data}=await sb.from("kampanyalar").select("*").or(`marka.is.null,marka.eq.${brand}`);
-    aktifKampanyalar=(data||[]).filter(k=>!k.bitis_tarihi || k.bitis_tarihi>=today);
+    const allowed=allowedBrands();
+    const {data}=await sb.from("kampanyalar").select("*");
+    aktifKampanyalar=(data||[]).filter(k=>(!k.bitis_tarihi || k.bitis_tarihi>=today) && (!k.marka || allowed.includes(k.marka)));
   }catch(e){ aktifKampanyalar=[]; }
 }
 function matchKampanyalar(){
@@ -572,6 +587,7 @@ function matchKampanyalar(){
   const modelSet=new Set(items.map(r=>(r.kod||"").toUpperCase()));
   const out=[];
   aktifKampanyalar.forEach(k=>{
+    if(k.marka && k.marka!==brand) return; // farklı marka kampanyası bu sepete uymaz
     const cats=(k.kategoriler||[]).map(katNorm).filter(Boolean);
     const mods=(k.secili_modeller||[]).map(m=>(m||"").toUpperCase());
     const gated=mods.length>0; const modSet=new Set(mods);
@@ -593,28 +609,30 @@ function matchKampanyalar(){
 }
 function renderKampanyaPanel(){
   const panel=$("kampPanel"), list=$("kampList"); if(!panel||!list) return;
-  const ks=matchKampanyalar();
-  if(!ks.length){
-    panel.style.display="";
-    const markaAd=brand==='bosch'?'Bosch':'Siemens';
-    list.innerHTML=`<div class="mut" style="font-size:12px">Ürün ekledikçe <b>${markaAd}</b> için uygun kampanyalar burada otomatik çıkar.${aktifKampanyalar.length?'':` Şu an ${markaAd} markasında tanımlı aktif kampanya yok.`}</div>`;
-    return;
-  }
-  const appliedIds=ks.filter(k=>secilenKampanya.has(k.id));
-  const indT=appliedIds.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
-  const hakT=appliedIds.reduce((a,k)=>a+(k.hakedis||0),0);
-  list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın — kampanya kotası/geçerliliği Diva'dan teyit edilmeden satışı tamamlamayın.</div>`
-    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Aşağıdaki kampanyalar bu sepete <b>uygun</b>. İndirim/hakediş ancak <b>"Uygula"</b> dediğinde işlenir. <b>Set</b> kampanyalar birbiriyle <b>birleşmez</b> (birini seçince diğeri kalkar); <b>tekil/hediye</b> kampanyalar ayrıca eklenebilir.</div>`
-    +ks.map(k=>{ const on=secilenKampanya.has(k.id); const bndl=isBundleKamp(k); return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0">
-      <div style="flex:1"><span class="badge" style="font-size:9px;background:${bndl?'rgba(245,158,11,.2)':'rgba(34,197,94,.2)'}">${bndl?'SET':'TEKİL'}</span> <b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}</div>
-      <div class="mut" style="font-size:13px;margin:0 14px">İndirim <b style="color:var(--ok)">${fmt(k.musteri_indirimi)} ₺</b> · Hakediş <b style="color:var(--acc)">${fmt(k.hakedis)} ₺</b></div>
-      <button class="${on?'':'ghost '}sm" style="${on?'background:var(--ok);color:#06200f':''}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button>
+  panel.style.display="";
+  const matched=matchKampanyalar(); const matchIds=new Set(matched.map(k=>k.id));
+  const all=aktifKampanyalar.slice().sort((a,b)=>(matchIds.has(b.id)?1:0)-(matchIds.has(a.id)?1:0));
+  if(!all.length){ list.innerHTML='<div class="mut" style="font-size:12px">Tanımlı aktif kampanya yok.</div>'; return; }
+  const applied=all.filter(k=>secilenKampanya.has(k.id));
+  const indT=applied.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
+  const hakT=applied.reduce((a,k)=>a+(k.hakedis||0),0);
+  list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın.</div>`
+    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Tüm aktif kampanyalar listeleniyor. <b style="color:var(--warn)">⚠ uygun olabilir</b> işaretliler bu sepete uyuyor; uygulamak için <b>"Uygula"</b> de. <b>Set</b> kampanyalar birbiriyle birleşmez; <b>tekil/hediye</b> eklenebilir.</div>`
+    +all.map(k=>{ const on=secilenKampanya.has(k.id); const bndl=isBundleKamp(k); const uygun=matchIds.has(k.id); const mk=k.marka||'ikisi';
+      return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;${uygun?'':'opacity:.6'}">
+      <div style="flex:1">
+        <span class="badge" style="font-size:9px;background:${bndl?'rgba(245,158,11,.2)':'rgba(34,197,94,.2)'}">${bndl?'SET':'TEKİL'}</span>
+        <span class="badge" style="font-size:9px">${mk}</span>
+        <b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}
+        ${uygun?`<div style="color:var(--warn);font-size:11px;font-weight:700;margin-top:2px">⚠ Bu kampanya uygun olabilir — Diva kontrolü tavsiye edilir</div>`:''}
+      </div>
+      <div class="mut" style="font-size:13px;margin:0 14px">İnd <b style="color:var(--ok)">${fmt(k.musteri_indirimi)}</b> · Hak <b style="color:var(--acc)">${fmt(k.hakedis)}</b></div>
+      ${uygun?`<button class="${on?'':'ghost '}sm" style="${on?'background:var(--ok);color:#06200f':''}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button>`:`<span class="mut" style="font-size:11px;width:80px;text-align:center">sepete uymuyor</span>`}
     </div>`;}).join("")
     +`<div class="row" style="justify-content:flex-end;margin-top:10px;gap:22px">
-        <span class="mut">Uygulanan müşteri indirimi: <b style="color:var(--ok)">${fmt(indT)} ₺</b></span>
+        <span class="mut">Uygulanan indirim: <b style="color:var(--ok)">${fmt(indT)} ₺</b></span>
         <span class="mut">Uygulanan hakediş (size iade): <b class="big" style="color:var(--acc)">${fmt(hakT)} ₺</b></span>
       </div>`;
-  panel.style.display="";
 }
 function isBundleKamp(k){ return ['all','all+any','any2'].includes(k&&k.match_type); }
 function toggleKampanya(id){
@@ -652,15 +670,18 @@ async function refetch(r){
     r.ad=row.urun_adi||r.kod; r.toptan=row.toptan_fiyat; r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
     if(row.toptan_fiyat!=null) r.isET=false;
   } else { r.ad="— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; }
-  r.s1=r.s2=null; r.sKadikoy=0; r.netStok=null;
+  r.marsMevcut=r.horozMevcut=r.kadikoyMevcut=r.marsAyrilan=r.horozAyrilan=null; r.sKadikoy=0; r.netStok=null;
   if(profil.rol==="bayi"){
     const {data:bs}=await sb.from("bayi_stok").select("adet").eq("model_kodu",r.kod).eq("marka",brand).maybeSingle();
-    r.s1 = bs? bs.adet : 0; r.netStok=r.s1;
+    r.marsMevcut = bs? bs.adet : 0; r.netStok=r.marsMevcut; r.sKadikoy=0;
   } else {
     const {data:st}=await sb.from("stok").select("depo,tip,adet").eq("model_kodu",r.kod).eq("marka",brand);
-    const acc={mars:0,horoz:0,kadikoy:0};
-    (st||[]).forEach(x=>{ const sg=x.tip==='ayrilmis'?-1:1; acc[x.depo]=(acc[x.depo]||0)+sg*(x.adet||0); });
-    r.s1=acc.mars; r.s2=acc.horoz; r.sKadikoy=acc.kadikoy; r.netStok=acc.mars+acc.horoz+acc.kadikoy;
+    const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
+    (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); });
+    r.marsMevcut=acc.mars.m; r.horozMevcut=acc.horoz.m; r.kadikoyMevcut=acc.kadikoy.m;
+    r.marsAyrilan=acc.mars.a; r.horozAyrilan=acc.horoz.a;
+    r.sKadikoy=acc.kadikoy.m-acc.kadikoy.a;
+    r.netStok=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
   }
   renderRows();
 }
