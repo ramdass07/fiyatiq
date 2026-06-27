@@ -531,10 +531,10 @@ function renderRows(){
     const valid = r.kod && r.ad!=="— bulunamadı —" && (r.isET? (+r.etToptan>0) : (+r.toptan>0));
     if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0); }
     const maliyetCell = r.isET
-      ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:90px" oninput="quoteRows[${i}].etToptan=+this.value;recalc()">`
+      ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:90px" onchange="quoteRows[${i}].etToptan=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(maliyetL);
     const pesinCell = r.isET
-      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="satış/adet" style="width:95px" oninput="quoteRows[${i}].manuelFiyat=+this.value;recalc()">`
+      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="satış/adet" style="width:95px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : `${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}`;
     const tr=document.createElement("tr");
     tr.innerHTML=`
