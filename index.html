@@ -574,7 +574,7 @@ function renderRows(){
   const netTaksit=finalTaksit*(1-komis/100);
   const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
   const tk=+(($("taksit")||{}).value)||0;
-  lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip};
+  lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip,appliedNames:applied.map(k=>k.ad),baseNakit};
   $("tAdet").textContent=fmt(tAdet);
   $("tMaliyet").textContent=fmt(tMaliyet);
   $("tBip").textContent=fmt(tBip);
@@ -776,7 +776,15 @@ function printDoc(kind){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   const ad=(($("mAd")||{}).value)||"", tel=(($("mTel")||{}).value)||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
   const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
-  const tr=items.map((r,i)=>`<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(r.nakit)} ₺</td><td style="text-align:right">${fmt((r.nakit||0)*(r.adet||1))} ₺</td></tr>`).join("");
+  const ind=(lastTot&&lastTot.musteriInd>0)?lastTot.musteriInd:0;
+  const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
+  const N=items.length; const indPer=(ind>0&&N>0)?ind/N:0;
+  let custTotal=0;
+  const tr=items.map((r,i)=>{ const lineFull=(r.nakit||0)*(r.adet||1); const lineNet=Math.max(0,lineFull-indPer); custTotal+=lineNet;
+    const indCol= ind>0? `<td style="text-align:right;color:#dc2626">-${fmt(indPer)} ₺</td>`:"";
+    return `<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(lineFull)} ₺</td>${indCol}<td style="text-align:right">${fmt(lineNet)} ₺</td></tr>`;
+  }).join("");
+  const formToplam= ind>0? custTotal : toplam;
   const imza= kind==="siparis"?`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px"><div>Müşteri İmza<br><br>____________________</div><div>Mağaza İmza<br><br>____________________</div></div>`:"";
   const bilgi= kind==="siparis"?`<div style="margin-top:18px;font-size:11.5px;line-height:1.55;border-top:1px solid #e2e8f0;padding-top:10px">
     <b>Değerli Müşterimiz,</b><br>Satın almış olduğunuz ürünlerin teslimat ve montaj sürecinde herhangi bir aksaklık yaşanmaması için aşağıdaki bilgilendirmeleri dikkatle incelemenizi rica ederiz.
@@ -799,8 +807,9 @@ function printDoc(kind){
   .tot{text-align:right;font-size:18px;font-weight:800;color:#1e40af;margin-top:12px}.foot{margin-top:18px;font-size:11px;color:#64748b}</style></head>
   <body><h1>fiyatiq</h1><div class="sub">${baslik}</div>
   <div class="info"><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div><div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
-  <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Birim</th><th>Tutar</th></tr></thead><tbody>${tr}</tbody></table>
-  <div class="tot">TOPLAM: ${fmt(toplam)} ₺${tk>1?` &nbsp;|&nbsp; ${bk} ${tk} Taksit — Aylık ${fmt(toplam/tk)} ₺`:""}</div>
+  <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Tutar</th>${ind>0?'<th>Kampanya İnd.</th>':''}<th>Net Tutar</th></tr></thead><tbody>${tr}</tbody></table>
+  ${ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ürünlere eşit dağıtılmıştır)</div>`:""}
+  <div class="tot">TOPLAM: ${fmt(formToplam)} ₺${tk>1?` &nbsp;|&nbsp; ${bk} ${tk} Taksit — Aylık ${fmt(formToplam/tk)} ₺`:""}</div>
   ${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();
