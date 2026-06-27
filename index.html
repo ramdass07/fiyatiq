@@ -649,7 +649,6 @@ function renderKampanyaPanel(){
   const indT=applied.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
   const hakT=applied.reduce((a,k)=>a+(k.hakedis||0),0);
   list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın.</div>`
-    +`<div class="mut" style="font-size:12px;margin-bottom:6px">Tüm aktif kampanyalar listeleniyor. Hepsinde <b>"Uygula"</b> var; ama sepete uymayan birini işaretlersen <b style="color:var(--bad)">kırmızı uyarı</b> çıkar. <b>Set</b> kampanyalar birbiriyle birleşmez; <b>tekil/hediye</b> eklenebilir.</div>`
     +all.map(k=>{ const on=secilenKampanya.has(k.id); const bndl=isBundleKamp(k); const uygun=matchIds.has(k.id); const mk=k.marka||'ikisi';
       let uyari="";
       if(uygun) uyari=`<div style="color:var(--warn);font-size:11px;font-weight:700;margin-top:2px">⚠ Bu kampanya uygun olabilir — Diva kontrolü tavsiye edilir</div>`;
