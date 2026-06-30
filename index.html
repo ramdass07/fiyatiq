@@ -31,6 +31,9 @@
   #grid{font-size:13px}
   #grid th,#grid td{padding:6px 7px}
   #grid input{padding:5px 6px}
+  #grid.basit th:nth-child(11),#grid.basit td:nth-child(11),
+  #grid.basit th:nth-child(12),#grid.basit td:nth-child(12),
+  #grid.basit th:nth-child(13),#grid.basit td:nth-child(13){display:none}
   th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
   td input{width:130px;text-align:left}
@@ -135,7 +138,9 @@
     </div>
     <div class="card">
       <div class="row" style="margin-bottom:6px">
-        <div class="grow"></div><button class="sm" onclick="addRow()">+ Ürün satırı</button>
+        <div class="grow"></div>
+        <button class="ghost sm" id="gorunumBtn" onclick="toggleGorunum()">📋 Basite geç</button>
+        <button class="sm" onclick="addRow()">+ Ürün satırı</button>
       </div>
       <div id="gridWrap"><table id="grid"><thead><tr>
         <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Maliyet</th><th>BİP</th><th>Peşin Fiyat</th><th>Taksitli Fiyat</th>
@@ -240,7 +245,9 @@
 const SUPABASE_URL = "https://xooknwhvxmkfoiaaosui.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Hq44fpVzfZfTvcPQZL-5xw_8kmLRl19";
 
-let sb, brand="siemens", quoteRows=[], appReady=false;
+let sb, brand="siemens", quoteRows=[], appReady=false, basitMod=false;
+function applyGorunum(){ const g=$("grid"); if(g) g.classList.toggle("basit",basitMod); const b=$("gorunumBtn"); if(b) b.textContent=basitMod?"📊 Detaylıya geç":"📋 Basite geç"; }
+function toggleGorunum(){ basitMod=!basitMod; try{localStorage.setItem("fq_basit",basitMod?"1":"0");}catch(e){} applyGorunum(); }
 let profil = {rol:"bayi", marka_erisimi:["siemens","bosch"], abonelik_durumu:"pasif"};
 let impState = {};
 
@@ -312,6 +319,7 @@ async function showApp(session){
   $("bayilerCard").style.display = profil.rol==="admin" ? "" : "none";
   $("bayiStokCard").style.display = "none"; // şimdilik tüm mağazalar merkez stoğu görüyor; kendi-stok yükleme ileride
   $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent="Kadıköy"; $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H";
+  { let stored=null; try{stored=localStorage.getItem("fq_basit");}catch(e){} basitMod = stored!=null ? (stored==="1") : (profil.rol==="bayi"); applyGorunum(); } // bayi varsayılan basit, admin detaylı; düğmeyle değişir
   await loadBanks();
   await loadAktifKampanyalar();
   if(quoteRows.length===0) addRow();
@@ -783,12 +791,16 @@ function printDoc(kind){
   const ind=(lastTot&&lastTot.musteriInd>0)?lastTot.musteriInd:0;
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
   const N=items.length; const indPer=(ind>0&&N>0)?ind/N:0;
-  let custTotal=0;
-  const tr=items.map((r,i)=>{ const lineFull=(r.nakit||0)*(r.adet||1); const lineNet=Math.max(0,lineFull-indPer); custTotal+=lineNet;
+  const taksitliVar=(tk>1)&&(komisOran>0);
+  let pT=0,tT=0;
+  const tr=items.map((r,i)=>{
+    const pesinLine=(r.nakit||0)*(r.adet||1), taksitLine=(r.taksit||0)*(r.adet||1);
+    const pesinNet=Math.max(0,pesinLine-indPer), taksitNet=Math.max(0,taksitLine-indPer);
+    pT+=pesinNet; tT+=taksitNet;
     const indCol= ind>0? `<td style="text-align:right;color:#dc2626">-${fmt(indPer)} ₺</td>`:"";
-    return `<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td><td style="text-align:right">${fmt(lineFull)} ₺</td>${indCol}<td style="text-align:right">${fmt(lineNet)} ₺</td></tr>`;
+    const tCol= taksitliVar? `<td style="text-align:right">${fmt(taksitNet)} ₺</td>`:"";
+    return `<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td>${indCol}<td style="text-align:right">${fmt(pesinNet)} ₺</td>${tCol}</tr>`;
   }).join("");
-  const formToplam= ind>0? custTotal : toplam;
   const imza= kind==="siparis"?`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px"><div>Müşteri İmza<br><br>____________________</div><div>Mağaza İmza<br><br>____________________</div></div>`:"";
   const bilgi= kind==="siparis"?`<div style="margin-top:18px;font-size:11.5px;line-height:1.55;border-top:1px solid #e2e8f0;padding-top:10px">
     <b>Değerli Müşterimiz,</b><br>Satın almış olduğunuz ürünlerin teslimat ve montaj sürecinde herhangi bir aksaklık yaşanmaması için aşağıdaki bilgilendirmeleri dikkatle incelemenizi rica ederiz.
@@ -811,9 +823,9 @@ function printDoc(kind){
   .tot{text-align:right;font-size:18px;font-weight:800;color:#1e40af;margin-top:12px}.foot{margin-top:18px;font-size:11px;color:#64748b}</style></head>
   <body><h1>fiyatiq</h1><div class="sub">${baslik}</div>
   <div class="info"><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div><div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
-  <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Tutar</th>${ind>0?'<th>Kampanya İnd.</th>':''}<th>Net Tutar</th></tr></thead><tbody>${tr}</tbody></table>
-  ${ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ürünlere eşit dağıtılmıştır)</div>`:""}
-  <div class="tot">TOPLAM: ${fmt(formToplam)} ₺${tk>1?` &nbsp;|&nbsp; ${bk} ${tk} Taksit — Aylık ${fmt(formToplam/tk)} ₺`:""}</div>
+  <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>${ind>0?'<th>Kampanya İnd.</th>':''}<th>Peşin Fiyat</th>${taksitliVar?'<th>Taksitli Fiyat</th>':''}</tr></thead><tbody>${tr}</tbody></table>
+  ${ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ürünlere eşit dağıtılıp fiyatlara işlenmiştir)</div>`:""}
+  <div class="tot">PEŞİN TOPLAM: ${fmt(pT)} ₺${taksitliVar?`<br>TAKSİTLİ TOPLAM: ${fmt(tT)} ₺ &nbsp;(${bk} ${tk} Taksit — Aylık ${fmt(tT/tk)} ₺)`:""}</div>
   ${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();
