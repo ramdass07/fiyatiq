@@ -176,11 +176,19 @@
   </main>
 
   <main id="adminView" style="display:none">
+    <div id="adminBrandBanner" style="position:sticky;top:0;z-index:30;margin:0 0 14px;padding:12px 16px;border-radius:10px;font-weight:800;font-size:15px;letter-spacing:.5px;text-align:center;background:#0e7490;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.35)">ŞU AN: SIEMENS — tüm yüklemeler, stoklar ve kampanyalar SIEMENS'e yazılır</div>
     <div class="card" id="bayilerCard">
       <h2>Bayiler <span class="badge">kayıt onayı / yönetim</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Yeni kayıtlar <b>pasif</b> gelir; "Aktif Yap" deyince veriyi görür.</p>
       <table><thead><tr><th>Ad / Mağaza</th><th>Marka</th><th>Rol</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="bayiList"></tbody></table>
       <div id="bayiMsg" class="msg"></div>
+    </div>
+
+    <div class="card" id="tekliflerCard">
+      <h2>📑 Teklifler <span class="badge">mağazalardan gelen</span></h2>
+      <p class="mut" style="font-size:12px;margin:0 0 8px">Mağazalarının kaydettiği teklifler buraya düşer. <button class="ghost sm" onclick="loadTeklifler()">↻ Yenile</button></p>
+      <div id="gridWrap2" style="overflow-x:auto"><table><thead><tr><th>Teklif No</th><th>Tarih</th><th>Mağaza</th><th>Personel</th><th>Müşteri</th><th>Marka</th><th class="num">Tutar</th><th>Ürünler</th></tr></thead><tbody id="tekliflerList"></tbody></table></div>
+      <div id="tekliflerMsg" class="msg"></div>
     </div>
 
     <h2 style="margin:4px 0 0">Merkezi Veri Yükleme <span id="aktifMarka" class="badge">Aktif: Siemens</span></h2>
@@ -330,7 +338,7 @@ async function showApp(session){
   if(quoteRows.length===0) addRow();
 }
 async function loadProfil(uid){
-  const {data} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu").eq("id",uid).maybeSingle();
+  const {data} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad").eq("id",uid).maybeSingle();
   if(data) profil = data;
 }
 function allowedBrands(){ return profil.rol==="admin"||profil.rol==="personel" ? ["siemens","bosch"] : (profil.marka_erisimi||[]); }
@@ -349,12 +357,20 @@ function setBrand(b){
   if(typeof secilenKampanya!=='undefined') secilenKampanya.clear(); // marka değişince diğer markanın seçimleri kalkar
   quoteRows.forEach(r=>refetch(r)); loadBanks();
   loadAktifKampanyalar().then(()=>renderRows());
+  syncAdminBrand();
+}
+function syncAdminBrand(){
+  const isB = brand==="bosch";
+  const ban=$("adminBrandBanner");
+  if(ban){ ban.textContent="ŞU AN: "+(isB?"BOSCH":"SIEMENS")+" — tüm yüklemeler, stoklar ve kampanyalar "+(isB?"BOSCH":"SIEMENS")+"'e yazılır"; ban.style.background=isB?"#b91c1c":"#0e7490"; }
+  const am=$("aktifMarka"); if(am) am.textContent="Aktif: "+(isB?"Bosch":"Siemens");
+  const av=$("adminView"); if(av && av.style.display!=="none"){ loadKampanyalar(); }
 }
 function toggleAdmin(){
   const a=$("adminView"), b=$("bayiView");
   const showAdmin = a.style.display==="none";
   a.style.display = showAdmin?"block":"none"; b.style.display = showAdmin?"none":"block";
-  if(showAdmin){ loadKampanyalar(); loadBankaPanel(); if(profil.rol==="admin") loadBayiler(); }
+  if(showAdmin){ syncAdminBrand(); loadKampanyalar(); loadBankaPanel(); loadTeklifler(); if(profil.rol==="admin") loadBayiler(); }
 }
 // ===== BANKA KOMİSYONLARI (yönetim) =====
 async function loadBankaPanel(){
@@ -771,14 +787,37 @@ async function setKomis(){
 function onBankChange(){ loadTaksit(); }
 function onTaksitChange(){ setKomis(); }
 function calcBank(){ renderRows(); }
+async function loadTeklifler(){
+  const tb=$("tekliflerList"); if(!tb) return;
+  const {data,error}=await sb.from("teklifler").select("*").order("created_at",{ascending:false}).limit(200);
+  if(error){ if($("tekliflerMsg")) $("tekliflerMsg").textContent="Hata: "+error.message; return; }
+  let pmap={}; try{ const ps=await sb.from("profiller").select("id,magaza,ad"); (ps.data||[]).forEach(p=>pmap[p.id]={magaza:p.magaza,ad:p.ad}); }catch(e){}
+  const rows=data||[];
+  tb.innerHTML = rows.length ? rows.map(t=>{
+    const s=t.satirlar||{}; const arr=Array.isArray(s); const no=arr?"—":(s.no||"—"); const personel=arr?"—":(s.personel||"—");
+    const items=arr?s:(s.items||[]);
+    const magaza=(!arr&&s.magaza)||(pmap[t.bayi_id]&&(pmap[t.bayi_id].magaza||pmap[t.bayi_id].ad))||"—";
+    const tarih=t.created_at? new Date(t.created_at).toLocaleString("tr-TR"):"—";
+    const urunler=items.map(x=>x.model).filter(Boolean).join(", ");
+    return `<tr><td><b>${no}</b></td><td>${tarih}</td><td>${magaza}</td><td>${personel}</td><td>${t.musteri_ad||"—"}${t.musteri_tel?(" · "+t.musteri_tel):""}</td><td>${t.marka||""}</td><td class="num">${fmt(t.toplam)} ₺</td><td class="mut" style="font-size:11px">${urunler.slice(0,70)}${urunler.length>70?" …":""}</td></tr>`;
+  }).join("") : '<tr><td colspan="8" class="mut">Henüz teklif yok.</td></tr>';
+}
+let currentTeklifNo=null;
+function magazaPrefix(){ const m=((profil&&(profil.magaza||profil.ad))||"MGZ").toUpperCase().replace(/[^A-Z0-9]/g,""); return (m.slice(0,3)||"MGZ"); }
+function genTeklifNo(){ const d=new Date(),yy=String(d.getFullYear()).slice(2),mm=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'),rnd=Math.random().toString(36).slice(2,6).toUpperCase(); return magazaPrefix()+"-"+yy+mm+dd+"-"+rnd; }
+function getTeklifNo(){ if(!currentTeklifNo) currentTeklifNo=genTeklifNo(); return currentTeklifNo; }
 async function saveQuote(){
   const {data:{user}}=await sb.auth.getUser();
-  const satirlar=quoteRows.filter(r=>r.kod&&r.ad!=="— bulunamadı —").map(r=>({model:r.kod,ad:r.ad,adet:r.adet,nakit:r.nakit,taksit:r.taksit,maliyet:r.maliyet}));
+  const items=quoteRows.filter(r=>r.kod&&r.ad!=="— bulunamadı —").map(r=>({model:r.kod,ad:r.ad,adet:r.adet,nakit:r.nakit,taksit:r.taksit,maliyet:r.maliyet,kd:r.sKadikoy>0}));
   const msg=$("saveMsg");
-  if(!satirlar.length){ msg.textContent="Geçerli ürün yok."; msg.className="bad"; return; }
+  if(!items.length){ msg.textContent="Geçerli ürün yok."; msg.className="bad"; return; }
+  const teklifNo=getTeklifNo();
+  const personel=(($("satisPersonel")||{}).value)||null;
+  const satirlar={no:teklifNo, personel, magaza:(profil&&profil.magaza)||null, items};
   const toplam=lastTot?Math.round(lastTot.finalNakit):quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
   const {error}=await sb.from("teklifler").insert({bayi_id:user.id,marka:brand,musteri_ad:(($("mAd")||{}).value)||null,musteri_tel:(($("mTel")||{}).value)||null,satirlar,toplam,satis_tutari:toplam});
-  msg.textContent=error?"Hata: "+error.message:"✓ Teklif kaydedildi"; msg.className=error?"bad":"ok";
+  msg.textContent=error?"Hata: "+error.message:("✓ Teklif kaydedildi · No: "+teklifNo); msg.className=error?"bad":"ok";
+  if(!error) currentTeklifNo=null; // sonraki teklif yeni no alır
 }
 function teklifItems(){ return quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —"); }
 function teklifToplam(items){ return lastTot? Math.round((komisOran>0?lastTot.finalTaksit:lastTot.finalNakit)) : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0); }
@@ -790,7 +829,7 @@ function shareWhatsApp(){
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
   const N=items.length, indPer=(ind>0&&N>0)?ind/N:0;
   let pT=0,tT=0;
-  let m="*FİYAT TEKLİFİ*\n"+"═".repeat(16)+"\n\n";
+  let m="*FİYAT TEKLİFİ*\n"+`Teklif No: ${getTeklifNo()}\n`+"═".repeat(16)+"\n\n";
   items.forEach((r,i)=>{ const kd=r.sKadikoy>0?" [KD]":"";
     const pesinNet=Math.max(0,(r.nakit||0)*(r.adet||1)-indPer), taksitNet=Math.max(0,(r.taksit||0)*(r.adet||1)-indPer);
     pT+=pesinNet; tT+=taksitNet;
@@ -845,7 +884,7 @@ function printDoc(kind){
   table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px}th{background:#eff6ff;color:#1e40af}
   .tot{text-align:right;font-size:18px;font-weight:800;color:#1e40af;margin-top:12px}.foot{margin-top:18px;font-size:11px;color:#64748b}</style></head>
   <body><h1>fiyatiq</h1><div class="sub">${baslik}</div>
-  <div class="info"><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div>${personel?`<div><b>Satış Personeli:</b> ${personel}</div>`:""}<div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
+  <div class="info"><div><b>Teklif No:</b> ${getTeklifNo()}</div><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div>${personel?`<div><b>Satış Personeli:</b> ${personel}</div>`:""}<div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
   <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>${ind>0?'<th>Kampanya İnd.</th>':''}<th>Peşin Fiyat</th>${taksitliVar?'<th>Taksitli Fiyat</th>':''}</tr></thead><tbody>${tr}</tbody></table>
   ${ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ürünlere eşit dağıtılıp fiyatlara işlenmiştir)</div>`:""}
   <div class="tot">PEŞİN TOPLAM: ${fmt(pT)} ₺${taksitliVar?`<br>TAKSİTLİ TOPLAM: ${fmt(tT)} ₺ &nbsp;(${bk} ${tk} Taksit — Aylık ${fmt(tT/tk)} ₺)`:""}</div>
@@ -1062,7 +1101,7 @@ async function admKampanya(){
   }catch(e){ adminMsgEl("kMsg","Hata: "+e.message,"bad"); }
 }
 async function loadKampanyalar(){
-  const {data}=await sb.from("kampanyalar").select("*").order("created_at",{ascending:false});
+  const {data}=await sb.from("kampanyalar").select("*").or(`marka.eq.${brand},marka.is.null`).order("created_at",{ascending:false});
   const tb=$("kList"); if(!tb) return;
   tb.innerHTML=(data||[]).map(k=>`<tr><td>${k.ad}</td><td><select onchange="kampMarkaSet('${k.id}',this.value)"><option value="bosch" ${k.marka==='bosch'?'selected':''}>Bosch</option><option value="siemens" ${k.marka==='siemens'?'selected':''}>Siemens</option><option value="" ${!k.marka?'selected':''}>İkisi</option></select></td><td>${k.match_type}</td><td class="num">${fmt(k.musteri_indirimi)}</td><td class="num">${fmt(k.hakedis)}</td><td>${k.bitis_tarihi||"—"}</td><td><button class="ghost sm" onclick="delKampanya('${k.id}')">✕</button></td></tr>`).join("");
 }
