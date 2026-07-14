@@ -192,7 +192,7 @@
     </div>
 
     <h2 style="margin:4px 0 0">Merkezi Veri Yükleme <span id="aktifMarka" class="badge">Aktif: Siemens</span></h2>
-    <p class="mut" style="font-size:13px;margin:4px 0 12px">Yüklemeler <b>üstten seçili markaya</b> yazılır (Siemens/Bosch). Ham dosyayı at, "Akıllı Tara" sütunları otomatik tanır.</p>
+    <p class="mut" style="font-size:13px;margin:4px 0 12px">Yüklemeler <b>üstten seçili markaya</b> yazılır (Siemens/Bosch). Fiyat kutularına <b>birden çok parça dosyayı aynı anda</b> seçebilirsin; "Akıllı Tara" hepsini birleştirip sütunları otomatik tanır.</p>
     <div id="importers"></div>
 
     <div class="card">
@@ -910,7 +910,7 @@ function buildImporters(){
         ${cfg.donem?`<div class="fld"><label>Dönem</label><input id="${k}_donem" type="month" value="${mon}"></div>`:""}
         ${cfg.tarih?`<div class="fld"><label>Sayım Tarihi</label><input id="${k}_tarih" type="date" value="${today}"></div>`:""}
         ${cfg.depo===true?`<div class="fld"><label>Depo</label><select id="${k}_depo"><option value="mars">Mars</option><option value="horoz">Horoz</option><option value="kadikoy">Kadıköy</option></select></div>`:""}
-        <div class="fld"><label>Dosya</label><input id="${k}_file" type="file" accept=".xlsx,.xls,.csv"></div>
+        <div class="fld"><label>Dosya${cfg.stockMode?"":" (çok parça seçebilirsin)"}</label><input id="${k}_file" type="file" accept=".xlsx,.xls,.csv"${cfg.stockMode?"":" multiple"}></div>
         <button class="sm" onclick="smartScan('${k}')">Akıllı Tara</button>
         <button class="ghost sm" onclick="impRead('${k}')">Elle eşle</button>
       </div>
@@ -971,38 +971,40 @@ function autodetect(aoa,cols){
 }
 async function smartScan(k){
   try{
-    const cfg=IMPORTERS[k]; const f=$(k+"_file").files[0];
-    if(!f){ impMsg(k,"Dosya seç.","bad"); return; }
-    impMsg(k,"Tüm sayfalar taranıyor...");
-    const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
-    impState[k]={wb};
+    const cfg=IMPORTERS[k]; const files=$(k+"_file").files;
+    if(!files||!files.length){ impMsg(k,"Dosya seç.","bad"); return; }
+    impMsg(k, (files.length>1?files.length+" dosya · ":"")+"tüm sayfalar taranıyor...");
     const valCols=cfg.cols.slice(1);
-    const all=[]; const seen=new Set(); const detail=[];
-    wb.SheetNames.forEach(sn=>{
-      const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
-      if(cfg.stockMode){ const out=parseStockRows(aoa); out.forEach(o=>{ if(!seen.has(o.model_kodu)){ seen.add(o.model_kodu); all.push(o); } }); detail.push(`${sn}:${out.length}`); return; }
-      let hr=-1,best=0;
-      if(valCols.some(c=>c.skw)){ for(let r=0;r<Math.min(aoa.length,15);r++){ const row=aoa[r]||[]; let sc=0; valCols.forEach(c=>{ if(c.skw && row.some(cell=>colMatches(cell,c))) sc++; }); if(sc>best){best=sc;hr=r;} } }
-      const dataStart= hr<0?0:hr+1;
-      const codeCol=detectCodeCol(aoa,dataStart);
-      const vmap={}; valCols.forEach(c=>{ let idx=-1; if(hr>=0&&c.skw){ const row=aoa[hr]||[]; for(let j=0;j<row.length;j++){ if(colMatches(row[j],c)){ idx=j; break; } } } if(idx<0&&c.type==="num") idx=numFallback(aoa,dataStart,codeCol); vmap[c.key]=idx; });
-      let cnt=0;
-      for(let i=dataStart;i<aoa.length;i++){ const r=aoa[i]||[]; if(!isCode(r[codeCol])) continue; const kod=(""+r[codeCol]).trim().toUpperCase(); if(seen.has(kod)) continue;
-        const obj={model_kodu:kod}; let has=false;
-        valCols.forEach(c=>{ const j=vmap[c.key]; let v= j>=0? r[j]:null; if(c.type==="num"){ obj[c.key]= isNum(v)?+v:null; if(obj[c.key]!=null) has=true; } else { obj[c.key]= v==null?null:(""+v).trim(); if(obj[c.key]) has=true; } });
-        if(!cfg.codesOnly && !has) continue;
-        seen.add(kod); all.push(obj); cnt++;
-      }
-      detail.push(`${sn}:${cnt}`);
-    });
-    impState[k].rows=all;
+    const all=[]; const seen=new Set(); const detail=[]; let lastWb=null;
+    for(const f of files){
+      const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true}); lastWb=wb;
+      const pre=files.length>1?(f.name.replace(/\.[^.]+$/,"").slice(0,10)+"·"):"";
+      wb.SheetNames.forEach(sn=>{
+        const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+        if(cfg.stockMode){ const out=parseStockRows(aoa); out.forEach(o=>{ if(!seen.has(o.model_kodu)){ seen.add(o.model_kodu); all.push(o); } }); detail.push(`${pre}${sn}:${out.length}`); return; }
+        let hr=-1,best=0;
+        if(valCols.some(c=>c.skw)){ for(let r=0;r<Math.min(aoa.length,15);r++){ const row=aoa[r]||[]; let sc=0; valCols.forEach(c=>{ if(c.skw && row.some(cell=>colMatches(cell,c))) sc++; }); if(sc>best){best=sc;hr=r;} } }
+        const dataStart= hr<0?0:hr+1;
+        const codeCol=detectCodeCol(aoa,dataStart);
+        const vmap={}; valCols.forEach(c=>{ let idx=-1; if(hr>=0&&c.skw){ const row=aoa[hr]||[]; for(let j=0;j<row.length;j++){ if(colMatches(row[j],c)){ idx=j; break; } } } if(idx<0&&c.type==="num") idx=numFallback(aoa,dataStart,codeCol); vmap[c.key]=idx; });
+        let cnt=0;
+        for(let i=dataStart;i<aoa.length;i++){ const r=aoa[i]||[]; if(!isCode(r[codeCol])) continue; const kod=(""+r[codeCol]).trim().toUpperCase(); if(seen.has(kod)) continue;
+          const obj={model_kodu:kod}; let has=false;
+          valCols.forEach(c=>{ const j=vmap[c.key]; let v= j>=0? r[j]:null; if(c.type==="num"){ obj[c.key]= isNum(v)?+v:null; if(obj[c.key]!=null) has=true; } else { obj[c.key]= v==null?null:(""+v).trim(); if(obj[c.key]) has=true; } });
+          if(!cfg.codesOnly && !has) continue;
+          seen.add(kod); all.push(obj); cnt++;
+        }
+        detail.push(`${pre}${sn}:${cnt}`);
+      });
+    }
+    impState[k]={wb:lastWb, rows:all};
     const prev=$(k+"_prev"); prev.style.display="block";
     let html="<table><thead><tr><th>Kod</th>"+valCols.map(c=>`<th>${c.label}</th>`).join("")+"</tr></thead><tbody>";
     all.slice(0,6).forEach(o=>{ html+="<tr><td>"+o.model_kodu+"</td>"+valCols.map(c=>`<td>${o[c.key]==null?"":o[c.key]}</td>`).join("")+"</tr>"; });
     html+="</tbody></table>"; prev.innerHTML=html;
     $(k+"_map").style.display="none";
     $(k+"_write").disabled = all.length===0;
-    impMsg(k, all.length? `✓ ${all.length} kayıt bulundu (${detail.join(", ")}). Kontrol et, 'DB'ye Yaz'.` : "Kayıt bulunamadı — bu kutuya doğru dosyayı attığından emin ol.", all.length?"ok":"bad");
+    impMsg(k, all.length? `✓ ${files.length>1?files.length+" dosyadan ":""}${all.length} kayıt bulundu (${detail.join(", ")}). Kontrol et, 'DB'ye Yaz'.` : "Kayıt bulunamadı — bu kutuya doğru dosyayı attığından emin ol.", all.length?"ok":"bad");
   }catch(e){ impMsg(k,"Hata: "+e.message,"bad"); }
 }
 async function impRead(k){
