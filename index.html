@@ -941,22 +941,38 @@ function tclassify(name){
   // stok değilse fiyat listesi kabul et (toptan/perakende sayfalarını içeriden bulur)
   return {brand, kind: brand? "fiyat": null};
 }
+// Dosya içeriğinden marka tahmini (ad'da yoksa): sayfa adları + üst satırlarda SIEMENS/BOSCH ara
+function detectBrandWb(wb){
+  const names=tkc(wb.SheetNames.join(" "));
+  if(names.includes("siemens")) return "siemens";
+  if(names.includes("bosch")) return "bosch";
+  for(const sn of wb.SheetNames.slice(0,3)){
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:null});
+    for(let r=0;r<Math.min(aoa.length,10);r++){ const t=tkc((aoa[r]||[]).join(" "));
+      if(t.includes("siemens")) return "siemens"; if(t.includes("bosch")) return "bosch"; }
+  }
+  return null;
+}
+function markaAd(b){ return b==="bosch"?"Bosch": b==="siemens"?"Siemens": "?"; }
 // Ham BSH FL (çok sayfalı) veya temiz dosyadan toptan + perakende + BİP çıkarır
 function parsePriceWb(wb, marka, donem){
   const top={}, per={}, bip={};
   wb.SheetNames.forEach(sn=>{
-    const nm=tkey(sn); if(nm.includes("bundle")) return;
+    const nm=tkc(sn); if(nm.includes("bundle")||nm.includes("launch")||nm.includes("baglant")) return; // Launch / Bağlantı sayfalarını atla
     const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
     let hr=-1;
-    for(let r=0;r<Math.min(aoa.length,20);r++){ const t=(aoa[r]||[]).map(tkey);
-      if(t.some(x=>x==="urunler"||x==="urunkodu"||x==="urun")){ hr=r; break; } }
+    for(let r=0;r<Math.min(aoa.length,20);r++){ const t=(aoa[r]||[]).map(tkc);
+      if(t.some(x=>x.includes("urun"))){ hr=r; break; } } // "Ürün", "Ürün Kodu", "Yeni Ürün Kodu"...
     if(hr<0) return;
-    const H=(aoa[hr]||[]).map(tkey);
+    const H=(aoa[hr]||[]).map(tkc);
     const cc=detectCodeCol(aoa,hr+1);
     const isT=nm.includes("toptan"), isP=nm.includes("perakende");
     let pc=-1, tgt=null;
-    if(isT){ pc=H.findIndex((h,j)=>j>cc&&h==="toptan"); if(pc<0) pc=H.findIndex((h,j)=>j>cc&&h==="nakitfiyat"); tgt=top; }
-    else if(isP){ pc=H.findIndex(h=>h==="pesinfiyat"); if(pc<0) pc=H.findIndex(h=>h.includes("pesin")&&!h.includes("kampanyasiz")); tgt=per; }
+    if(isT){ pc=H.findIndex((h,j)=>j>cc&&h==="toptan"); // Bosch: tek NAKİT/TOPTAN sütunu
+             if(pc<0) pc=H.findIndex((h,j)=>j>cc&&h==="nakitfiyat");
+             if(pc<0) pc=H.findIndex((h,j)=>j>cc&&h.includes("gun")&&h.includes("geri")); // Siemens: en soldaki (en geri) valörlü = nakit karşılığı (5 AY/4 AY...)
+             tgt=top; }
+    else if(isP){ pc=H.findIndex(h=>h==="pesinfiyat"); if(pc<0) pc=H.findIndex(h=>h.includes("pesin")&&!h.includes("kampanyasiz")&&!h.includes("pesinat")); tgt=per; }
     else { // sayfa adı belirsiz: temiz dosya (Toptan/BİP) — toptan sütununa bak
       pc=H.findIndex((h,j)=>j>cc&&h==="toptan"); if(pc>=0) tgt=top;
     }
@@ -984,7 +1000,11 @@ async function topluTara(files){
     const c=tclassify(f.name); const res={name:f.name, brand:c.brand, kind:c.kind, depo:c.depo, tip:c.tip, ok:false, detay:""};
     try{
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
-      if(!c.brand){ res.detay="marka tanınamadı (ad içinde Bosch/Siemens yok)"; }
+      // Marka: dosya adı > içerik > panelde seçili marka. Panelle çelişki varsa karışmasın diye atla.
+      if(c.brand && c.brand!==brand){ res.brand=c.brand; res.detay="⚠ Panelde "+markaAd(brand)+" seçili ama dosya "+markaAd(c.brand)+" görünüyor — karışmasın diye atlandı. Üstten doğru markaya geç."; window.topluItems.push(res); continue; }
+      if(!c.brand){ c.brand = detectBrandWb(wb) || brand; res.brand=c.brand; }
+      if(!c.kind){ c.kind="fiyat"; res.kind="fiyat"; }
+      if(!c.brand){ res.detay="marka tanınamadı"; }
       else if(c.kind==="stok"){ let rows=[]; const seen={};
         wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
           parseStockRows(aoa).forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; rows.push({model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
@@ -1038,6 +1058,7 @@ function buildImporters(){
 }
 function sheetAoa(wb,name){ return XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null}); }
 function tkey(s){ return (""+(s==null?"":s)).normalize("NFKD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/ı/g,"i").trim(); }
+function tkc(s){ return tkey(s).replace(/[^a-z0-9]/g,""); } // boşluk/noktalama atılmış sıkı anahtar
 const CODE_RE=/^(?=.*\d)[A-Z0-9]{5,}$/;
 function isCode(v){ return CODE_RE.test((""+(v==null?"":v)).trim().toUpperCase()); }
 function colMatches(cell,c){ if(!c.skw) return false; const t=tkey(cell); if(!c.skw.some(w=>t.includes(w))) return false; if(c.sneg&&c.sneg.some(w=>t.includes(w))) return false; return true; }
