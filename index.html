@@ -665,11 +665,13 @@ async function stokSorgula(){
       ${net<=0?'<div class="nostock" style="margin-top:4px">⚠ BU ÜRÜNDE STOK YOK</div>':''}`;
   }
   const ad=row&&row.urun_adi?row.urun_adi:q;
+  const pm=primliMap[q];
+  const pmTxt=(pm&&pm.fiyat)?`<span class="chip" style="background:var(--bad);color:#fff;border-color:var(--bad)">⭐ Primli Satış ${fmt(pm.fiyat)} ₺</span>`:"";
   const pTxt=(row&&row.nakit_fiyat)?`<span class="chip pesin">Peşin ${fmt(row.nakit_fiyat)} ₺</span>`:"";
   const tTxt=(row&&row.toptan_fiyat!=null)?`<span class="chip toptan">Toptan ${fmt(row.toptan_fiyat)} ₺</span>`:"";
   const bTxt=(row&&row.bip_tutar)?`<span class="chip bip">BİP ${fmt(row.bip_tutar)} ₺</span>`:"";
-  const fiyat=(pTxt+tTxt+bTxt)?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">${pTxt}${tTxt}${bTxt}</div>`:"";
-  const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
+  const fiyat=(pmTxt+pTxt+tTxt+bTxt)?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">${pmTxt}${pTxt}${tTxt}${bTxt}</div>`:"";
+  const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null && !pm)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
   box.innerHTML=`<div class="card" style="background:var(--field);margin:0;padding:14px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">${ad}</b> <span class="badge" style="font-size:9px">${brand}</span>${primliRozet(q)}${yok}</div>${fiyat}${stokHtml}</div>`;
 }
 function stokCell(v){ if(v==null) return '<span class="mut">—</span>'; if(v<=0) return '<span class="mut">0</span>'; if(v<=3) return `<span class="blink" title="Az stok!">${v}</span>`; return v; }
@@ -684,10 +686,12 @@ function calcParts(r,kar,komis){
   const km = komis>0 ? (1+kar/100)*komis/100 : 0;
   const manuelP = r.isET && (+r.manuelFiyat>0);   // Manuel peşin
   const manuelT = r.isET && (+r.manuelTaksit>0);  // Manuel taksitli
+  // Sabit peşin: önce manuel override, yoksa primli fiyat (varsa) — satışçı Manuel'le değiştirebilir
+  const sabitPesin = manuelP ? (+r.manuelFiyat) : ((+r.primliFiyat>0) ? (+r.primliFiyat) : null);
   let unitNakit, unitTaksit;
-  unitNakit = manuelP ? (+r.manuelFiyat) : unitBipli*(1+kar/100);
+  unitNakit = (sabitPesin!=null) ? sabitPesin : unitBipli*(1+kar/100);
   if(manuelT) unitTaksit = +r.manuelTaksit;
-  else if(manuelP) unitTaksit = komis>0 ? unitNakit/(1-komis/100) : unitNakit;
+  else if(sabitPesin!=null) unitTaksit = komis>0 ? unitNakit/(1-komis/100) : unitNakit;
   else unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
   const unitNetTaksit = unitTaksit*(1-komis/100);
   const karPesin = unitBipli>0 ? (unitNakit/unitBipli -1)*100 : 0;
@@ -908,10 +912,12 @@ async function refetch(r){
   if(!r.kod){ renderRows(); return; }
   const {data:f} = await sb.rpc("urun_fiyat",{p_model_kodu:r.kod,p_marka:brand,p_donem:aktifDonem||_donem()});
   const row=f&&f[0];
+  const pr=primliMap[(r.kod||"").toUpperCase()]; // primli ürün mü?
+  r.primliFiyat = (pr && pr.fiyat) ? pr.fiyat : null; // belirlenen primli satış fiyatı (varsayılan peşin)
   if(row && (row.urun_adi || row.toptan_fiyat!=null)){
     r.ad=row.urun_adi||r.kod; r.toptan=row.toptan_fiyat; r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
     if(row.toptan_fiyat!=null) r.isET=false;
-  } else { r.ad="— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; }
+  } else { r.ad = pr ? r.kod : "— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; } // primli ama listede yoksa: kodu göster, manuel toptan
   r.marsMevcut=r.horozMevcut=r.kadikoyMevcut=r.marsAyrilan=r.horozAyrilan=null; r.sKadikoy=0; r.netStok=null;
   {
     // Tüm kullanıcılar MERKEZ stoğu görür (Mars/Horoz/Kadıköy + ayrılan)
