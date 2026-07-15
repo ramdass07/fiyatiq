@@ -76,6 +76,10 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:var(--field);border:1px solid var(--line);margin-left:6px}
   @keyframes fqblink{0%,100%{opacity:1}50%{opacity:.2}}
   .blink{animation:fqblink .85s steps(1,end) infinite;color:var(--bad);font-weight:800}
+  @keyframes uyariPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.45);border-color:var(--bad)}50%{box-shadow:0 0 20px 5px rgba(239,68,68,.55);border-color:#fca5a5}}
+  .uyari-kritik{background:rgba(239,68,68,.12);border:2.5px solid var(--bad);color:#fecaca;border-radius:12px;padding:13px 18px;margin-bottom:10px;font-weight:800;font-size:15px;display:flex;align-items:center;gap:10px;animation:uyariPulse 1.05s ease-in-out infinite}
+  .uyari-kritik .big-red{color:#fca5a5;font-size:20px;letter-spacing:.5px}
+  .uyari-sari{background:rgba(245,158,11,.14);border:2px solid var(--warn);color:#fde68a;border-radius:12px;padding:11px 16px;margin-bottom:10px;font-weight:700;font-size:14px}
   .kd{display:inline-block;background:var(--warn);color:#3b2600;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:800;margin-left:5px}
   .nostock{display:inline-block;color:var(--bad);font-weight:800;margin-left:6px;font-size:11px}
   .diva-uyari{background:rgba(245,158,11,.15);border:1px solid var(--warn);color:var(--warn);padding:7px 11px;border-radius:8px;margin-bottom:10px;font-weight:700;font-size:13px}
@@ -173,6 +177,7 @@
       </tr></thead><tbody id="rows"></tbody>
       <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="6"></th></tr></tfoot></table></div>
     </div>
+    <div id="uyariKutu" style="display:none;margin-bottom:18px"></div>
     <div class="card" id="kampPanel" style="display:none;border:1px solid var(--ok)">
       <h2 style="margin-top:0;cursor:pointer;user-select:none" onclick="toggleKampPanel()"><span id="kampArrow">▶</span> 🎁 Kampanyalar <span id="kampCount" class="badge">otomatik</span></h2>
       <div id="kampList" style="display:none"></div>
@@ -230,8 +235,21 @@
     <p class="mut" style="font-size:13px;margin:4px 0 12px">Yüklemeler <b>üstten seçili markaya</b> yazılır (Siemens/Bosch). Fiyat kutularına <b>birden çok parça dosyayı aynı anda</b> seçebilirsin; "Akıllı Tara" hepsini birleştirip sütunları otomatik tanır.</p>
     <div id="importers"></div>
 
+    <div class="card" id="kampSihirbazCard" style="border:2px solid var(--brand)">
+      <h2>🤖 Kampanya Sihirbazı <span class="badge">Opus · otomatik ayıklar</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Bosch kampanya <b>PDF</b>'lerini (broşür + uygulama yazısı) veya Siemens <b>Excel</b>'ini <b>hepsini birden</b> buraya bırak. Yapay zekâ kampanyaları çıkarır → aşağıda kontrol edip kaydedersin. Üstten <b>doğru markayı</b> seçmeyi unutma.</p>
+      <label id="ksDrop" ondragover="event.preventDefault();this.style.background='#1d4ed822'" ondragleave="this.style.background='var(--field)'" ondrop="event.preventDefault();this.style.background='var(--field)';kampSihirbaz(event.dataTransfer.files)" style="display:block;border:2px dashed var(--brand);border-radius:12px;padding:22px;text-align:center;cursor:pointer;background:var(--field)">
+        <input id="ksFile" type="file" accept=".pdf,.xlsx,.xls" multiple style="display:none" onchange="kampSihirbaz(this.files)">
+        <div style="font-size:15px;font-weight:700">📄 Kampanya dosyalarını buraya bırak, ya da tıkla</div>
+        <div class="mut" style="font-size:12px;margin-top:4px">Bosch: broşür + uygulama yazısı PDF · Siemens: kampanya Excel</div>
+      </label>
+      <div id="ksMsg" class="msg"></div>
+      <div id="ksSonuc" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:10px;display:none" id="ksKaydetRow"><button id="ksKaydet" onclick="kampSihirbazKaydet()">✓ Seçili Kampanyaları Kaydet</button><span id="ksKayMsg" class="msg"></span></div>
+    </div>
+
     <div class="card">
-      <h2>Kampanya İçe Aktar <span class="badge">Bosch PDF / Siemens Excel</span></h2>
+      <h2>Kampanya İçe Aktar <span class="badge">Bosch PDF / Siemens Excel (eski, elle)</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Üstten markayı seç, dosyayı at → sistem indirimli kampanyaları çıkarır → her birini kontrol edip "Ekle"ye bas.</p>
       <div class="row" style="align-items:flex-end">
         <input id="kampFile" type="file" accept=".pdf,.xlsx,.xls"><button class="sm" onclick="kampOku()">Oku</button>
@@ -576,7 +594,7 @@ async function stokSorgula(){
   const q=($("stokSorguInput").value||"").trim().toUpperCase(); const box=$("stokSorguSonuc");
   if(!q){ box.innerHTML=""; return; }
   box.innerHTML='<span class="mut">Sorgulanıyor...</span>';
-  const {data:f}=await sb.rpc("urun_fiyat",{p_model_kodu:q,p_marka:brand,p_donem:aktifDonem});
+  const {data:f}=await sb.rpc("urun_fiyat",{p_model_kodu:q,p_marka:brand,p_donem:aktifDonem||_donem()});
   const row=f&&f[0];
   let stokHtml="";
   {
@@ -626,13 +644,15 @@ function renderRows(){
   const tb=$("rows"); if(!tb) return;
   const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
   tb.innerHTML="";
-  let tMaliyet=0,tBip=0,tBipli=0,tAdet=0;
+  let tMaliyet=0,tBip=0,tBipli=0,tAdet=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
   quoteRows.forEach((r,i)=>{
     const p=calcParts(r,kar,komis);
     r.nakit=p.unitNakit; r.taksit=p.unitTaksit; r.maliyet=p.unitToptan; r.kar=p.karPct;
     const maliyetL=p.unitToptan*p.adet, bipL=p.unitBip*p.adet, nakitL=p.unitNakit*p.adet, taksitL=p.unitTaksit*p.adet;
     const valid = r.kod && r.ad!=="— bulunamadı —" && (r.isET? (+r.etToptan>0) : (+r.toptan>0));
-    if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0); }
+    if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0);
+      if(!r.isET && r.netStok!=null){ if(r.netStok<=0) uyStokYok.push(r.kod); else if(r.netStok<=3) uyKritik.push(r.kod+" ("+r.netStok+" adet)"); }
+      if(p.karPesin<0) uyZararSatir.push(r.kod); }
     const maliyetCell = r.isET
       ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:78px" onchange="quoteRows[${i}].etToptan=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(maliyetL);
@@ -647,7 +667,7 @@ function renderRows(){
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off" style="width:118px"
-           oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC()"
+           oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();setTimeout(()=>{const rr=quoteRows[${i}]; if(rr&&rr.kod)refetch(rr);},250)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
       <td>${r.ad||""}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="Kadıköy: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
@@ -692,6 +712,7 @@ function renderRows(){
   if($("aylik")) $("aylik").textContent= (komis>0&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px"; e.innerHTML = tBipli<=0?'—':('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):'')); }
+  renderUyarilar(uyStokYok,uyKritik,uyZararSatir,karPesinTot,tAdet>0&&tBipli>0);
   const kr=$("kampInfoRow");
   const setSayisi=applied.filter(k=>isBundleKamp(k)).length;
   const setUyari=setSayisi>1?` <span class="blink" style="color:var(--bad)">⚠ ${setSayisi} SET kampanyası birlikte uygulandı — set'ler normalde birleşmez, mutlaka Diva kontrolü yapın!</span>`:'';
@@ -699,6 +720,26 @@ function renderRows(){
     else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygun olabilir — panelden <b>"Uygula"</b> de.`; }
     else kr.style.display="none"; }
   renderKampanyaPanel();
+}
+// Satış uyarıları: stok yok / kritik stok / düşük kâr — büyük kırmızı yanıp söner
+function renderUyarilar(stokYok, kritik, zararSatir, karPesinTot, hasValid){
+  const box=$("uyariKutu"); if(!box) return;
+  const parts=[];
+  if(stokYok.length){
+    parts.push(`<div class="uyari-kritik"><span class="big-red">⛔ STOKTA YOK</span><span>${stokYok.join(", ")} — hiçbir depoda stok yok. <b>Satışı onaylıyor musun?</b> (satmadan önce stok/tedarik teyidi al)</span></div>`);
+  }
+  if(kritik.length){
+    parts.push(`<div class="uyari-kritik"><span class="big-red">⚠ KRİTİK STOK</span><span>${kritik.join(", ")} — çok az kaldı, satmadan stok teyidi yap.</span></div>`);
+  }
+  if(hasValid && karPesinTot<0){
+    parts.push(`<div class="uyari-kritik"><span class="big-red">⛔ ZARAR SATIŞ</span><span>Bu teklif <b>ZARARINA</b> (kâr ${karPesinTot.toFixed(1)}%). Fiyatı/indirimleri kontrol et!</span></div>`);
+  } else if(hasValid && karPesinTot<3){
+    parts.push(`<div class="uyari-kritik"><span class="big-red">⚠ DÜŞÜK KÂR</span><span>Kâr çok düşük (${karPesinTot.toFixed(1)}%). Fiyatı gözden geçir.</span></div>`);
+  } else if(zararSatir.length){
+    parts.push(`<div class="uyari-sari">⚠ Şu satır(lar) zararına: <b>${zararSatir.join(", ")}</b> — toplam kâr artıda olsa da tek tek kontrol et.</div>`);
+  }
+  box.innerHTML=parts.join("");
+  box.style.display = parts.length? "" : "none";
 }
 // ===== KAMPANYA OTOMATİK UYGULAMA (teklif ekranı) =====
 let aktifKampanyalar=[];
@@ -766,7 +807,7 @@ function renderKampanyaPanel(){
   if(!all.length){ list.innerHTML='<div class="mut" style="font-size:12px">Tanımlı aktif kampanya yok.</div>'; setHeader(); return; }
   const indT=applied.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
   const hakT=applied.reduce((a,k)=>a+(k.hakedis||0),0);
-  list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce mutlaka DIVA sistem kontrolü yapın.</div>`
+  list.innerHTML=`<div class="diva-uyari">⚠ Kampanya seçimi serbesttir — satıştan önce mutlaka DİVA sistem kontrolü yapın.</div>`
     +all.map(k=>{ const on=secilenKampanya.has(k.id); const bndl=isBundleKamp(k); const uygun=matchIds.has(k.id); const mk=k.marka||'ikisi';
       let uyari="";
       if(uygun) uyari=` <span class="badge" style="font-size:9px;background:rgba(34,197,94,.22);color:var(--ok);border-color:var(--ok)">✓ sepete uygun</span>`;
@@ -787,10 +828,11 @@ function renderKampanyaPanel(){
       </div>`;
   setHeader();
 }
-function isBundleKamp(k){ return ['all','all+any','any2'].includes(k&&k.match_type); }
+function isBundleKamp(k){ return ['all','all+any','any2','xl','xxl','xl+xxl'].includes(k&&k.match_type); }
+// Satıcı her kampanyayı SERBESTÇE seçer — zorlama yok, sadece DİVA kontrol uyarısı gösterilir.
 function toggleKampanya(id){
   if(secilenKampanya.has(id)) secilenKampanya.delete(id); else secilenKampanya.add(id);
-  renderRows(); // istediğin kadar uygulanabilir; birden fazla SET olursa aşağıda uyarı çıkar
+  renderRows();
 }
 async function onCode(i,val){ quoteRows[i].kod=val.trim().toUpperCase(); await refetch(quoteRows[i]); }
 let acRow=-1, acTimer=null;
@@ -809,7 +851,7 @@ function pickProduct(code){ if(acRow<0)return; quoteRows[acRow].kod=code; $("ac"
 function hideAC(){ setTimeout(()=>$("ac").classList.remove("show"),180); }
 async function refetch(r){
   if(!r.kod){ renderRows(); return; }
-  const {data:f} = await sb.rpc("urun_fiyat",{p_model_kodu:r.kod,p_marka:brand,p_donem:aktifDonem});
+  const {data:f} = await sb.rpc("urun_fiyat",{p_model_kodu:r.kod,p_marka:brand,p_donem:aktifDonem||_donem()});
   const row=f&&f[0];
   if(row && (row.urun_adi || row.toptan_fiyat!=null)){
     r.ad=row.urun_adi||r.kod; r.toptan=row.toptan_fiyat; r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
@@ -1295,6 +1337,85 @@ async function loadKampanyalar(){
 }
 async function kampMarkaSet(id,val){ await sb.from("kampanyalar").update({marka:val||null}).eq("id",id); }
 async function delKampanya(id){ await sb.from("kampanyalar").delete().eq("id",id); loadKampanyalar(); }
+
+// ===== KAMPANYA SİHİRBAZI (Opus ile otomatik ayıklama) =====
+async function ksMetinCikar(file){
+  let text="";
+  if(/\.pdf$/i.test(file.name)){
+    const buf=await file.arrayBuffer();
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    for(let p=1;p<=pdf.numPages;p++){ const pg=await pdf.getPage(p); const tc=await pg.getTextContent();
+      const lines={}; tc.items.forEach(it=>{ const y=Math.round(it.transform[5]); (lines[y]=lines[y]||[]).push(it); });
+      Object.keys(lines).map(Number).sort((a,b)=>b-a).forEach(y=>{ text+=lines[y].sort((a,b)=>a.transform[4]-b.transform[4]).map(it=>it.str).join(" ")+"\n"; });
+      text+="\n";
+    }
+  } else {
+    const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
+    wb.SheetNames.forEach(sn=>{ text+="### SAYFA: "+sn+"\n"; const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:""});
+      aoa.forEach(r=>{ const line=(r||[]).filter(c=>c).join(" | "); if(line) text+=line+"\n"; }); });
+  }
+  return text.replace(/([\d.])[ \t]+(?=[\d.])/g,"$1");
+}
+async function kampSihirbaz(files){
+  const msg=$("ksMsg"); if(!files||!files.length) return;
+  msg.className="msg"; msg.textContent="📄 Dosyalar okunuyor...";
+  $("ksSonuc").innerHTML=""; $("ksKaydetRow").style.display="none";
+  let metin="";
+  try{ for(const f of files){ metin+="\n===== DOSYA: "+f.name+" =====\n"+(await ksMetinCikar(f))+"\n"; } }
+  catch(e){ msg.className="msg bad"; msg.textContent="Okuma hatası: "+e.message; return; }
+  if(metin.trim().length<20){ msg.className="msg bad"; msg.textContent="Dosyalardan metin çıkmadı (taranmış görüntü PDF olabilir)."; return; }
+  msg.textContent="🤖 Opus kampanyaları ayıklıyor... (birkaç saniye)";
+  try{
+    const resp=await fetch("/api/kampanya-oku",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({marka:brand,donem:_donem(),metin})});
+    const data=await resp.json();
+    if(!resp.ok||data.error){ msg.className="msg bad"; msg.textContent="Sihirbaz hatası: "+(data.error||resp.status)+(data.ham?(" · "+data.ham):""); return; }
+    window.ksKampanyalar=(data.kampanyalar||[]).map(k=>({...k, _kaydet:true}));
+    if(!window.ksKampanyalar.length){ msg.className="msg bad"; msg.textContent="Kampanya bulunamadı. Dosyayı kontrol et."; return; }
+    msg.className="msg ok"; msg.textContent="✓ "+window.ksKampanyalar.length+" kampanya çıkarıldı. Aşağıda kontrol et, gerekirse düzelt, sonra kaydet.";
+    ksRenderTable();
+    $("ksKaydetRow").style.display="";
+  }catch(e){ msg.className="msg bad"; msg.textContent="Bağlantı hatası: "+e.message+" (aracı fonksiyon /api/kampanya-oku yüklü mü?)"; }
+}
+const KS_MATCH=["any2","all","all+any","xl+xxl","model_list","tumu"];
+function ksRenderTable(){
+  const box=$("ksSonuc"); const ks=window.ksKampanyalar||[];
+  box.innerHTML=ks.map((k,i)=>`<div class="card" style="background:var(--field);margin:0 0 10px;padding:12px;border:1px solid ${k._kaydet?'var(--brand)':'var(--line)'}">
+    <div class="row" style="align-items:center;gap:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-weight:700"><input type="checkbox" ${k._kaydet?'checked':''} onchange="window.ksKampanyalar[${i}]._kaydet=this.checked;ksRenderTable()"> Kaydet</label>
+      <input value="${(k.ad||'').replace(/"/g,'&quot;')}" placeholder="Kampanya adı" style="flex:1;min-width:220px;font-weight:700" oninput="window.ksKampanyalar[${i}].ad=this.value">
+      <span class="badge" style="font-size:9px">${brand}</span>
+    </div>
+    <div class="row" style="margin-top:8px;gap:12px">
+      <div class="fld"><label>Tür (match)</label><select onchange="window.ksKampanyalar[${i}].match_type=this.value">${KS_MATCH.map(m=>`<option value="${m}" ${k.match_type===m?'selected':''}>${m}</option>`).join("")}</select></div>
+      <div class="fld"><label>Müşteri indirimi ₺</label><input type="number" value="${k.musteri_indirimi||0}" style="width:120px" oninput="window.ksKampanyalar[${i}].musteri_indirimi=+this.value"></div>
+      <div class="fld"><label>Hakediş ₺</label><input type="number" value="${k.hakedis||0}" style="width:110px" oninput="window.ksKampanyalar[${i}].hakedis=+this.value"></div>
+      <div class="fld"><label>Kota ₺</label><input type="number" value="${k.kota||0}" style="width:100px" oninput="window.ksKampanyalar[${i}].kota=+this.value"></div>
+      <div class="fld"><label>Bitiş</label><input type="date" value="${k.bitis_tarihi||''}" oninput="window.ksKampanyalar[${i}].bitis_tarihi=this.value"></div>
+    </div>
+    <div class="row" style="margin-top:8px;gap:12px">
+      <div class="fld" style="flex:1"><label>Kategoriler (virgülle)</label><input value="${(k.kategoriler||[]).join(', ')}" style="width:100%" oninput="window.ksKampanyalar[${i}].kategoriler=this.value.split(',').map(s=>s.trim()).filter(Boolean)"></div>
+    </div>
+    <div class="row" style="margin-top:8px"><div class="fld" style="flex:1"><label>Seçili modeller (${(k.secili_modeller||[]).length} adet, virgülle)</label><textarea style="width:100%;min-height:46px;font-size:12px" oninput="window.ksKampanyalar[${i}].secili_modeller=this.value.split(/[,\\n]/).map(s=>s.trim().toUpperCase()).filter(Boolean)">${(k.secili_modeller||[]).join(', ')}</textarea></div></div>
+    <div class="row" style="margin-top:8px"><div class="fld" style="flex:1"><label>Birleşme kuralı (kurallar)</label><textarea style="width:100%;min-height:40px;font-size:12px" oninput="window.ksKampanyalar[${i}].kurallar=this.value">${(k.kurallar||'').replace(/</g,'&lt;')}</textarea></div></div>
+  </div>`).join("");
+}
+async function kampSihirbazKaydet(){
+  const ks=(window.ksKampanyalar||[]).filter(k=>k._kaydet&&k.ad);
+  const msg=$("ksKayMsg"); const btn=$("ksKaydet");
+  if(!ks.length){ msg.className="msg bad"; msg.textContent="Kaydedilecek kampanya seçilmedi."; return; }
+  btn.disabled=true; msg.className="msg"; msg.textContent="Kaydediliyor...";
+  try{
+    const rows=ks.map(k=>({ad:k.ad.trim(),marka:brand,match_type:k.match_type||"all",kategoriler:k.kategoriler||[],
+      secili_modeller:k.secili_modeller||[],musteri_indirimi:+k.musteri_indirimi||0,hakedis:+k.hakedis||0,
+      kota:+k.kota||null,bitis_tarihi:k.bitis_tarihi||null,kurallar:k.kurallar||null,donem:_donem(),aktif:true}));
+    const {error}=await sb.from("kampanyalar").insert(rows); if(error) throw new Error(error.message);
+    msg.className="msg ok"; msg.textContent="✓ "+rows.length+" kampanya kaydedildi.";
+    $("ksSonuc").innerHTML=""; $("ksKaydetRow").style.display="none"; window.ksKampanyalar=[];
+    loadKampanyalar(); loadAktifKampanyalar();
+  }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; btn.disabled=false; }
+}
 
 // ===== KAMPANYA İÇE AKTAR (PDF/Excel, yarı-otomatik) =====
 const TR_AY={ocak:1,subat:2,"şubat":2,mart:3,nisan:4,mayis:5,"mayıs":5,haziran:6,temmuz:7,agustos:8,"ağustos":8,eylul:9,"eylül":9,ekim:10,kasim:11,"kasım":11,aralik:12,"aralık":12};
