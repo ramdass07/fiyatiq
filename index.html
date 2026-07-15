@@ -917,35 +917,46 @@ function _bugun(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMo
 function tclassify(name){
   const n=tkey(name);
   const brand = n.includes("bosch")?"bosch": n.includes("siemens")?"siemens": null;
-  let tip = (n.includes("ayrilmis")||n.includes("ayrilan")||n.includes("emanet")) ? "ayrilmis" : "mevcut";
-  let depo = n.includes("mars")?"mars": n.includes("horoz")?"horoz": (n.includes("kadikoy")||n.includes("kadkoy"))?"kadikoy": null;
+  const tip = (n.includes("ayrilmis")||n.includes("ayrilan")||n.includes("emanet")) ? "ayrilmis" : "mevcut";
+  const depo = n.includes("mars")?"mars": n.includes("horoz")?"horoz": (n.includes("kadikoy")||n.includes("kadkoy"))?"kadikoy": null;
   if(depo) return {brand, kind:"stok", depo, tip};
-  if(n.includes("toptan")) return {brand, kind:"toptan"};
-  if(n.includes("perakende")) return {brand, kind:"perakende"};
-  if(n.includes("phase")||n.includes("phaseout")) return {brand, kind:"phaseout"};
-  return {brand, kind:null};
+  // stok değilse fiyat listesi kabul et (toptan/perakende sayfalarını içeriden bulur)
+  return {brand, kind: brand? "fiyat": null};
 }
-function parseToptanWb(wb, marka, donem){
-  const toptan={}, bip={};
+// Ham BSH FL (çok sayfalı) veya temiz dosyadan toptan + perakende + BİP çıkarır
+function parsePriceWb(wb, marka, donem){
+  const top={}, per={}, bip={};
   wb.SheetNames.forEach(sn=>{
-    if(tkey(sn).includes("bundle")) return;
+    const nm=tkey(sn); if(nm.includes("bundle")) return;
     const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
     let hr=-1;
-    for(let r=0;r<Math.min(aoa.length,15);r++){ const t=(aoa[r]||[]).map(tkey);
-      if(t.some(x=>x==="toptan"||x==="bip"||x.includes("urunkodu")||x==="urun")){ hr=r; break; } }
+    for(let r=0;r<Math.min(aoa.length,20);r++){ const t=(aoa[r]||[]).map(tkey);
+      if(t.some(x=>x==="urunler"||x==="urunkodu"||x==="urun")){ hr=r; break; } }
     if(hr<0) return;
     const H=(aoa[hr]||[]).map(tkey);
-    let topCol=-1,bipCol=-1; H.forEach((h,j)=>{ if(h==="toptan")topCol=j; if(h==="bip")bipCol=j; });
-    const codeCol=detectCodeCol(aoa,hr+1);
-    for(let i=hr+1;i<aoa.length;i++){ const row=aoa[i]||[]; const kod=(""+(row[codeCol]==null?"":row[codeCol])).trim().toUpperCase();
-      if(!isCode(kod)) continue;
-      if(topCol>=0 && isNum(row[topCol]) && +row[topCol]>0) toptan[kod]=Math.round(+row[topCol]*100)/100;
-      if(bipCol>=0 && isNum(row[bipCol])){ const v=Math.round(+row[bipCol]*100)/100; if(v>0 || !(kod in bip)) bip[kod]=v; }
+    const cc=detectCodeCol(aoa,hr+1);
+    const isT=nm.includes("toptan"), isP=nm.includes("perakende");
+    let pc=-1, tgt=null;
+    if(isT){ pc=H.findIndex((h,j)=>j>cc&&h==="toptan"); if(pc<0) pc=H.findIndex((h,j)=>j>cc&&h==="nakitfiyat"); tgt=top; }
+    else if(isP){ pc=H.findIndex(h=>h==="pesinfiyat"); if(pc<0) pc=H.findIndex(h=>h.includes("pesin")&&!h.includes("kampanyasiz")); tgt=per; }
+    else { // sayfa adı belirsiz: temiz dosya (Toptan/BİP) — toptan sütununa bak
+      pc=H.findIndex((h,j)=>j>cc&&h==="toptan"); if(pc>=0) tgt=top;
+    }
+    const bc=H.findIndex((h,j)=>j>cc&&h==="bip");
+    if(pc>=0 && tgt){
+      for(let i=hr+1;i<aoa.length;i++){ const row=aoa[i]||[]; const kod=(""+(row[cc]==null?"":row[cc])).trim().toUpperCase();
+        if(!isCode(kod)) continue; const v=row[pc]; if(isNum(v)&&+v>0) tgt[kod]=Math.round(+v*100)/100; }
+    }
+    if(bc>=0){
+      for(let i=hr+1;i<aoa.length;i++){ const row=aoa[i]||[]; const kod=(""+(row[cc]==null?"":row[cc])).trim().toUpperCase();
+        if(!isCode(kod)) continue; const v=row[bc]; if(isNum(v)){ const b=Math.round(+v*100)/100; if(b>0||!(kod in bip)) bip[kod]=b; } }
     }
   });
-  const topRows=Object.keys(toptan).map(k=>({model_kodu:k,marka,donem,toptan_fiyat:toptan[k]}));
-  const bipRows=Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}));
-  return {topRows,bipRows};
+  return {
+    topRows: Object.keys(top).map(k=>({model_kodu:k,marka,donem,toptan_fiyat:top[k]})),
+    perRows: Object.keys(per).map(k=>({model_kodu:k,marka,donem,nakit_fiyat:per[k]})),
+    bipRows: Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}))
+  };
 }
 async function topluTara(files){
   const box=$("topluSonuc"); if(!files||!files.length) return;
@@ -956,16 +967,19 @@ async function topluTara(files){
     try{
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
       if(!c.brand){ res.detay="marka tanınamadı (ad içinde Bosch/Siemens yok)"; }
-      else if(c.kind==="toptan"){ const r=parseToptanWb(wb,c.brand,donem); res.topRows=r.topRows; res.bipRows=r.bipRows; res.ok=r.topRows.length>0; res.detay=r.topRows.length+" toptan + "+r.bipRows.length+" BİP"; }
       else if(c.kind==="stok"){ let rows=[]; const seen={};
         wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
           parseStockRows(aoa).forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; rows.push({model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
         res.stokRows=rows; res.ok=rows.length>0; res.detay=rows.length+" stok · "+c.depo+"/"+c.tip; }
-      else { res.detay="dosya tipi tanınamadı (toptan/stok/perakende değil)"; }
+      else { // fiyat listesi (ham FL veya temiz)
+        const r=parsePriceWb(wb,c.brand,donem); res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
+        res.ok=(r.topRows.length+r.perRows.length+r.bipRows.length)>0;
+        const parts=[]; if(r.topRows.length)parts.push(r.topRows.length+" toptan"); if(r.perRows.length)parts.push(r.perRows.length+" perakende"); if(r.bipRows.length)parts.push(r.bipRows.length+" BİP");
+        res.detay= res.ok? parts.join(" + ") : "fiyat sütunu bulunamadı"; }
     }catch(e){ res.detay="okunamadı: "+e.message; }
     window.topluItems.push(res);
   }
-  box.innerHTML=window.topluItems.map(r=>`<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b><br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind||"?"} — ${r.detay}</span></div>`).join("");
+  box.innerHTML=window.topluItems.map(r=>`<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b><br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind==="stok"?"stok":"fiyat listesi"} — ${r.detay}</span></div>`).join("");
   const okcount=window.topluItems.filter(r=>r.ok).length;
   $("topluYaz").disabled = okcount===0;
   $("topluYaz").textContent = okcount? `✓ Onayla ve Yükle (${okcount} dosya)` : "✓ Onayla ve Yükle";
@@ -975,8 +989,10 @@ async function topluYaz(){
   if(!items.length) return; btn.disabled=true; msg.className="msg"; msg.textContent="Yükleniyor, bekle...";
   try{
     for(const r of items){
-      if(r.kind==="toptan"){ if(r.topRows.length) await upsert("toptan_fiyatlar",r.topRows,"model_kodu,marka,donem"); if(r.bipRows.length) await upsert("bip",r.bipRows,"model_kodu,marka,donem"); }
-      else if(r.kind==="stok"){ await sb.from("stok").delete().eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"model_kodu,marka,depo,tip"); }
+      if(r.kind==="stok"){ await sb.from("stok").delete().eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"model_kodu,marka,depo,tip"); }
+      else { if(r.topRows&&r.topRows.length) await upsert("toptan_fiyatlar",r.topRows,"model_kodu,marka,donem");
+             if(r.perRows&&r.perRows.length) await upsert("perakende_fiyatlar",r.perRows,"model_kodu,marka,donem");
+             if(r.bipRows&&r.bipRows.length) await upsert("bip",r.bipRows,"model_kodu,marka,donem"); }
     }
     msg.className="msg ok"; msg.textContent="✓ Hepsi yüklendi! Yukarıdan 'Hızlı Stok Sorgu' ile kontrol edebilirsin.";
   }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; btn.disabled=false; }
