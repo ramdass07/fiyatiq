@@ -128,7 +128,7 @@
   <main id="bayiView">
     <div class="card">
       <h2>🔎 Hızlı Stok Sorgu</h2>
-      <div class="row"><input id="stokSorguInput" placeholder="Ürün kodu (ör: KGN56VWD0N)" style="width:300px" autocomplete="off" onkeydown="if(event.key==='Enter')stokSorgula()"><button class="sm" onclick="stokSorgula()">Sorgula</button></div>
+      <div class="row" style="position:relative"><input id="stokSorguInput" placeholder="Ürün kodu ya da adı (3 harf yeter)" style="width:320px" autocomplete="off" oninput="stokOner(this.value)" onblur="setTimeout(stokKapatOner,200)" onkeydown="if(event.key==='Enter'){stokKapatOner();stokSorgula();}"><button class="sm" onclick="stokSorgula()">Sorgula</button><div id="stokOneri" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:50;background:var(--field);border:1px solid #ffffff22;border-radius:8px;min-width:340px;max-height:300px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div></div>
       <div id="stokSorguSonuc" style="margin-top:10px"></div>
     </div>
     <div class="card" id="bayiStokCard" style="display:none">
@@ -523,6 +523,21 @@ function toggleManuel(i){
   else { r.etToptan=null; r.manuelFiyat=null; r.manuelTaksit=null; } // vazgeç: eski otomatik değerlere dön
   recalc();
 }
+let stokOnerT=null;
+async function stokOner(v){
+  const box=$("stokOneri"); if(!box) return; const q=(v||"").trim();
+  if(q.length<3){ box.style.display="none"; return; }
+  clearTimeout(stokOnerT);
+  stokOnerT=setTimeout(async()=>{
+    try{ const {data}=await sb.from("urunler").select("model_kodu,urun_adi").eq("marka",brand).or(`model_kodu.ilike.%${q}%,urun_adi.ilike.%${q}%`).limit(10);
+      if(!data||!data.length){ box.style.display="none"; return; }
+      box.innerHTML=data.map(o=>'<div onmousedown="stokSec(\''+o.model_kodu+'\')" style="padding:8px 11px;cursor:pointer;border-bottom:1px solid #ffffff10;font-size:13px" onmouseover="this.style.background=\'#ffffff14\'" onmouseout="this.style.background=\'\'"><b>'+o.model_kodu+'</b> <span class="mut">'+(o.urun_adi||"")+'</span></div>').join("");
+      box.style.display="block";
+    }catch(e){ box.style.display="none"; }
+  },180);
+}
+function stokSec(kod){ $("stokSorguInput").value=kod; stokKapatOner(); stokSorgula(); }
+function stokKapatOner(){ const b=$("stokOneri"); if(b) b.style.display="none"; }
 async function stokSorgula(){
   const q=($("stokSorguInput").value||"").trim().toUpperCase(); const box=$("stokSorguSonuc");
   if(!q){ box.innerHTML=""; return; }
@@ -543,7 +558,10 @@ async function stokSorgula(){
       ${net<=0?'<div class="nostock" style="margin-top:4px">⚠ BU ÜRÜNDE STOK YOK</div>':''}`;
   }
   const ad=row&&row.urun_adi?row.urun_adi:q;
-  const fiyat=row&&row.nakit_fiyat?` · <span class="mut">Etiket peşin:</span> <b>${fmt(row.nakit_fiyat)} ₺</b>`:'';
+  const pTxt=(row&&row.nakit_fiyat)?` · <span class="mut">Peşin:</span> <b>${fmt(row.nakit_fiyat)} ₺</b>`:"";
+  const tTxt=(row&&row.toptan_fiyat!=null)?` · <span class="mut">Toptan:</span> <b>${fmt(row.toptan_fiyat)} ₺</b>`:"";
+  const bTxt=(row&&row.bip_tutar)?` · <span class="mut">BİP:</span> <b>${fmt(row.bip_tutar)} ₺</b>`:"";
+  const fiyat=pTxt+tTxt+bTxt;
   const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
   box.innerHTML=`<div class="card" style="background:var(--field);margin:0;padding:12px"><div><b style="font-size:15px">${ad}</b> <span class="badge" style="font-size:9px">${brand}</span>${fiyat}${yok}</div>${stokHtml}</div>`;
 }
