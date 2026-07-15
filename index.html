@@ -177,6 +177,17 @@
 
   <main id="adminView" style="display:none">
     <div id="adminBrandBanner" style="position:sticky;top:0;z-index:30;margin:0 0 14px;padding:12px 16px;border-radius:10px;font-weight:800;font-size:15px;letter-spacing:.5px;text-align:center;background:#0e7490;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.35)">ŞU AN: SIEMENS — tüm yüklemeler, stoklar ve kampanyalar SIEMENS'e yazılır</div>
+    <div class="card" id="topluGuncelleme" style="border:2px solid var(--acc)">
+      <h2>🚀 Aylık Veri Güncelleme <span class="badge">tek kutu · otomatik tanır</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">BSH ham dosyalarını (toptan, stok...) <b>hepsini birden</b> buraya bırak. Sistem markayı ve tipi <b>dosya adından otomatik</b> tanır — marka/tip seçmene gerek yok. Sonra tek "Onayla ve Yükle".</p>
+      <label id="topluDrop" ondragover="event.preventDefault();this.style.background='#1d4ed822'" ondragleave="this.style.background='var(--field)'" ondrop="event.preventDefault();this.style.background='var(--field)';topluTara(event.dataTransfer.files)" style="display:block;border:2px dashed #3b82f6;border-radius:12px;padding:26px;text-align:center;cursor:pointer;background:var(--field)">
+        <input id="topluFile" type="file" accept=".xlsx,.xls,.csv" multiple style="display:none" onchange="topluTara(this.files)">
+        <div style="font-size:15px;font-weight:700">📁 Dosyaları buraya sürükle, ya da tıkla</div>
+        <div class="mut" style="font-size:12px;margin-top:4px">Örn: BOSCH TEMMUZ TOPTAN.xlsx · Bosch Mars Stok.xlsx · Siemens Horoz Stok.xls</div>
+      </label>
+      <div id="topluSonuc" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:10px"><button id="topluYaz" onclick="topluYaz()" disabled>✓ Onayla ve Yükle</button><span id="topluMsg" class="msg"></span></div>
+    </div>
     <div class="card" id="bayilerCard">
       <h2>Bayiler <span class="badge">kayıt onayı / yönetim</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Yeni kayıtlar <b>pasif</b> gelir; "Aktif Yap" deyince veriyi görür.</p>
@@ -899,6 +910,78 @@ async function upsert(table,rows,conflict){
   for(let i=0;i<rows.length;i+=400){ const {error}=await sb.from(table).upsert(rows.slice(i,i+400),{onConflict:conflict}); if(error) throw new Error(table+": "+error.message); }
 }
 function colLetter(i){ return XLSX.utils.encode_col(i); }
+// ===== TEK KUTU: AYLIK GÜNCELLEME (otomatik tanı + yükle) =====
+window.topluItems=[];
+function _donem(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01"; }
+function _bugun(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function tclassify(name){
+  const n=tkey(name);
+  const brand = n.includes("bosch")?"bosch": n.includes("siemens")?"siemens": null;
+  let tip = (n.includes("ayrilmis")||n.includes("ayrilan")||n.includes("emanet")) ? "ayrilmis" : "mevcut";
+  let depo = n.includes("mars")?"mars": n.includes("horoz")?"horoz": (n.includes("kadikoy")||n.includes("kadkoy"))?"kadikoy": null;
+  if(depo) return {brand, kind:"stok", depo, tip};
+  if(n.includes("toptan")) return {brand, kind:"toptan"};
+  if(n.includes("perakende")) return {brand, kind:"perakende"};
+  if(n.includes("phase")||n.includes("phaseout")) return {brand, kind:"phaseout"};
+  return {brand, kind:null};
+}
+function parseToptanWb(wb, marka, donem){
+  const toptan={}, bip={};
+  wb.SheetNames.forEach(sn=>{
+    if(tkey(sn).includes("bundle")) return;
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+    let hr=-1;
+    for(let r=0;r<Math.min(aoa.length,15);r++){ const t=(aoa[r]||[]).map(tkey);
+      if(t.some(x=>x==="toptan"||x==="bip"||x.includes("urunkodu")||x==="urun")){ hr=r; break; } }
+    if(hr<0) return;
+    const H=(aoa[hr]||[]).map(tkey);
+    let topCol=-1,bipCol=-1; H.forEach((h,j)=>{ if(h==="toptan")topCol=j; if(h==="bip")bipCol=j; });
+    const codeCol=detectCodeCol(aoa,hr+1);
+    for(let i=hr+1;i<aoa.length;i++){ const row=aoa[i]||[]; const kod=(""+(row[codeCol]==null?"":row[codeCol])).trim().toUpperCase();
+      if(!isCode(kod)) continue;
+      if(topCol>=0 && isNum(row[topCol]) && +row[topCol]>0) toptan[kod]=Math.round(+row[topCol]*100)/100;
+      if(bipCol>=0 && isNum(row[bipCol])){ const v=Math.round(+row[bipCol]*100)/100; if(v>0 || !(kod in bip)) bip[kod]=v; }
+    }
+  });
+  const topRows=Object.keys(toptan).map(k=>({model_kodu:k,marka,donem,toptan_fiyat:toptan[k]}));
+  const bipRows=Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}));
+  return {topRows,bipRows};
+}
+async function topluTara(files){
+  const box=$("topluSonuc"); if(!files||!files.length) return;
+  box.innerHTML="<span class='mut'>Taranıyor...</span>"; window.topluItems=[];
+  const donem=_donem(), bugun=_bugun();
+  for(const f of files){
+    const c=tclassify(f.name); const res={name:f.name, brand:c.brand, kind:c.kind, depo:c.depo, tip:c.tip, ok:false, detay:""};
+    try{
+      const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
+      if(!c.brand){ res.detay="marka tanınamadı (ad içinde Bosch/Siemens yok)"; }
+      else if(c.kind==="toptan"){ const r=parseToptanWb(wb,c.brand,donem); res.topRows=r.topRows; res.bipRows=r.bipRows; res.ok=r.topRows.length>0; res.detay=r.topRows.length+" toptan + "+r.bipRows.length+" BİP"; }
+      else if(c.kind==="stok"){ let rows=[]; const seen={};
+        wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+          parseStockRows(aoa).forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; rows.push({model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
+        res.stokRows=rows; res.ok=rows.length>0; res.detay=rows.length+" stok · "+c.depo+"/"+c.tip; }
+      else { res.detay="dosya tipi tanınamadı (toptan/stok/perakende değil)"; }
+    }catch(e){ res.detay="okunamadı: "+e.message; }
+    window.topluItems.push(res);
+  }
+  box.innerHTML=window.topluItems.map(r=>`<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b><br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind||"?"} — ${r.detay}</span></div>`).join("");
+  const okcount=window.topluItems.filter(r=>r.ok).length;
+  $("topluYaz").disabled = okcount===0;
+  $("topluYaz").textContent = okcount? `✓ Onayla ve Yükle (${okcount} dosya)` : "✓ Onayla ve Yükle";
+}
+async function topluYaz(){
+  const items=window.topluItems.filter(r=>r.ok); const msg=$("topluMsg"); const btn=$("topluYaz");
+  if(!items.length) return; btn.disabled=true; msg.className="msg"; msg.textContent="Yükleniyor, bekle...";
+  try{
+    for(const r of items){
+      if(r.kind==="toptan"){ if(r.topRows.length) await upsert("toptan_fiyatlar",r.topRows,"model_kodu,marka,donem"); if(r.bipRows.length) await upsert("bip",r.bipRows,"model_kodu,marka,donem"); }
+      else if(r.kind==="stok"){ await sb.from("stok").delete().eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"model_kodu,marka,depo,tip"); }
+    }
+    msg.className="msg ok"; msg.textContent="✓ Hepsi yüklendi! Yukarıdan 'Hızlı Stok Sorgu' ile kontrol edebilirsin.";
+  }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; btn.disabled=false; }
+}
+
 function buildImporters(){
   const c=$("importers"); if(!c) return;
   const ym=new Date(); const mon=ym.getFullYear()+"-"+String(ym.getMonth()+1).padStart(2,"0");
