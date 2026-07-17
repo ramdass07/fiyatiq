@@ -757,8 +757,10 @@ function renderRows(){
   // Satışçı uygun OLMAYAN kampanyayı da elle uygulayabilir (sorumluluk + Diva uyarısıyla)
   const applied=aktifKampanyalar.filter(k=>secilenKampanya.has(k.id));
   const uygunsuzSecili=applied.filter(k=>!matchIds.has(k.id));
-  const hakedis=applied.reduce((a,k)=>a+(+k.hakedis||0),0);
-  const musteriInd=applied.reduce((a,k)=>a+(+k.musteri_indirimi||0),0);
+  // Hakediş DÜZ toplam DEĞİL — sepeti kampanyalara dağıtarak en yükseği bulan motorla hesaplanır
+  const dag=hesaplaHakedis(applied, quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —" && (r.isET?(+r.etToptan>0):(+r.toptan>0))));
+  const hakedis=dag.toplamHak;
+  const musteriInd=dag.toplamInd;
   // Alt kart satırlardaki GERÇEK fiyatları (manuel dahil) baz alır; hakediş üstüne uygulanır
   const baseNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
   const baseTaksit=quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
@@ -787,9 +789,7 @@ function renderRows(){
   if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px"; e.innerHTML = tBipli<=0?'—':('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):'')); }
   renderUyarilar(uyStokYok,uyKritik,uyZararSatir,karPesinTot,tAdet>0&&tBipli>0);
   const kr=$("kampInfoRow");
-  const setSayisi=applied.filter(k=>isBundleKamp(k)).length;
-  const setUyari=setSayisi>1?` <span class="blink" style="color:var(--bad)">⚠ ${setSayisi} SET kampanyası birlikte uygulandı — set'ler normalde birleşmez, mutlaka Diva kontrolü yapın!</span>`:'';
-  if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}${setUyari}`; }
+  if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}${dokumHTML(dag)}`; }
     else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygun olabilir — panelden <b>"Uygula"</b> de.`; }
     else kr.style.display="none"; }
   renderKampanyaPanel();
@@ -902,6 +902,69 @@ function renderKampanyaPanel(){
   setHeader();
 }
 function isBundleKamp(k){ return ['all','all+any','any2','xl','xxl','xl+xxl'].includes(k&&k.match_type); }
+// Kampanyanın bundle türü: xl (tek tek dolap), ankastre (fırın+ocak+davlumbaz seti), ikili (2 farklı beyaz eşya), diger
+function bundleTuru(k){
+  const mt=k&&k.match_type;
+  if(['xl','xxl','xl+xxl'].includes(mt)) return 'xl';
+  if(mt==='any2') return 'ikili';
+  if(mt==='all'){ const cats=(k.kategoriler||[]).map(katNorm).filter(Boolean); const ank=new Set(['FIRIN','OCAK','DAVLUMBAZ','ANKASTRE']); if(cats.length&&cats.every(c=>ank.has(c))) return 'ankastre'; }
+  return 'diger';
+}
+// === HAKEDİŞ DAĞITIM MOTORU ===
+// Sepeti tek tek ürünlere ayırıp kampanyalara DAĞITARAK EN YÜKSEK hakedişi bulur; şeffaf döküm döndürür.
+// Sıra: XL/XXL (tek tek, en yüksek) → ankastre set (1+1+1) → 2'li (farklı kategori çiftleri). Bir ürün yalnız bir yerde sayılır.
+function hesaplaHakedis(applied, rows){
+  const dokum=[]; let toplamHak=0, toplamInd=0;
+  // birim listesi (adet kadar çoğalt) — her birim tek bir kampanyada kullanılır
+  const units=[];
+  rows.forEach(r=>{ const kod=(r.kod||"").toUpperCase(); const kat=(kategoriOf(kod)||[])[0]||null; const adet=+r.adet||1; for(let n=0;n<adet;n++) units.push({kod,kat,used:false}); });
+  const xlK=applied.filter(k=>bundleTuru(k)==='xl');
+  const ankK=applied.filter(k=>bundleTuru(k)==='ankastre');
+  const ikiK=applied.filter(k=>bundleTuru(k)==='ikili');
+  const digerK=applied.filter(k=>bundleTuru(k)==='diger');
+  const hasBundle=xlK.length||ankK.length||ikiK.length;
+  // kategori bazlı gate: kampanyanın secili_modeller listesinde O kategoriden model VARSA, sadece o modeller geçerli
+  // (ör. Siemens'te alt seri fırınlar sete girmez — liste hangi fırınların girdiğini söyler)
+  const gateFor=(k,kat)=>{ const mods=(k.secili_modeller||[]).map(m=>(m||"").toUpperCase()); const ofKat=mods.filter(m=>(kategoriOf(m)||[])[0]===kat); return ofKat.length?new Set(ofKat):null; };
+  // 1) XL/XXL buzdolapları — her biri tek başına (BSH zaten ayrı telefona ayrı girer)
+  xlK.forEach(k=>{ const gate=gateFor(k,'BUZDOLABI'); const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0;
+    units.filter(u=>!u.used&&u.kat==='BUZDOLABI'&&gate&&gate.has(u.kod)).forEach(u=>{ u.used=true; toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'❄️',aciklama:`${u.kod} — XL/XXL buzdolabı`,hak,ind}); }); });
+  // 2) Ankastre setleri — 1 fırın + 1 ocak + 1 davlumbaz; fazlası açıkta kalır
+  ankK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0;
+    const pick=kat=>{ const g=gateFor(k,kat); return units.filter(u=>!u.used&&u.kat===kat&&(!g||g.has(u.kod))); };
+    const f=pick('FIRIN'), o=pick('OCAK'), d=pick('DAVLUMBAZ'); const n=Math.min(f.length,o.length,d.length);
+    for(let s=0;s<n;s++){ f[s].used=o[s].used=d[s].used=true; toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'🍳',aciklama:`Ankastre set: ${f[s].kod} + ${o[s].kod} + ${d[s].kod}`,hak,ind}); } });
+  // 3) 2'li beyaz eşya — MUTLAKA 2 FARKLI kategori (iki çamaşır eşleşmez). Greedy: en çok olan 2 kategoriyi eşle → maksimum çift.
+  const varsayilanHavuz=new Set(['BUZDOLABI','DERINDONDURUCU','CAMASIR','KURUTMA','BULASIK']);
+  ikiK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0;
+    const havuz=(k.kategoriler||[]).map(katNorm).filter(Boolean); const havSet=havuz.length?new Set(havuz):varsayilanHavuz;
+    const free=units.filter(u=>!u.used&&u.kat&&havSet.has(u.kat));
+    const byKat={}; free.forEach(u=>{ (byKat[u.kat]=byKat[u.kat]||[]).push(u); });
+    const cats=Object.keys(byKat).map(kk=>({kat:kk,arr:byKat[kk]}));
+    while(true){ cats.sort((a,b)=>b.arr.length-a.arr.length); if(cats.length<2||cats[1].arr.length===0) break;
+      const a=cats[0].arr.pop(), b=cats[1].arr.pop(); a.used=b.used=true; toplamHak+=hak; toplamInd+=ind;
+      dokum.push({ikon:'🔗',aciklama:`2'li: ${a.kod} (${a.kat}) + ${b.kod} (${b.kat})`,hak,ind}); } });
+  // 4) diğer (tekil / tümü / all+any) — düz bir kez uygulanır
+  digerK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0; if(hak||ind){ toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'🎁',aciklama:k.ad||'kampanya',hak,ind}); } });
+  // eşleşmeyen bundle-adayı birimler (bilgi amaçlı — sadece bundle seçiliyse)
+  let bosta=[];
+  if(hasBundle){ const aday=new Set(['BUZDOLABI','DERINDONDURUCU','CAMASIR','KURUTMA','BULASIK','FIRIN','OCAK','DAVLUMBAZ']);
+    const bm={}; units.filter(u=>!u.used&&u.kat&&aday.has(u.kat)).forEach(u=>bm[u.kod]=(bm[u.kod]||0)+1);
+    bosta=Object.keys(bm).map(kk=>bm[kk]>1?`${kk}×${bm[kk]}`:kk); }
+  return {toplamHak,toplamInd,dokum,bosta};
+}
+function dokumHTML(dag){
+  if(!dag||!dag.dokum||!dag.dokum.length) return '';
+  const satir=dag.dokum.map(d=>`<div class="row" style="justify-content:space-between;gap:12px;padding:1px 0"><span>${d.ikon||'•'} ${d.aciklama}</span><span style="color:var(--acc);font-weight:700;white-space:nowrap">+${fmt(d.hak)} ₺</span></div>`).join('');
+  const bos=(dag.bosta&&dag.bosta.length)?`<div class="mut" style="font-size:11px;margin-top:5px">➖ Eşleşmedi (hakediş yok): ${dag.bosta.join(', ')}</div>`:'';
+  return `<div style="margin-top:9px;border:1px dashed var(--acc);border-radius:10px;padding:9px 12px;background:rgba(56,189,248,.06)">
+    <div style="font-weight:800;font-size:12px;margin-bottom:5px">📊 Hakediş dökümü — sistem sepeti şöyle böldü:</div>
+    ${satir}
+    <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span style="font-weight:800">TOPLAM HAKEDİŞ</span><span style="font-weight:800;color:var(--acc)">${fmt(dag.toplamHak)} ₺</span></div>
+    ${bos}
+    <div class="mut" style="font-size:10.5px;margin-top:5px">Bu bölme en yüksek hakedişe göre otomatik yapıldı. Satıştan önce DİVA'dan teyit alın.</div>
+  </div>`;
+}
 // Satıcı her kampanyayı SERBESTÇE seçer — zorlama yok, sadece DİVA kontrol uyarısı gösterilir.
 function toggleKampanya(id){
   if(secilenKampanya.has(id)) secilenKampanya.delete(id); else secilenKampanya.add(id);
