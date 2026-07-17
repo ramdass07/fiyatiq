@@ -891,7 +891,7 @@ function kategoriOf(code){
   if(/^S/.test(c)) return ["BULASIK"];
   if(/^A[SC]/.test(c)) return ["KLIMA"];
   if(/^H/.test(c)) return ["FIRIN","ANKASTRE"];
-  if(/^P/.test(c)) return ["OCAK","ANKASTRE"];
+  if(/^[PE]/.test(c)) return ["OCAK","ANKASTRE"]; // P=Bosch ocak (PPP6...), E=Siemens ocak (EO6C6PP30O...)
   if(/^(LC|LB|LH|D)/.test(c)) return ["DAVLUMBAZ","ANKASTRE"];
   if(/^(BE|BF|CM|CF|FE|FC)/.test(c)) return ["MIKRODALGA","ANKASTRE"];
   if(/^(BC|BG|BB)/.test(c)) return ["SUPURGE"];
