@@ -251,6 +251,16 @@
       <div id="primliMsg" class="msg"></div>
     </div>
 
+    <div class="card" id="magazaAyarCard">
+      <h2>🏬 Mağaza Ayarları <span class="badge">kendi depon</span></h2>
+      <div class="row" style="align-items:flex-end">
+        <div class="fld"><label>Kendi Depo Adı (ör. Kadıköy, Maltepe)</label><input id="depoAdiInp" style="width:180px" maxlength="24"></div>
+        <button class="sm" onclick="depoAdiKaydet()">Kaydet</button>
+        <span id="depoAdiMsg" class="msg"></span>
+      </div>
+      <p class="mut" style="font-size:12px;margin:6px 0 0">Stok tablosundaki üçüncü depo sütunu bu adla görünür ve stok dosyanın adında bu kelime geçerse otomatik tanınır. <b>Mars</b> ve <b>Horoz</b> herkes için BSH resmi lojistiğidir, değişmez.</p>
+    </div>
+
     <div class="card" id="bayilerCard">
       <h2>Bayiler <span class="badge">kayıt onayı / yönetim</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Yeni kayıtlar <b>pasif</b> gelir; "Aktif Yap" deyince veriyi görür.</p>
@@ -265,8 +275,8 @@
       <div id="tekliflerMsg" class="msg"></div>
     </div>
 
-    <h2 style="margin:4px 0 0">Merkezi Veri Yükleme <span id="aktifMarka" class="badge">Aktif: Siemens</span></h2>
-    <p class="mut" style="font-size:13px;margin:4px 0 12px">Yüklemeler <b>üstten seçili markaya</b> yazılır (Siemens/Bosch). Fiyat kutularına <b>birden çok parça dosyayı aynı anda</b> seçebilirsin; "Akıllı Tara" hepsini birleştirip sütunları otomatik tanır.</p>
+    <h2 style="margin:4px 0 0" id="merkeziBaslik">Merkezi Veri Yükleme <span id="aktifMarka" class="badge">Aktif: Siemens</span></h2>
+    <p class="mut" style="font-size:13px;margin:4px 0 12px" id="merkeziAciklama">Yüklemeler <b>üstten seçili markaya</b> yazılır (Siemens/Bosch). Fiyat kutularına <b>birden çok parça dosyayı aynı anda</b> seçebilirsin; "Akıllı Tara" hepsini birleştirip sütunları otomatik tanır.</p>
     <div id="importers"></div>
 
     <div class="card" id="kampSihirbazCard" style="border:2px solid var(--brand)">
@@ -282,7 +292,7 @@
       <div class="row" style="margin-top:10px;display:none" id="ksKaydetRow"><button id="ksKaydet" onclick="kampSihirbazKaydet()">✓ Seçili Kampanyaları Kaydet</button><span id="ksKayMsg" class="msg"></span></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="kampIceCard">
       <h2>Kampanya İçe Aktar <span class="badge">Bosch PDF / Siemens Excel (eski, elle)</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">Üstten markayı seç, dosyayı at → sistem indirimli kampanyaları çıkarır → her birini kontrol edip "Ekle"ye bas.</p>
       <div class="row" style="align-items:flex-end">
@@ -296,7 +306,7 @@
       <div id="kampAday"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="kampElleCard">
       <h2>Kampanya / Paket Tanımla (elle)</h2>
       <div class="row">
         <div class="fld"><label>Kampanya adı</label><input id="kAd" placeholder="2'li Beyaz Eşya"></div>
@@ -371,7 +381,7 @@ const IMPORTERS = {
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"}] },
 };
 ["mevcut","ayrilmis"].forEach(tp=>["mars","horoz","kadikoy"].forEach(dp=>{
-  IMPORTERS["stok_"+tp+"_"+dp]={ title:(tp==="mevcut"?"Mevcut":"Ayrılmış")+" Stok · "+(dp==="mars"?"Mars":dp==="horoz"?"Horoz":"Kadıköy"),
+  IMPORTERS["stok_"+tp+"_"+dp]={ title:(tp==="mevcut"?"Mevcut":"Ayrılmış")+" Stok · "+(dp==="mars"?"Mars":dp==="horoz"?"Horoz":"Kendi Depo"),
     target:"stok", conflict:"model_kodu,marka,depo,tip", depo:dp, tip:tp, snapshot:true, stockMode:true, tarih:true,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},{key:"adet",label:"Adet",type:"num"}] };
 }));
@@ -413,11 +423,10 @@ async function showApp(session){
   show("appView"); appReady=true;
   $("who").textContent = session.user.email;
   applyBrandAccess();
-  const editor = profil.rol==="admin" || profil.rol==="personel";
-  $("adminBtn").style.display = editor ? "" : "none";
-  $("bayilerCard").style.display = profil.rol==="admin" ? "" : "none";
-  $("bayiStokCard").style.display = "none"; // şimdilik tüm mağazalar merkez stoğu görüyor; kendi-stok yükleme ileride
-  $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent="Kadıköy"; $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H";
+  $("adminBtn").style.display = ""; // herkes girer; içerideki kartlar role göre görünür
+  applyAdminAccess();
+  const bsc=$("bayiStokCard"); if(bsc) bsc.style.display = "none";
+  $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent=depoAdi(); $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H";
   { let stored=null; try{stored=localStorage.getItem("fq_basit");}catch(e){} basitMod = stored!=null ? (stored==="1") : (profil.rol==="bayi"); applyGorunum(); } // bayi varsayılan basit, admin detaylı; düğmeyle değişir
   try{ const p=localStorage.getItem("fq_personel"); if(p && $("satisPersonel")) $("satisPersonel").value=p; }catch(e){}
   await loadAktifDonem();
@@ -465,16 +474,29 @@ async function primliYukle(files){
   if(!rows.length){ msg.className="msg bad"; msg.textContent="Primli ürün bulunamadı (sütunlar: Ürün Kodu · Primli Fiyat · Prim)."; return; }
   msg.textContent="Yükleniyor ("+rows.length+" ürün)...";
   try{
-    await sb.from("primli_urunler").delete().eq("marka",brand).eq("donem",donem); // o markanın bu dönemini yenile
-    await upsert("primli_urunler",rows,"model_kodu,marka,donem");
+    await sb.from("primli_urunler").delete().eq("marka",brand).eq("donem",donem); // o markanın bu dönemini yenile (RLS: sadece kendi bayinin)
+    await upsert("primli_urunler",rows,"bayi_id,model_kodu,marka,donem","model_kodu,marka,donem");
     await loadPrimli(); renderRows();
     msg.className="msg ok"; msg.textContent="✓ "+rows.length+" primli ürün yüklendi ("+(brand==="bosch"?"Bosch":"Siemens")+"). Artık teklif/sorguda kırmızı ⭐ PRİMLİ uyarısı çıkar.";
     $("primliFile").value="";
   }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; }
 }
 async function loadProfil(uid){
-  const {data} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad").eq("id",uid).maybeSingle();
+  // depo_adi kolonu migrasyondan önce yoksa eski kolonlara düş (giriş asla kırılmasın)
+  let {data,error} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad,depo_adi").eq("id",uid).maybeSingle();
+  if(error){ const r2=await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad").eq("id",uid).maybeSingle(); data=r2.data; }
   if(data) profil = data;
+}
+function depoAdi(){ return (profil&&profil.depo_adi)?profil.depo_adi:"Kadıköy"; }
+function isEditor(){ return profil.rol==="admin"||profil.rol==="personel"; }
+async function depoAdiKaydet(){
+  const v=(($("depoAdiInp")||{}).value||"").trim(); const m=$("depoAdiMsg");
+  if(!v){ m.className="msg bad"; m.textContent="Depo adı boş olamaz."; return; }
+  const {error}=await sb.rpc("depo_adi_ayarla",{p_ad:v});
+  if(error){ m.className="msg bad"; m.textContent="Hata: "+error.message+" (SQL migrasyonu çalıştırıldı mı?)"; return; }
+  profil.depo_adi=v; const th=$("thStok3"); if(th) th.textContent=v;
+  m.className="msg ok"; m.textContent="✓ Kaydedildi — stok sütunu artık '"+v+"'.";
+  renderRows();
 }
 function allowedBrands(){ return profil.rol==="admin"||profil.rol==="personel" ? ["siemens","bosch"] : (profil.marka_erisimi||[]); }
 function applyBrandAccess(){
@@ -510,7 +532,20 @@ function toggleAdmin(){
   const a=$("adminView"), b=$("bayiView");
   const showAdmin = a.style.display==="none";
   a.style.display = showAdmin?"block":"none"; b.style.display = showAdmin?"none":"block";
-  if(showAdmin){ syncAdminBrand(); loadKampanyalar(); loadBankaPanel(); loadTeklifler(); if(profil.rol==="admin") loadBayiler(); }
+  if(showAdmin){ applyAdminAccess(); syncAdminBrand();
+    if(isEditor()){ loadKampanyalar(); loadBankaPanel(); loadTeklifler(); }
+    if(profil.rol==="admin") loadBayiler();
+    const di=$("depoAdiInp"); if(di) di.value=depoAdi(); }
+}
+// Yönetim kartları role göre: bayi sadece STOK + PRİMLİ + Mağaza Ayarları görür;
+// FL/kampanya/banka MERKEZDEN (admin/personel) yüklenir — ortak veridir.
+function applyAdminAccess(){
+  const ed=isEditor();
+  ["kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama","importers"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  const bc=$("bayilerCard"); if(bc) bc.style.display=profil.rol==="admin"?"":"none";
+  const tg=$("topluGuncelleme");
+  if(tg){ const p=tg.querySelector("p.mut"); if(p && !ed) p.innerHTML="Kendi <b>stok dosyalarını</b> buraya bırak (dosya adında <b>Mars</b>, <b>Horoz</b> ya da kendi depo adın <b>"+depoAdi()+"</b> geçsin). Fiyat listeleri ve kampanyalar merkezden gelir, sen yüklemezsin."; }
+  const di=$("depoAdiInp"); if(di && !di.value) di.value=depoAdi();
 }
 // ===== BANKA KOMİSYONLARI (yönetim) =====
 async function loadBankaPanel(){
@@ -682,7 +717,7 @@ async function stokSorgula(){
     stokHtml=`<table style="margin-top:6px;width:auto"><thead><tr><th>Depo</th><th class="num">Mevcut</th><th class="num">Ayrılan</th></tr></thead><tbody>
       <tr><td>Mars</td><td class="num">${stokCell(acc.mars.m)}</td><td class="num">${ayrCell(acc.mars.a)}</td></tr>
       <tr><td>Horoz</td><td class="num">${stokCell(acc.horoz.m)}</td><td class="num">${ayrCell(acc.horoz.a)}</td></tr>
-      <tr><td>Kadıköy ${acc.kadikoy.m>0?'<span class="kd">KD</span>':''}${kadikoyTarih?` <span class="mut" style="font-size:10px">(sayım ${fmtTarih(kadikoyTarih)})</span>`:''}</td><td class="num">${stokCell(acc.kadikoy.m)}</td><td class="num">${ayrCell(acc.kadikoy.a)}</td></tr>
+      <tr><td>${depoAdi()} ${acc.kadikoy.m>0?'<span class="kd">KD</span>':''}${kadikoyTarih?` <span class="mut" style="font-size:10px">(sayım ${fmtTarih(kadikoyTarih)})</span>`:''}</td><td class="num">${stokCell(acc.kadikoy.m)}</td><td class="num">${ayrCell(acc.kadikoy.a)}</td></tr>
       </tbody><tfoot><tr><th>NET satılabilir</th><th class="num ${net<=0?'bad':net<=3?'warn':'ok'}" colspan="2">${net}</th></tr></tfoot></table>
       ${net<=0?'<div class="nostock" style="margin-top:4px">⚠ BU ÜRÜNDE STOK YOK</div>':''}`;
   }
@@ -750,7 +785,7 @@ function renderRows(){
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();setTimeout(()=>{const rr=quoteRows[${i}]; if(rr&&rr.kod)refetch(rr);},250)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
-      <td>${r.ad||""}${primliRozet(r.kod)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="Kadıköy: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+      <td>${r.ad||""}${primliRozet(r.kod)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -784,8 +819,10 @@ function renderRows(){
   const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
   const karPesinTot=dip>0?(finalNakit/dip-1)*100:0;
   const karTaksitTot=dip>0?(netTaksit/dip-1)*100:0;
-  const hasTaksitTot=komis>0||quoteRows.some(r=>r.isET && +r.manuelTaksit>0)||manuelToplamTaksit!=null;
   const tk=+(($("taksit")||{}).value)||0;
+  // %0 komisyonlu banka (ör. BEKO GARANTİ) da taksitlidir — banka+taksit seçiliyse taksitli fiyat GÖSTERİLİR
+  const bankaTaksitli = tk>1 && ((($("banka")||{}).value)||"")!=="";
+  const hasTaksitTot=komis>0||bankaTaksitli||quoteRows.some(r=>r.isET && +r.manuelTaksit>0)||manuelToplamTaksit!=null;
   // elle-fiyat kutularının placeholder'ına otomatik değeri yaz + not
   const mtP=$("mtPesin"), mtT=$("mtTaksit"), mtN=$("mtNot");
   if(mtP && manuelToplamPesin==null) mtP.placeholder="oto: "+fmt(autoNakit);
@@ -800,9 +837,9 @@ function renderRows(){
   const tKarEl=$("tKar"); if(tKarEl){ tKarEl.className="num"; tKarEl.style.fontSize="12px"; tKarEl.style.lineHeight="1.3"; tKarEl.innerHTML = tBipli<=0?'—':('P '+karBadge(karPesinTot)+(hasTaksitTot?'<br>T '+karBadge(karTaksitTot):'')); }
   const anyMT=hasTaksitTot;
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
-  if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||anyMT||manuelToplamTaksit!=null)? fmt(finalTaksit) : '—';
-  if($("aylik")) $("aylik").textContent= ((komis>0||manuelToplamTaksit!=null)&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
-  if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
+  if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||bankaTaksitli||anyMT||manuelToplamTaksit!=null)? fmt(finalTaksit) : '—';
+  if($("aylik")) $("aylik").textContent= ((komis>0||bankaTaksitli||manuelToplamTaksit!=null)&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
+  if($("komShow")) $("komShow").textContent= (komis>0||bankaTaksitli)? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px"; e.innerHTML = tBipli<=0?'—':('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):'')); }
   renderUyarilar(uyStokYok,uyKritik,uyZararSatir,karPesinTot,tAdet>0&&tBipli>0);
   const kr=$("kampInfoRow");
@@ -1106,7 +1143,7 @@ function teklifToplam(items){ return lastTot? Math.round((komisOran>0?lastTot.fi
 function shareWhatsApp(){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   const tk=+$("taksit").value, bk=$("banka").value;
-  const taksitliVar=(tk>1)&&(komisOran>0);
+  const taksitliVar=(tk>1)&&(komisOran>0 || ((($("banka")||{}).value)||"")!=="");
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
   const N=items.length;
   const baseP=lastTot?lastTot.baseNakit:items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
@@ -1147,7 +1184,7 @@ function printDoc(kind){
   const indPerP=(redP>0&&N>0)?redP/N:0, indPerT=(redT>0&&N>0)?redT/N:0;
   const ind=redP;
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
-  const taksitliVar=(tk>1)&&(komisOran>0);
+  const taksitliVar=(tk>1)&&(komisOran>0 || ((($("banka")||{}).value)||"")!=="");
   let pT=0,tT=0;
   const tr=items.map((r,i)=>{
     const pesinLine=(r.nakit||0)*(r.adet||1), taksitLine=(r.taksit||0)*(r.adet||1);
@@ -1189,8 +1226,12 @@ function printDoc(kind){
 
 // ===== AYRI YÜKLEME KUTULARI =====
 function impMsg(k,t,cls){ const e=$(k+"_msg"); if(e){ e.textContent=t; e.className="msg "+(cls||""); } }
-async function upsert(table,rows,conflict){
-  for(let i=0;i<rows.length;i+=400){ const {error}=await sb.from(table).upsert(rows.slice(i,i+400),{onConflict:conflict}); if(error) throw new Error(table+": "+error.message); }
+async function upsert(table,rows,conflict,eskiConflict){
+  // eskiConflict: çok bayili migrasyon henüz çalıştırılmadıysa eski benzersiz anahtara geri düş
+  for(let i=0;i<rows.length;i+=400){
+    let {error}=await sb.from(table).upsert(rows.slice(i,i+400),{onConflict:conflict});
+    if(error && eskiConflict){ const r2=await sb.from(table).upsert(rows.slice(i,i+400),{onConflict:eskiConflict}); error=r2.error; }
+    if(error) throw new Error(table+": "+error.message); }
 }
 function colLetter(i){ return XLSX.utils.encode_col(i); }
 // ===== TEK KUTU: AYLIK GÜNCELLEME (otomatik tanı + yükle) =====
@@ -1201,7 +1242,8 @@ function tclassify(name){
   const n=tkey(name);
   const brand = n.includes("bosch")?"bosch": n.includes("siemens")?"siemens": null;
   const tip = (n.includes("ayrilmis")||n.includes("ayrilan")||n.includes("emanet")) ? "ayrilmis" : "mevcut";
-  const depo = n.includes("mars")?"mars": n.includes("horoz")?"horoz": (n.includes("kadikoy")||n.includes("kadkoy"))?"kadikoy": null;
+  const da=tkey(depoAdi()); // bayinin kendi depo adı da dosya adından tanınır (Kadıköy, Maltepe...)
+  const depo = n.includes("mars")?"mars": n.includes("horoz")?"horoz": (n.includes("kadikoy")||n.includes("kadkoy")||(da&&da.length>=3&&n.includes(da)))?"kadikoy": null;
   if(depo) return {brand, kind:"stok", depo, tip};
   // stok değilse fiyat listesi kabul et (toptan/perakende sayfalarını içeriden bulur)
   return {brand, kind: brand? "fiyat": null};
@@ -1280,6 +1322,8 @@ async function topluTara(files){
         wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
           parseStockRows(aoa).forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; rows.push({model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
         res.stokRows=rows; res.ok=rows.length>0; res.detay=rows.length+" stok · "+c.depo+"/"+c.tip; }
+      else if(!isEditor()){ // bayi rolü: fiyat/kampanya dosyası yükleyemez — merkezden gelir
+        res.detay="Bu bir fiyat listesi görünüyor — fiyatlar MERKEZDEN yüklenir. Sen sadece STOK dosyası yükleyebilirsin (dosya adında Mars, Horoz ya da '"+depoAdi()+"' geçsin)."; }
       else { // fiyat listesi (ham FL veya temiz)
         const r=parsePriceWb(wb,c.brand,donem); res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
         res.ok=(r.topRows.length+r.perRows.length+r.bipRows.length)>0;
@@ -1300,7 +1344,7 @@ async function topluYaz(){
   try{
     for(const r of items){
       [...(r.topRows||[]),...(r.perRows||[])].forEach(x=>{ if(x.donem && (!r_maxDonem || x.donem>r_maxDonem)) r_maxDonem=x.donem; });
-      if(r.kind==="stok"){ await sb.from("stok").delete().eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"model_kodu,marka,depo,tip"); }
+      if(r.kind==="stok"){ await sb.from("stok").delete().eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"bayi_id,model_kodu,marka,depo,tip","model_kodu,marka,depo,tip"); }
       else { if(r.topRows&&r.topRows.length) await upsert("toptan_fiyatlar",r.topRows,"model_kodu,marka,donem");
              if(r.perRows&&r.perRows.length) await upsert("perakende_fiyatlar",r.perRows,"model_kodu,marka,donem");
              if(r.bipRows&&r.bipRows.length) await upsert("bip",r.bipRows,"model_kodu,marka,donem");
@@ -1325,7 +1369,7 @@ function buildImporters(){
       <div class="row">
         ${cfg.donem?`<div class="fld"><label>Dönem</label><input id="${k}_donem" type="month" value="${mon}"></div>`:""}
         ${cfg.tarih?`<div class="fld"><label>Sayım Tarihi</label><input id="${k}_tarih" type="date" value="${today}"></div>`:""}
-        ${cfg.depo===true?`<div class="fld"><label>Depo</label><select id="${k}_depo"><option value="mars">Mars</option><option value="horoz">Horoz</option><option value="kadikoy">Kadıköy</option></select></div>`:""}
+        ${cfg.depo===true?`<div class="fld"><label>Depo</label><select id="${k}_depo"><option value="mars">Mars</option><option value="horoz">Horoz</option><option value="kadikoy">Kendi Depo</option></select></div>`:""}
         <div class="fld"><label>Dosya${cfg.stockMode?"":" (çok parça seçebilirsin)"}</label><input id="${k}_file" type="file" accept=".xlsx,.xls,.csv"${cfg.stockMode?"":" multiple"}></div>
         <button class="sm" onclick="smartScan('${k}')">Akıllı Tara</button>
         <button class="ghost sm" onclick="impRead('${k}')">Elle eşle</button>
