@@ -740,7 +740,6 @@ function calcParts(r,kar,komis){
   const unitToptan = r.isET ? (+r.etToptan||0) : (+r.toptan||0);
   const unitBip = r.isET ? 0 : (+r.bip||0);
   const unitBipli = unitToptan - unitBip;
-  const km = komis>0 ? (1+kar/100)*komis/100 : 0;
   const manuelP = r.isET && (+r.manuelFiyat>0);   // Manuel peşin
   const manuelT = r.isET && (+r.manuelTaksit>0);  // Manuel taksitli
   // Sabit peşin: önce manuel override, yoksa primli fiyat (varsa) — satışçı Manuel'le değiştirebilir
@@ -748,8 +747,8 @@ function calcParts(r,kar,komis){
   let unitNakit, unitTaksit;
   unitNakit = (sabitPesin!=null) ? sabitPesin : unitBipli*(1+kar/100);
   if(manuelT) unitTaksit = +r.manuelTaksit;
-  else if(sabitPesin!=null) unitTaksit = komis>0 ? unitNakit/(1-komis/100) : unitNakit;
-  else unitTaksit = (km>0&&km<1) ? (1+kar/100)*unitBipli/(1-km) : unitNakit;
+  // TEK doğru kural: taksitli = peşin ÷ (1-komisyon). Banka kesince elde kalan = peşin fiyat (kuruşu kuruşuna).
+  else unitTaksit = (komis>0&&komis<100) ? unitNakit/(1-komis/100) : unitNakit;
   const unitNetTaksit = unitTaksit*(1-komis/100);
   const karPesin = unitBipli>0 ? (unitNakit/unitBipli -1)*100 : 0;
   const karTaksit = unitBipli>0 ? (unitNetTaksit/unitBipli -1)*100 : 0;
@@ -809,7 +808,9 @@ function renderRows(){
   const baseTaksit=quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
   // Hakediş DÜZ TL olarak düşülür (8.000 → tam 8.000), kâr oranıyla çarpılmaz
   const autoNakit=Math.max(0,baseNakit-hakedis);
-  const autoTaksit=Math.max(0,baseTaksit-hakedis);
+  // Taksitlide hakediş komisyonlu büyütülerek düşülür: banka kesintisi sonrası elde kalan,
+  // peşin senaryosuyla KURUŞU KURUŞUNA aynı olsun (taksitli = peşin ÷ (1-komisyon))
+  const autoTaksit=Math.max(0, baseTaksit - (komis>0 ? hakedis/(1-komis/100) : hakedis));
   // Satışçı pazarlıkta nihai fiyatı ELLE ezebilir (peşin ve/veya taksitli) — kâr o fiyata göre hesaplanır
   let finalNakit=autoNakit, finalTaksit=autoTaksit;
   if(manuelToplamPesin!=null) finalNakit=Math.max(0,manuelToplamPesin);
