@@ -208,6 +208,13 @@
       <div class="fld" style="text-align:right"><label>Komisyon</label><span id="komShow" class="mut">—</span></div>
       <div class="fld" style="text-align:right"><label>Kâr</label><span class="big" id="karPct">—</span></div>
     </div>
+    <div class="row" id="manuelToplamRow" style="margin-top:10px;gap:12px;align-items:flex-end;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:10px">
+      <span class="mut" style="font-size:12px;align-self:center">✏️ Pazarlıkta elle fiyat ver:</span>
+      <div class="fld"><label style="color:var(--acc)">Elle Peşin Fiyat</label><input id="mtPesin" type="number" placeholder="oto" style="width:140px" oninput="setManuelToplam('pesin',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></div>
+      <div class="fld"><label style="color:var(--acc)">Elle Taksitli Fiyat</label><input id="mtTaksit" type="number" placeholder="oto" style="width:140px" oninput="setManuelToplam('taksit',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></div>
+      <button class="ghost sm" onclick="setManuelToplam('sifirla')">↺ Otomatiğe dön</button>
+      <span id="mtNot" class="mut" style="font-size:11px;align-self:center;color:var(--acc)"></span>
+    </div>
     <div class="row" id="kampInfoRow" style="margin-top:6px;display:none"><span id="kampInfo" class="mut" style="font-size:12px"></span></div>
     </div>
     <div class="row" style="justify-content:flex-end">
@@ -485,6 +492,7 @@ function setBrand(b){
   document.querySelectorAll("#brandSeg button").forEach(x=>x.classList.toggle("on",x.dataset.b===b));
   const am=$("aktifMarka"); if(am) am.textContent="Aktif: "+(b==="bosch"?"Bosch":"Siemens");
   if(typeof secilenKampanya!=='undefined') secilenKampanya.clear(); // marka değişince diğer markanın seçimleri kalkar
+  if(typeof setManuelToplam==='function') setManuelToplam('sifirla'); // marka değişince elle fiyat sıfırlanır
   quoteRows.forEach(r=>refetch(r)); loadBanks();
   loadAktifKampanyalar().then(()=>renderRows());
   if(typeof topluTemizle==="function") topluTemizle(); // marka değişince eski yükleme sonucu ekranda kalmasın
@@ -765,15 +773,24 @@ function renderRows(){
   const baseNakit=quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
   const baseTaksit=quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
   // Hakediş DÜZ TL olarak düşülür (8.000 → tam 8.000), kâr oranıyla çarpılmaz
-  const finalNakit=Math.max(0,baseNakit-hakedis);
-  const finalTaksit=Math.max(0,baseTaksit-hakedis);
+  const autoNakit=Math.max(0,baseNakit-hakedis);
+  const autoTaksit=Math.max(0,baseTaksit-hakedis);
+  // Satışçı pazarlıkta nihai fiyatı ELLE ezebilir (peşin ve/veya taksitli) — kâr o fiyata göre hesaplanır
+  let finalNakit=autoNakit, finalTaksit=autoTaksit;
+  if(manuelToplamPesin!=null) finalNakit=Math.max(0,manuelToplamPesin);
+  if(manuelToplamTaksit!=null) finalTaksit=Math.max(0,manuelToplamTaksit);
   const dip=Math.max(0,tBipli-hakedis);
   const netTaksit=finalTaksit*(1-komis/100);
   const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
   const karPesinTot=dip>0?(finalNakit/dip-1)*100:0;
   const karTaksitTot=dip>0?(netTaksit/dip-1)*100:0;
-  const hasTaksitTot=komis>0||quoteRows.some(r=>r.isET && +r.manuelTaksit>0);
+  const hasTaksitTot=komis>0||quoteRows.some(r=>r.isET && +r.manuelTaksit>0)||manuelToplamTaksit!=null;
   const tk=+(($("taksit")||{}).value)||0;
+  // elle-fiyat kutularının placeholder'ına otomatik değeri yaz + not
+  const mtP=$("mtPesin"), mtT=$("mtTaksit"), mtN=$("mtNot");
+  if(mtP && manuelToplamPesin==null) mtP.placeholder="oto: "+fmt(autoNakit);
+  if(mtT && manuelToplamTaksit==null) mtT.placeholder="oto: "+fmt(autoTaksit);
+  if(mtN) mtN.textContent=(manuelToplamPesin!=null||manuelToplamTaksit!=null)?"● Elle fiyat aktif — kâr bu fiyata göre":"";
   lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip,appliedNames:applied.map(k=>k.ad),baseNakit};
   $("tAdet").textContent=fmt(tAdet);
   $("tMaliyet").textContent=fmt(tMaliyet);
@@ -783,8 +800,8 @@ function renderRows(){
   const tKarEl=$("tKar"); if(tKarEl){ tKarEl.className="num"; tKarEl.style.fontSize="12px"; tKarEl.style.lineHeight="1.3"; tKarEl.innerHTML = tBipli<=0?'—':('P '+karBadge(karPesinTot)+(hasTaksitTot?'<br>T '+karBadge(karTaksitTot):'')); }
   const anyMT=hasTaksitTot;
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
-  if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||anyMT)? fmt(finalTaksit) : '—';
-  if($("aylik")) $("aylik").textContent= (komis>0&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
+  if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||anyMT||manuelToplamTaksit!=null)? fmt(finalTaksit) : '—';
+  if($("aylik")) $("aylik").textContent= ((komis>0||manuelToplamTaksit!=null)&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
   if($("komShow")) $("komShow").textContent= komis>0? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px"; e.innerHTML = tBipli<=0?'—':('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):'')); }
   renderUyarilar(uyStokYok,uyKritik,uyZararSatir,karPesinTot,tAdet>0&&tBipli>0);
@@ -813,6 +830,14 @@ function renderUyarilar(stokYok, kritik, zararSatir, karPesinTot, hasValid){
   }
   box.innerHTML=parts.join("");
   box.style.display = parts.length? "" : "none";
+}
+// ===== ELLE NİHAİ FİYAT (pazarlık) — peşin ve/veya taksitli ezme =====
+let manuelToplamPesin=null, manuelToplamTaksit=null;
+function setManuelToplam(hangi,val){
+  if(hangi==='sifirla'){ manuelToplamPesin=null; manuelToplamTaksit=null; const a=$("mtPesin"),b=$("mtTaksit"); if(a)a.value=""; if(b)b.value=""; }
+  else if(hangi==='pesin'){ manuelToplamPesin=(val===''||val==null)?null:(+val||0); }
+  else if(hangi==='taksit'){ manuelToplamTaksit=(val===''||val==null)?null:(+val||0); }
+  renderRows();
 }
 // ===== KAMPANYA OTOMATİK UYGULAMA (teklif ekranı) =====
 let aktifKampanyalar=[];
