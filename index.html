@@ -734,7 +734,7 @@ async function stokSorgula(){
 function stokCell(v){ if(v==null) return '<span class="mut">—</span>'; if(v<=0) return '<span class="mut">0</span>'; if(v<=3) return `<span class="blink" title="Az stok!">${v}</span>`; return v; }
 function ayrCell(v){ if(v==null||v<=0) return '<span class="mut">—</span>'; return `<span style="color:var(--warn)" title="Ayrılan/emanet">${v}</span>`; }
 function fmtTarih(d){ if(!d) return ''; const p=(''+d).split('-'); return p.length===3? p[2]+'.'+p[1]+'.'+p[0].slice(2) : (''+d); }
-function karBadge(p){ if(p==null||isNaN(p)) return '<span class="mut">—</span>'; if(p<0) return '<span class="blink">ZARAR '+p.toFixed(1)+'%</span>'; const c=p<3?'bad':p<8?'warn':'ok'; return '<span class="'+c+'">'+p.toFixed(1)+'%</span>'; }
+function karBadge(p){ if(p==null||isNaN(p)) return '<span class="mut">—</span>'; if(p>-0.05&&p<0.05) p=0; if(p<0) return '<span class="blink">ZARAR '+p.toFixed(1)+'%</span>'; const c=p<3?'bad':p<8?'warn':'ok'; return '<span class="'+c+'">'+p.toFixed(1)+'%</span>'; }
 function calcParts(r,kar,komis){
   const adet=r.adet??1;
   const unitToptan = r.isET ? (+r.etToptan||0) : (+r.toptan||0);
@@ -829,7 +829,7 @@ function renderRows(){
   if(mtP && manuelToplamPesin==null) mtP.placeholder="oto: "+fmt(autoNakit);
   if(mtT && manuelToplamTaksit==null) mtT.placeholder="oto: "+fmt(autoTaksit);
   if(mtN) mtN.textContent=(manuelToplamPesin!=null||manuelToplamTaksit!=null)?"● Manuel fiyat aktif — kâr bu fiyata göre":"";
-  lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip,appliedNames:applied.map(k=>k.ad),baseNakit,baseTaksit,manuelP:manuelToplamPesin,manuelT:manuelToplamTaksit};
+  lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip,appliedNames:applied.map(k=>k.ad),baseNakit,baseTaksit,manuelP:manuelToplamPesin,manuelT:manuelToplamTaksit,dagilim:dag.dagilim||{}};
   $("tAdet").textContent=fmt(tAdet);
   $("tMaliyet").textContent=fmt(tMaliyet);
   $("tBip").textContent=fmt(tBip);
@@ -992,6 +992,8 @@ function bundleTuru(k){
 // Sıra: XL/XXL (tek tek, en yüksek) → ankastre set (1+1+1) → 2'li (farklı kategori çiftleri). Bir ürün yalnız bir yerde sayılır.
 function hesaplaHakedis(applied, rows){
   const dokum=[]; let toplamHak=0, toplamInd=0;
+  // dagilim: kod → o ürüne düşen hakediş TL (teklif/sipariş formunda İNDİRİM ilgili ürüne yazılır)
+  const dagilim={}; const dagEkle=(kod,tl)=>{ dagilim[kod]=(dagilim[kod]||0)+tl; };
   // birim listesi (adet kadar çoğalt) — her birim tek bir kampanyada kullanılır
   const units=[];
   rows.forEach(r=>{ const kod=(r.kod||"").toUpperCase(); const kat=(kategoriOf(kod)||[])[0]||null; const adet=+r.adet||1; for(let n=0;n<adet;n++) units.push({kod,kat,used:false}); });
@@ -1005,12 +1007,12 @@ function hesaplaHakedis(applied, rows){
   const gateFor=(k,kat)=>{ const mods=(k.secili_modeller||[]).map(m=>(m||"").toUpperCase()); const ofKat=mods.filter(m=>(kategoriOf(m)||[])[0]===kat); return ofKat.length?new Set(ofKat):null; };
   // 1) XL/XXL buzdolapları — her biri tek başına (BSH zaten ayrı telefona ayrı girer)
   xlK.forEach(k=>{ const gate=gateFor(k,'BUZDOLABI'); const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0;
-    units.filter(u=>!u.used&&u.kat==='BUZDOLABI'&&gate&&gate.has(u.kod)).forEach(u=>{ u.used=true; toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'❄️',aciklama:`${u.kod} — XL/XXL buzdolabı`,hak,ind}); }); });
+    units.filter(u=>!u.used&&u.kat==='BUZDOLABI'&&gate&&gate.has(u.kod)).forEach(u=>{ u.used=true; toplamHak+=hak; toplamInd+=ind; dagEkle(u.kod,hak); dokum.push({ikon:'❄️',aciklama:`${u.kod} — XL/XXL buzdolabı`,hak,ind}); }); });
   // 2) Ankastre setleri — 1 fırın + 1 ocak + 1 davlumbaz; fazlası açıkta kalır
   ankK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0;
     const pick=kat=>{ const g=gateFor(k,kat); return units.filter(u=>!u.used&&u.kat===kat&&(!g||g.has(u.kod))); };
     const f=pick('FIRIN'), o=pick('OCAK'), d=pick('DAVLUMBAZ'); const n=Math.min(f.length,o.length,d.length);
-    for(let s=0;s<n;s++){ f[s].used=o[s].used=d[s].used=true; toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'🍳',aciklama:`Ankastre set: ${f[s].kod} + ${o[s].kod} + ${d[s].kod}`,hak,ind}); } });
+    for(let s=0;s<n;s++){ f[s].used=o[s].used=d[s].used=true; toplamHak+=hak; toplamInd+=ind; dagEkle(f[s].kod,hak/3); dagEkle(o[s].kod,hak/3); dagEkle(d[s].kod,hak/3); dokum.push({ikon:'🍳',aciklama:`Ankastre set: ${f[s].kod} + ${o[s].kod} + ${d[s].kod}`,hak,ind}); } });
   // 3) 2'li beyaz eşya — MUTLAKA 2 FARKLI kategori (iki çamaşır eşleşmez). Greedy: en çok olan 2 kategoriyi eşle → maksimum çift.
   const varsayilanHavuz=new Set(['BUZDOLABI','DERINDONDURUCU','CAMASIR','KURUTMA','BULASIK']);
   ikiK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0;
@@ -1020,6 +1022,7 @@ function hesaplaHakedis(applied, rows){
     const cats=Object.keys(byKat).map(kk=>({kat:kk,arr:byKat[kk]}));
     while(true){ cats.sort((a,b)=>b.arr.length-a.arr.length); if(cats.length<2||cats[1].arr.length===0) break;
       const a=cats[0].arr.pop(), b=cats[1].arr.pop(); a.used=b.used=true; toplamHak+=hak; toplamInd+=ind;
+      dagEkle(a.kod,hak/2); dagEkle(b.kod,hak/2);
       dokum.push({ikon:'🔗',aciklama:`2'li: ${a.kod} (${a.kat}) + ${b.kod} (${b.kat})`,hak,ind}); } });
   // 4) diğer (tekil / tümü / all+any) — düz bir kez uygulanır
   digerK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0; if(hak||ind){ toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'🎁',aciklama:k.ad||'kampanya',hak,ind}); } });
@@ -1028,7 +1031,7 @@ function hesaplaHakedis(applied, rows){
   if(hasBundle){ const aday=new Set(['BUZDOLABI','DERINDONDURUCU','CAMASIR','KURUTMA','BULASIK','FIRIN','OCAK','DAVLUMBAZ']);
     const bm={}; units.filter(u=>!u.used&&u.kat&&aday.has(u.kat)).forEach(u=>bm[u.kod]=(bm[u.kod]||0)+1);
     bosta=Object.keys(bm).map(kk=>bm[kk]>1?`${kk}×${bm[kk]}`:kk); }
-  return {toplamHak,toplamInd,dokum,bosta};
+  return {toplamHak,toplamInd,dokum,bosta,dagilim};
 }
 function dokumHTML(dag){
   if(!dag||!dag.dokum||!dag.dokum.length) return '';
@@ -1140,23 +1143,38 @@ async function saveQuote(){
   if(!error) currentTeklifNo=null; // sonraki teklif yeni no alır
 }
 function teklifItems(){ return quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —"); }
+// Çıktılarda indirim dağıtımı: hakediş İLGİLİ ürüne düşer (XL→o dolap, ankastre→3 set ürünü, 2'li→o çift);
+// kampanyaya bağlı olmayan fark (manuel fiyat, tekil kampanya) tüm ürünlere eşit dağıtılır.
+function teklifDagilim(items){
+  const N=items.length||1;
+  const baseP=lastTot?lastTot.baseNakit:items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
+  const finalP=lastTot?lastTot.finalNakit:baseP;
+  const baseT=(lastTot&&lastTot.baseTaksit!=null)?lastTot.baseTaksit:items.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
+  const finalT=(lastTot&&lastTot.finalTaksit!=null)?lastTot.finalTaksit:baseT;
+  const redP=Math.max(0,baseP-finalP), redT=Math.max(0,baseT-finalT);
+  const dagilim=(lastTot&&lastTot.dagilim)||{};
+  const dagT=Object.keys(dagilim).reduce((a,k)=>a+dagilim[k],0);
+  const gross=komisOran>0?1/(1-komisOran/100):1;
+  const kalanPerP=(redP-Math.min(redP,dagT))/N;               // hakediş dışı fark (manuel vb.) eşit dağıtılır
+  const kalanPerT=(redT-Math.min(redT,dagT*gross))/N;
+  const oranP = dagT>0 ? Math.min(1,redP/dagT) : 0;           // manuel fiyat hakedişten azını düşürdüyse oranla
+  const oranT = dagT>0 ? Math.min(1,redT/(dagT*gross)) : 0;
+  return { redP, redT, finalP, finalT,
+    indP:kod=>((dagilim[kod]||0)*oranP)+kalanPerP,
+    indT:kod=>((dagilim[kod]||0)*gross*oranT)+kalanPerT };
+}
 function teklifToplam(items){ return lastTot? Math.round((komisOran>0?lastTot.finalTaksit:lastTot.finalNakit)) : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0); }
 function shareWhatsApp(){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   const tk=+$("taksit").value, bk=$("banka").value;
   const taksitliVar=(tk>1)&&(komisOran>0 || ((($("banka")||{}).value)||"")!=="");
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
-  const N=items.length;
-  const baseP=lastTot?lastTot.baseNakit:items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
-  const finalP=lastTot?lastTot.finalNakit:baseP;
-  const baseT=(lastTot&&lastTot.baseTaksit!=null)?lastTot.baseTaksit:items.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
-  const finalT=(lastTot&&lastTot.finalTaksit!=null)?lastTot.finalTaksit:baseT;
-  const redP=Math.max(0,baseP-finalP), redT=Math.max(0,baseT-finalT);
-  const indPerP=(redP>0&&N>0)?redP/N:0, indPerT=(redT>0&&N>0)?redT/N:0;
+  const D=teklifDagilim(items);
+  const {redP,finalP,finalT}=D;
   const ind=redP;
   let m="*FİYAT TEKLİFİ*\n"+`Teklif No: ${getTeklifNo()}\n`+"═".repeat(16)+"\n\n";
   items.forEach((r,i)=>{ const kd=r.sKadikoy>0?" [KD]":"";
-    const pesinNet=Math.max(0,(r.nakit||0)*(r.adet||1)-indPerP), taksitNet=Math.max(0,(r.taksit||0)*(r.adet||1)-indPerT);
+    const pesinNet=Math.max(0,(r.nakit||0)*(r.adet||1)-D.indP(r.kod)), taksitNet=Math.max(0,(r.taksit||0)*(r.adet||1)-D.indT(r.kod));
     m+=`${i+1}. *${r.kod}*${kd}${r.ad?(" - "+r.ad):""} × ${r.adet}\n   Peşin: ${fmt(pesinNet)} ₺\n`;
     if(taksitliVar) m+=`   Taksitli: ${fmt(taksitNet)} ₺\n`;
     m+="\n";
@@ -1175,23 +1193,19 @@ function printDoc(kind){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   const ad=(($("mAd")||{}).value)||"", tel=(($("mTel")||{}).value)||"", personel=(($("satisPersonel")||{}).value)||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
   const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
-  // ÇIKTI = EKRAN: gerçek düşüşü (baz - nihai; hakediş veya manuel) satırlara dağıt, toplam ekrandaki final ile birebir
-  const N=items.length;
-  const baseP = lastTot? lastTot.baseNakit : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0);
-  const finalP = lastTot? lastTot.finalNakit : baseP;
-  const baseT = (lastTot&&lastTot.baseTaksit!=null)? lastTot.baseTaksit : items.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0);
-  const finalT = (lastTot&&lastTot.finalTaksit!=null)? lastTot.finalTaksit : baseT;
-  const redP=Math.max(0,baseP-finalP), redT=Math.max(0,baseT-finalT);
-  const indPerP=(redP>0&&N>0)?redP/N:0, indPerT=(redT>0&&N>0)?redT/N:0;
+  // ÇIKTI = EKRAN: indirim İLGİLİ ürüne dağıtılır (XL→dolap, ankastre→set, 2'li→çift); toplam ekranla birebir
+  const D=teklifDagilim(items);
+  const {redP,redT,finalP,finalT}=D;
   const ind=redP;
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
   const taksitliVar=(tk>1)&&(komisOran>0 || ((($("banka")||{}).value)||"")!=="");
   let pT=0,tT=0;
   const tr=items.map((r,i)=>{
     const pesinLine=(r.nakit||0)*(r.adet||1), taksitLine=(r.taksit||0)*(r.adet||1);
-    const pesinNet=Math.max(0,pesinLine-indPerP), taksitNet=Math.max(0,taksitLine-indPerT);
+    const iP=D.indP(r.kod), iT=D.indT(r.kod);
+    const pesinNet=Math.max(0,pesinLine-iP), taksitNet=Math.max(0,taksitLine-iT);
     pT+=pesinNet; tT+=taksitNet;
-    const indCol= ind>0? `<td style="text-align:right;color:#dc2626">-${fmt(indPerP)} ₺</td>`:"";
+    const indCol= ind>0? `<td style="text-align:right;color:#dc2626">${iP>0.5?('-'+fmt(iP)+' ₺'):'—'}</td>`:"";
     const tCol= taksitliVar? `<td style="text-align:right">${fmt(taksitNet)} ₺</td>`:"";
     return `<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td>${indCol}<td style="text-align:right">${fmt(pesinNet)} ₺</td>${tCol}</tr>`;
   }).join("");
@@ -1218,7 +1232,7 @@ function printDoc(kind){
   <body><h1>fiyatiq</h1><div class="sub">${baslik}</div>
   <div class="info"><div><b>Teklif No:</b> ${getTeklifNo()}</div><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div>${personel?`<div><b>Satış Personeli:</b> ${personel}</div>`:""}<div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
   <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>${ind>0?'<th>İndirim</th>':''}<th>Peşin Fiyat</th>${taksitliVar?'<th>Taksitli Fiyat</th>':''}</tr></thead><tbody>${tr}</tbody></table>
-  ${(ind>0&&kampNames.length)?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ürünlere eşit dağıtılıp fiyatlara işlenmiştir)</div>`:(ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Toplam indirim:</b> ${fmt(ind)} ₺ (fiyatlara işlenmiştir)</div>`:"")}
+  ${(ind>0&&kampNames.length)?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ilgili ürünlerin fiyatlarına işlenmiştir)</div>`:(ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Toplam indirim:</b> ${fmt(ind)} ₺ (fiyatlara işlenmiştir)</div>`:"")}
   <div class="tot">PEŞİN TOPLAM: ${fmt(Math.round(finalP))} ₺${taksitliVar?`<br>TAKSİTLİ TOPLAM: ${fmt(Math.round(finalT))} ₺ &nbsp;(${bk} ${tk} Taksit — Aylık ${fmt(Math.round(finalT/tk))} ₺)`:""}</div>
   ${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
