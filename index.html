@@ -878,13 +878,24 @@ function renderKampanyaPanel(){
   const applied=all.filter(k=>secilenKampanya.has(k.id));
   const setHeader=()=>{ const kc=$("kampCount"); if(kc) kc.textContent= applied.length?('✓ '+applied.length+' uygulandı'):(matched.length?(matched.length+' uygun — aç'):'kampanya'); const ar=$("kampArrow"); if(ar) ar.textContent=kampAcik?"▼":"▶"; list.style.display=kampAcik?"":"none"; };
   if(!all.length){ list.innerHTML='<div class="mut" style="font-size:12px">Tanımlı aktif kampanya yok.</div>'; setHeader(); return; }
-  const indT=applied.reduce((a,k)=>a+(k.musteri_indirimi||0),0);
-  const hakT=applied.reduce((a,k)=>a+(k.hakedis||0),0);
+  // Panelde her kampanyanın YANINDA, o anki sepet için GERÇEK hakediş önizlemesi (Uygula'ya basmadan görünür)
+  const vrows=quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —" && (r.isET?(+r.etToptan>0):(+r.toptan>0)));
+  // Alt özet: seçili kampanyaların DAĞITILMIŞ (gerçek) toplamı
+  let dagApp={toplamHak:0,toplamInd:0}; try{ dagApp=hesaplaHakedis(applied, vrows); }catch(e){}
+  const indT=dagApp.toplamInd;
+  const hakT=dagApp.toplamHak;
+  const birimAdi=k=>{ const t=bundleTuru(k); return t==='ikili'?'çift':(t==='ankastre'?'set':(t==='xl'?'adet':'kez')); };
   list.innerHTML=`<div class="diva-uyari">⚠ Satıştan önce DİVA'dan kampanya teyidi alın.</div>`
     +all.map(k=>{ const on=secilenKampanya.has(k.id); const bndl=isBundleKamp(k); const uygun=matchIds.has(k.id); const mk=k.marka||'ikisi';
+      // bu kampanya TEK BAŞINA bu sepette ne kazandırır?
+      let pv={toplamHak:0,dokum:[]}; try{ pv=hesaplaHakedis([k], vrows); }catch(e){}
+      const cnt=pv.dokum.length;
       let uyari="";
       if(uygun) uyari=` <span class="badge" style="font-size:9px;background:rgba(34,197,94,.22);color:var(--ok);border-color:var(--ok)">✓ sepete uygun</span>`;
       else if(on) uyari=`<div style="color:var(--bad);font-size:11px;font-weight:700;margin-top:2px">⚠ Bu kampanya sepete UYGUN OLMAYABİLİR — Diva kontrolü tavsiye edilir</div>`;
+      const sepetBox = pv.toplamHak>0
+        ? `<div><b style="color:var(--acc);font-size:16px">Bu sepette ${fmt(pv.toplamHak)} ₺</b> <span class="mut" style="font-size:11px">(${cnt} ${birimAdi(k)})</span></div>`
+        : `<div class="mut" style="font-size:11px">bu sepette uygun ürün yok</div>`;
       return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;${uygun?'':'opacity:.78'}">
       <div style="flex:1">
         <span class="badge" style="font-size:9px;background:${bndl?'rgba(245,158,11,.2)':'rgba(34,197,94,.2)'}">${bndl?'SET':'TEKİL'}</span>
@@ -892,7 +903,10 @@ function renderKampanyaPanel(){
         <b>${k.ad}</b>${k.kota?` <span class="mut" style="font-size:11px">· kota ${k.kota}</span>`:""}
         ${uyari}
       </div>
-      <div class="mut" style="font-size:13px;margin:0 14px">İnd <b style="color:var(--ok)">${fmt(k.musteri_indirimi)}</b> · Hak <b style="color:var(--acc)">${fmt(k.hakedis)}</b></div>
+      <div style="margin:0 14px;text-align:right;min-width:158px">
+        ${sepetBox}
+        <div class="mut" style="font-size:10.5px">birim: İnd ${fmt(k.musteri_indirimi)} · Hak ${fmt(k.hakedis)}</div>
+      </div>
       <button class="${on?'':'ghost '}sm" style="${on?(uygun?'background:var(--ok);color:#06200f':'background:var(--bad);color:#fff'):''}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button>
     </div>`;}).join("")
     +`<div class="row" style="justify-content:flex-end;margin-top:10px;gap:22px">
