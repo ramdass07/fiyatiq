@@ -917,9 +917,10 @@ function matchKampanyalar(){
     const cats=(k.kategoriler||[]).map(katNorm).filter(Boolean);
     const mods=(k.secili_modeller||[]).map(m=>(m||"").toUpperCase());
     const gated=mods.length>0; const modSet=new Set(mods);
+    const haricSet=new Set((k.haric_modeller||[]).map(m=>String(m||"").toUpperCase())); // kampanyaya girmeyen kodlar
     // Model listesi varsa: kategori kümesi SADECE listedeki ürünlerden türetilir (liste dışı ürün kampanyaya saymaz)
     const catSet=new Set();
-    items.forEach(r=>{ const code=(r.kod||"").toUpperCase(); if(gated && !modSet.has(code)) return; kategoriOf(code).forEach(t=>catSet.add(t)); });
+    items.forEach(r=>{ const code=(r.kod||"").toUpperCase(); if(haricSet.has(code)) return; if(gated && !modSet.has(code)) return; kategoriOf(code).forEach(t=>catSet.add(t)); });
     const has=c=>catSet.has(katNorm(c));
     let ok=false;
     switch(k.match_type){
@@ -1017,7 +1018,9 @@ function hesaplaHakedis(applied, rows){
   const varsayilanHavuz=new Set(['BUZDOLABI','DERINDONDURUCU','CAMASIR','KURUTMA','BULASIK']);
   ikiK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0;
     const havuz=(k.kategoriler||[]).map(katNorm).filter(Boolean); const havSet=havuz.length?new Set(havuz):varsayilanHavuz;
-    const free=units.filter(u=>!u.used&&u.kat&&havSet.has(u.kat));
+    // hariç modeller: kampanyaya GİRMEYEN kodlar (ör. 18 Tem'den itibaren XL/XXL dolaplar 2'liye dahil değil)
+    const haric=new Set((k.haric_modeller||[]).map(m=>String(m||"").toUpperCase()));
+    const free=units.filter(u=>!u.used&&u.kat&&havSet.has(u.kat)&&!haric.has(u.kod));
     const byKat={}; free.forEach(u=>{ (byKat[u.kat]=byKat[u.kat]||[]).push(u); });
     const cats=Object.keys(byKat).map(kk=>({kat:kk,arr:byKat[kk]}));
     while(true){ cats.sort((a,b)=>b.arr.length-a.arr.length); if(cats.length<2||cats[1].arr.length===0) break;
