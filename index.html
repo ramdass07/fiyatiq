@@ -287,8 +287,12 @@
         <div style="font-size:15px;font-weight:700">📄 Kampanya dosyalarını buraya bırak, ya da tıkla</div>
         <div class="mut" style="font-size:12px;margin-top:4px">Bosch: broşür + uygulama yazısı PDF · Siemens: kampanya Excel</div>
       </label>
+      <div class="fld" style="margin-top:12px"><label>📋 Ek yoksa: BSH <b>mailinin metnini</b> buraya yapıştır (kampanya değişiklikleri + fiyat farkı tablosu)</label>
+        <textarea id="ksMetin" style="width:100%;min-height:90px;font-size:12px" placeholder="Mail gövdesini kopyala → buraya yapıştır → Metni İşle"></textarea></div>
+      <div class="row" style="margin-top:6px"><button class="sm" onclick="ksMetinIsle()">🤖 Metni İşle</button></div>
       <div id="ksMsg" class="msg"></div>
       <div id="ksSonuc" style="margin-top:12px"></div>
+      <div id="ksFarkBox"></div>
       <div class="row" style="margin-top:10px;display:none" id="ksKaydetRow"><button id="ksKaydet" onclick="kampSihirbazKaydet()">✓ Seçili Kampanyaları Kaydet</button><span id="ksKayMsg" class="msg"></span></div>
     </div>
 
@@ -1584,7 +1588,48 @@ async function admKampanya(){
 async function loadKampanyalar(){
   const {data}=await sb.from("kampanyalar").select("*").or(`marka.eq.${brand},marka.is.null`).order("created_at",{ascending:false});
   const tb=$("kList"); if(!tb) return;
-  tb.innerHTML=(data||[]).map(k=>`<tr><td>${k.ad}</td><td><select onchange="kampMarkaSet('${k.id}',this.value)"><option value="bosch" ${k.marka==='bosch'?'selected':''}>Bosch</option><option value="siemens" ${k.marka==='siemens'?'selected':''}>Siemens</option><option value="" ${!k.marka?'selected':''}>İkisi</option></select></td><td>${k.match_type}</td><td class="num">${fmt(k.musteri_indirimi)}</td><td class="num">${fmt(k.hakedis)}</td><td>${k.bitis_tarihi||"—"}</td><td><button class="ghost sm" onclick="delKampanya('${k.id}')">✕</button></td></tr>`).join("");
+  window._kampCache={}; (data||[]).forEach(k=>window._kampCache[k.id]=k);
+  const bugun=_bugun();
+  tb.innerHTML=(data||[]).map(k=>{ const bitti=k.bitis_tarihi&&k.bitis_tarihi<bugun;
+    return `<tr style="${bitti?'opacity:.5':''}"><td>${k.ad}${bitti?' <span class="badge" style="font-size:9px;color:var(--bad)">bitti</span>':''}</td><td><select onchange="kampMarkaSet('${k.id}',this.value)"><option value="bosch" ${k.marka==='bosch'?'selected':''}>Bosch</option><option value="siemens" ${k.marka==='siemens'?'selected':''}>Siemens</option><option value="" ${!k.marka?'selected':''}>İkisi</option></select></td><td>${k.match_type}</td><td class="num">${fmt(k.musteri_indirimi)}</td><td class="num">${fmt(k.hakedis)}</td><td>${k.bitis_tarihi||"—"}</td>
+    <td style="white-space:nowrap"><button class="ghost sm" title="Model listelerini ve tutarları düzenle" onclick="kampDuzenle('${k.id}')">✎ Düzenle</button> ${bitti?'':`<button class="ghost sm" title="Kampanyayı bugünden itibaren bitir" onclick="kampBitir('${k.id}')">Bitir</button>`} <button class="ghost sm" onclick="delKampanya('${k.id}')">✕</button></td></tr>
+    <tr id="ked_${k.id}" style="display:none"><td colspan="7" style="text-align:left;background:var(--field)"></td></tr>`;}).join("");
+}
+// Kampanya satır içi düzenleme: dahil/hariç model listeleri + tutarlar + bitiş — bana sormadan panelden yönetilir
+function kampDuzenle(id){
+  const tr=$("ked_"+id); const k=(window._kampCache||{})[id]; if(!tr||!k) return;
+  if(tr.style.display===""){ tr.style.display="none"; return; }
+  tr.style.display="";
+  tr.firstElementChild.innerHTML=`
+    <div class="row" style="gap:12px">
+      <div class="fld" style="flex:1;min-width:260px"><label>DAHİL modeller (${(k.secili_modeller||[]).length} adet) — sadece bunlar kampanyaya girer; boşsa model kısıtı yok</label>
+        <textarea id="ke_mod_${id}" style="width:100%;min-height:54px;font-size:12px">${(k.secili_modeller||[]).join(', ')}</textarea></div>
+      <div class="fld" style="flex:1;min-width:260px"><label>HARİÇ modeller (${(k.haric_modeller||[]).length} adet) — bu kodlar kampanyaya GİREMEZ (ör. XL/XXL 2'liye giremez)</label>
+        <textarea id="ke_har_${id}" style="width:100%;min-height:54px;font-size:12px">${(k.haric_modeller||[]).join(', ')}</textarea></div>
+    </div>
+    <div class="row" style="margin-top:6px;gap:12px;align-items:flex-end">
+      <div class="fld"><label>Müşteri indirimi ₺</label><input id="ke_ind_${id}" type="number" value="${k.musteri_indirimi||0}" style="width:120px"></div>
+      <div class="fld"><label>Hakediş ₺</label><input id="ke_hak_${id}" type="number" value="${k.hakedis||0}" style="width:110px"></div>
+      <div class="fld"><label>Bitiş tarihi</label><input id="ke_bit_${id}" type="date" value="${k.bitis_tarihi||''}"></div>
+      <button class="sm" onclick="kampKaydetDuzen('${id}')">✓ Kaydet</button>
+      <span id="ke_msg_${id}" class="msg"></span>
+    </div>`;
+}
+async function kampKaydetDuzen(id){
+  const parse=v=>(v||"").split(/[,\n]/).map(s=>s.trim().toUpperCase()).filter(Boolean);
+  const upd={secili_modeller:parse($("ke_mod_"+id).value), haric_modeller:parse($("ke_har_"+id).value),
+    musteri_indirimi:+$("ke_ind_"+id).value||0, hakedis:+$("ke_hak_"+id).value||0, bitis_tarihi:$("ke_bit_"+id).value||null};
+  const {error}=await sb.from("kampanyalar").update(upd).eq("id",id);
+  const m=$("ke_msg_"+id);
+  if(error){ m.className="msg bad"; m.textContent="Hata: "+error.message; return; }
+  m.className="msg ok"; m.textContent="✓ Kaydedildi — teklif ekranında anında geçerli.";
+  window._kampCache[id]={...window._kampCache[id],...upd};
+  loadAktifKampanyalar();
+}
+async function kampBitir(id){
+  const dun=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  await sb.from("kampanyalar").update({bitis_tarihi:dun}).eq("id",id);
+  loadKampanyalar(); loadAktifKampanyalar();
 }
 async function kampMarkaSet(id,val){ await sb.from("kampanyalar").update({marka:val||null}).eq("id",id); }
 async function delKampanya(id){ await sb.from("kampanyalar").delete().eq("id",id); loadKampanyalar(); }
@@ -1611,23 +1656,81 @@ async function ksMetinCikar(file){
 async function kampSihirbaz(files){
   const msg=$("ksMsg"); if(!files||!files.length) return;
   msg.className="msg"; msg.textContent="📄 Dosyalar okunuyor...";
-  $("ksSonuc").innerHTML=""; $("ksKaydetRow").style.display="none";
+  $("ksSonuc").innerHTML=""; $("ksFarkBox").innerHTML=""; $("ksKaydetRow").style.display="none";
   let metin="";
   try{ for(const f of files){ metin+="\n===== DOSYA: "+f.name+" =====\n"+(await ksMetinCikar(f))+"\n"; } }
   catch(e){ msg.className="msg bad"; msg.textContent="Okuma hatası: "+e.message; return; }
   if(metin.trim().length<20){ msg.className="msg bad"; msg.textContent="Dosyalardan metin çıkmadı (taranmış görüntü PDF olabilir)."; return; }
-  msg.textContent="🤖 Opus kampanyaları ayıklıyor... (birkaç saniye)";
+  await ksIsle(metin);
+}
+// Ek yoksa: mail metnini yapıştır → aynı beyin işler
+async function ksMetinIsle(){
+  const t=(($("ksMetin")||{}).value||"").trim(); const msg=$("ksMsg");
+  if(t.length<20){ msg.className="msg bad"; msg.textContent="Önce mail metnini yapıştır (en az birkaç cümle)."; return; }
+  $("ksSonuc").innerHTML=""; $("ksFarkBox").innerHTML=""; $("ksKaydetRow").style.display="none";
+  await ksIsle(t);
+}
+async function ksIsle(metin){
+  const msg=$("ksMsg");
+  msg.className="msg"; msg.textContent="🤖 Opus ayıklıyor... (birkaç saniye)";
   try{
     const resp=await fetch("/api/kampanya-oku",{method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify({marka:brand,donem:_donem(),metin})});
     const data=await resp.json();
     if(!resp.ok||data.error){ msg.className="msg bad"; msg.textContent="Sihirbaz hatası: "+(data.error||resp.status)+(data.ham?(" · "+data.ham):""); return; }
-    window.ksKampanyalar=(data.kampanyalar||[]).map(k=>({...k, _kaydet:true}));
-    if(!window.ksKampanyalar.length){ msg.className="msg bad"; msg.textContent="Kampanya bulunamadı. Dosyayı kontrol et."; return; }
-    msg.className="msg ok"; msg.textContent="✓ "+window.ksKampanyalar.length+" kampanya çıkarıldı. Aşağıda kontrol et, gerekirse düzelt, sonra kaydet.";
-    ksRenderTable();
-    $("ksKaydetRow").style.display="";
+    // "bitti" durumundakiler varsayılan olarak KAYDEDİLMEZ (mevcut kampanyayı bitirme butonu çıkar)
+    window.ksKampanyalar=(data.kampanyalar||[]).map(k=>({...k, _kaydet:(k.durum!=='bitti'&&k.durum!=='devam')}));
+    window.ksFarklar=(data.fiyat_farklari||[]).map(f=>({...f, _uygula:true}));
+    const kc=window.ksKampanyalar.length, fc=window.ksFarklar.length;
+    if(!kc&&!fc){ msg.className="msg bad"; msg.textContent="Kampanya veya fiyat farkı bulunamadı. Metni/dosyayı kontrol et."; return; }
+    msg.className="msg ok"; msg.textContent=`✓ ${kc} kampanya${fc?` + ${fc} fiyat farkı`:''} çıkarıldı. Aşağıda kontrol et.`+(kc?" Yeni kampanyaları işaretleyip kaydet.":"");
+    ksRenderTable(); ksFarkTable();
+    $("ksKaydetRow").style.display= kc? "" : "none";
   }catch(e){ msg.className="msg bad"; msg.textContent="Bağlantı hatası: "+e.message+" (aracı fonksiyon /api/kampanya-oku yüklü mü?)"; }
+}
+// Fiyat farkı tablosu: kontrol + tek tuşla perakende & BİP güncelleme
+function ksFarkTable(){
+  const box=$("ksFarkBox"); if(!box) return; const fs=window.ksFarklar||[];
+  if(!fs.length){ box.innerHTML=""; return; }
+  box.innerHTML=`<div class="card" style="background:var(--field);margin:10px 0 0;padding:12px;border:1.5px solid var(--warn)">
+    <b>💰 Fiyat farkı / BİP güncellemesi — ${fs.length} model (${markaAd(brand)})</b>
+    <div style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th style="text-align:left">Uygula</th><th style="text-align:left">Model</th><th>Yeni Perakende ₺</th><th>Yeni BİP (fark) ₺</th></tr></thead><tbody>
+    ${fs.map((f,i)=>`<tr><td style="text-align:left"><input type="checkbox" ${f._uygula?'checked':''} onchange="window.ksFarklar[${i}]._uygula=this.checked"></td>
+      <td style="text-align:left"><b>${f.model_kodu}</b></td>
+      <td class="num"><input type="number" value="${f.yeni_perakende||''}" style="width:110px" oninput="window.ksFarklar[${i}].yeni_perakende=+this.value"></td>
+      <td class="num"><input type="number" value="${f.fark||''}" style="width:110px" oninput="window.ksFarklar[${i}].fark=+this.value"></td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="row" style="margin-top:8px"><button class="sm" onclick="ksFarkOnayIste()">✓ Seçilileri uygula (perakende + BİP)</button><span id="ksFarkMsg" class="msg"></span></div>
+  </div>`;
+}
+function ksFarkOnayIste(){
+  const fs=(window.ksFarklar||[]).filter(f=>f._uygula&&f.model_kodu); const m=$("ksFarkMsg");
+  if(!fs.length){ m.className="msg bad"; m.textContent="Uygulanacak model seçilmedi."; return; }
+  m.className="msg"; m.innerHTML=`⚠ <b>${fs.length}</b> modelin perakende + BİP değeri <b>${markaAd(brand)}</b> için güncellenecek. <button class="sm" style="margin-left:6px;background:var(--ok);color:#06200f" onclick="ksFarkUygula()">✓ Evet, Uygula</button> <button class="ghost sm" onclick="const x=$('ksFarkMsg');x.textContent='';x.className='msg'">Vazgeç</button>`;
+}
+async function ksFarkUygula(){
+  const fs=(window.ksFarklar||[]).filter(f=>f._uygula&&f.model_kodu); const m=$("ksFarkMsg");
+  m.className="msg"; m.textContent="Güncelleniyor...";
+  const donem=aktifDonem||_donem(); let ok=0; const err=[];
+  for(const f of fs){ const kod=(f.model_kodu||'').toUpperCase(); let hata=false;
+    if(+f.yeni_perakende>0){ const r=await sb.from("perakende_fiyatlar").upsert({model_kodu:kod,marka:brand,donem,nakit_fiyat:+f.yeni_perakende},{onConflict:"model_kodu,marka,donem"}); if(r.error){ err.push(kod); hata=true; } }
+    if(!hata && +f.fark>0){ const r2=await sb.from("bip").upsert({model_kodu:kod,marka:brand,donem,bip_tutar:+f.fark},{onConflict:"model_kodu,marka,donem"}); if(r2.error){ err.push(kod); hata=true; } }
+    if(!hata) ok++; }
+  m.className= err.length?"msg bad":"msg ok";
+  m.textContent= `✓ ${ok} model güncellendi — yeni fiyatlar ANINDA geçerli.`+(err.length?` ⚠ Hata: ${[...new Set(err)].join(', ')}`:'');
+}
+// "Bitti" denilen kampanyayı sistemde bul ve süresini dünle bitir
+async function ksMevcutBitir(i){
+  const k=(window.ksKampanyalar||[])[i]; if(!k) return; const msg=$("ksMsg");
+  const {data}=await sb.from("kampanyalar").select("id,ad,bitis_tarihi").eq("marka",brand);
+  const hedefTk=tkc(k.ad||"");
+  const bugun=_bugun();
+  const aday=(data||[]).filter(x=>(!x.bitis_tarihi||x.bitis_tarihi>=bugun) && (tkc(x.ad).includes(hedefTk.slice(0,12))||hedefTk.includes(tkc(x.ad).slice(0,12))));
+  if(!aday.length){ msg.className="msg bad"; msg.textContent=`"${k.ad}" adına benzeyen aktif kampanya bulunamadı — Kampanyalar listesinden elle bitir.`; return; }
+  const dun=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  for(const a of aday){ await sb.from("kampanyalar").update({bitis_tarihi:dun}).eq("id",a.id); }
+  msg.className="msg ok"; msg.textContent=`✓ Bitirildi: ${aday.map(a=>a.ad).join(" · ")}`;
+  loadKampanyalar(); loadAktifKampanyalar();
 }
 const KS_MATCH=["any2","all","all+any","xl+xxl","model_list","tumu"];
 function ksRenderTable(){
@@ -1637,6 +1740,8 @@ function ksRenderTable(){
       <label style="display:flex;align-items:center;gap:6px;font-weight:700"><input type="checkbox" ${k._kaydet?'checked':''} onchange="window.ksKampanyalar[${i}]._kaydet=this.checked;ksRenderTable()"> Kaydet</label>
       <input value="${(k.ad||'').replace(/"/g,'&quot;')}" placeholder="Kampanya adı" style="flex:1;min-width:220px;font-weight:700" oninput="window.ksKampanyalar[${i}].ad=this.value">
       <span class="badge" style="font-size:9px">${brand}</span>
+      ${k.durum==='bitti'?`<span class="badge" style="font-size:10px;background:var(--bad);color:#fff;border-color:var(--bad)">BİTTİ</span> <button class="ghost sm" onclick="ksMevcutBitir(${i})">Sistemdeki kampanyayı bitir</button>`:''}
+      ${k.durum==='devam'?`<span class="badge" style="font-size:10px;background:rgba(34,197,94,.2);color:var(--ok)">DEVAM — sistemde zaten varsa tekrar kaydetme</span>`:''}
     </div>
     <div class="row" style="margin-top:8px;gap:12px">
       <div class="fld"><label>Tür (match)</label><select onchange="window.ksKampanyalar[${i}].match_type=this.value">${KS_MATCH.map(m=>`<option value="${m}" ${k.match_type===m?'selected':''}>${m}</option>`).join("")}</select></div>
@@ -1649,6 +1754,7 @@ function ksRenderTable(){
       <div class="fld" style="flex:1"><label>Kategoriler (virgülle)</label><input value="${(k.kategoriler||[]).join(', ')}" style="width:100%" oninput="window.ksKampanyalar[${i}].kategoriler=this.value.split(',').map(s=>s.trim()).filter(Boolean)"></div>
     </div>
     <div class="row" style="margin-top:8px"><div class="fld" style="flex:1"><label>Seçili modeller (${(k.secili_modeller||[]).length} adet, virgülle)</label><textarea style="width:100%;min-height:46px;font-size:12px" oninput="window.ksKampanyalar[${i}].secili_modeller=this.value.split(/[,\\n]/).map(s=>s.trim().toUpperCase()).filter(Boolean)">${(k.secili_modeller||[]).join(', ')}</textarea></div></div>
+    <div class="row" style="margin-top:8px"><div class="fld" style="flex:1"><label>HARİÇ modeller (${(k.haric_modeller||[]).length} adet, virgülle) — bu kodlar kampanyaya GİREMEZ</label><textarea style="width:100%;min-height:36px;font-size:12px" oninput="window.ksKampanyalar[${i}].haric_modeller=this.value.split(/[,\\n]/).map(s=>s.trim().toUpperCase()).filter(Boolean)">${(k.haric_modeller||[]).join(', ')}</textarea></div></div>
     <div class="row" style="margin-top:8px"><div class="fld" style="flex:1"><label>Birleşme kuralı (kurallar)</label><textarea style="width:100%;min-height:40px;font-size:12px" oninput="window.ksKampanyalar[${i}].kurallar=this.value">${(k.kurallar||'').replace(/</g,'&lt;')}</textarea></div></div>
   </div>`).join("");
 }
@@ -1668,7 +1774,7 @@ async function ksGercekKaydet(){
   btn.disabled=true; msg.className="msg"; msg.textContent="Kaydediliyor...";
   try{
     const rows=ks.map(k=>({ad:k.ad.trim(),marka:brand,match_type:k.match_type||"all",kategoriler:k.kategoriler||[],
-      secili_modeller:k.secili_modeller||[],musteri_indirimi:+k.musteri_indirimi||0,hakedis:+k.hakedis||0,
+      secili_modeller:k.secili_modeller||[],haric_modeller:k.haric_modeller||[],musteri_indirimi:+k.musteri_indirimi||0,hakedis:+k.hakedis||0,
       kota:+k.kota||null,bitis_tarihi:k.bitis_tarihi||null,kurallar:k.kurallar||null,donem:_donem(),aktif:true}));
     const {error}=await sb.from("kampanyalar").insert(rows); if(error) throw new Error(error.message);
     msg.className="msg ok"; msg.textContent="✓ "+rows.length+" kampanya kaydedildi.";
