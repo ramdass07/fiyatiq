@@ -117,6 +117,49 @@
   tfoot th{border-top:1px solid color-mix(in srgb,var(--brand) 22%,var(--line));font-size:13px}
   header{border-bottom:1px solid color-mix(in srgb,var(--brand) 18%,var(--line))}
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<style>
+/* ===== ARAYÜZ v3 — modern görünüm (Inter, yumuşak kartlar, cam toplam çubuğu) ===== */
+*{font-family:'Inter',system-ui,Segoe UI,Roboto,sans-serif}
+body{background:
+ radial-gradient(1100px 520px at 85% -10%, color-mix(in srgb,var(--brand) 13%,transparent), transparent 62%),
+ radial-gradient(800px 480px at -5% 8%, rgba(34,197,94,.05), transparent 55%),
+ linear-gradient(180deg,#0b1120,#0f172a 40%);background-attachment:fixed}
+header{padding:13px 26px;background:rgba(15,23,42,.72);backdrop-filter:blur(14px) saturate(1.3)}
+header .brand{font-size:24px;letter-spacing:.5px}
+main{max-width:1240px;padding:26px 26px 120px}
+.card{border-radius:18px;border:1px solid rgba(148,163,184,.14);padding:20px 22px;
+ background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.004)),#141e30;
+ box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 18px 40px -18px rgba(0,0,0,.6)}
+.card:hover{border-color:rgba(148,163,184,.22)}
+.card h2{font-size:14.5px;font-weight:800;letter-spacing:.3px;color:#f1f5f9}
+button{border-radius:11px;font-weight:700;letter-spacing:.2px;padding:9px 16px;
+ background:linear-gradient(180deg,var(--brand),var(--brand2));color:var(--brandink)}
+button.ghost{background:rgba(255,255,255,.02);color:var(--txt)}
+select,input,textarea{border-radius:10px;background:#0a101d;border-color:rgba(148,163,184,.18);padding:9px 12px}
+th{font-size:11px;letter-spacing:.7px;color:#7e8ca3;font-weight:700}
+th,td{padding:9px 11px}
+#gridWrap{border:1px solid rgba(148,163,184,.1);border-radius:14px;padding:0 10px 6px;background:rgba(10,16,29,.4)}
+#grid tbody tr:hover td{background:color-mix(in srgb,var(--brand) 9%,transparent)}
+.totalsCard{border-radius:18px;backdrop-filter:blur(14px);
+ background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 9%,rgba(20,30,48,.92)),rgba(20,30,48,.96));
+ border:1px solid color-mix(in srgb,var(--brand) 35%,rgba(148,163,184,.2));
+ box-shadow:0 22px 50px -18px rgba(0,0,0,.75), 0 0 0 1px color-mix(in srgb,var(--brand) 12%,transparent) inset}
+.big{font-size:26px;font-weight:900}
+.seg{border-radius:12px;padding:3px;gap:2px;background:#0a101d}
+.seg button{border-radius:9px;padding:7px 20px}
+.badge{border-radius:8px;font-weight:600}
+.diva-uyari{border-radius:12px;background:linear-gradient(90deg,rgba(245,158,11,.16),rgba(245,158,11,.06));border-left:4px solid var(--warn)}
+.chip{border-radius:10px;padding:4px 12px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:rgba(148,163,184,.25);border-radius:99px;border:2px solid #0f172a}
+::-webkit-scrollbar-track{background:transparent}
+.uyari-kritik{border-radius:14px}
+h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+.login .card{backdrop-filter:blur(10px)}
+.login .brand{font-size:46px}
+</style>
 </head>
 <body class="brand-siemens">
 
@@ -124,7 +167,7 @@
 
 <div id="loginView" class="login" style="display:none">
   <h1 class="brand">fiyat<span class="q">iq</span></h1>
-  <div class="slogan">Çok bayili fiyat & teklif sistemi</div>
+  <div class="slogan">Akıllı fiyat & teklif sistemi</div>
   <div class="card" id="loginCard">
     <input id="email" type="email" placeholder="E-posta">
     <input id="pass" type="password" placeholder="Şifre">
