@@ -772,13 +772,14 @@ function renderRows(){
   const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
   tb.innerHTML="";
   let tMaliyet=0,tBip=0,tBipli=0,tAdet=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
-  // Maliyeti OLMAYAN ürünler (FL'de toptan yok + Manuel toptan da girilmemiş) — kâr hesabı bunlarsız YANILTICI olur
-  const uyMaliyetsiz=quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —" && !(r.isET?(+r.etToptan>0):(+r.toptan>0))).map(r=>r.kod);
+  // Maliyeti OLMAYAN ürünler (FL'de toptan yok / kod tanınmadı, Manuel toptan da girilmemiş) — kâr hesabı bunlarsız YANILTICI olur
+  const uyMaliyetsiz=quoteRows.filter(r=>r.kod && !(r.isET?(+r.etToptan>0):(+r.toptan>0))).map(r=>r.kod);
   quoteRows.forEach((r,i)=>{
     const p=calcParts(r,kar,komis);
     r.nakit=p.unitNakit; r.taksit=p.unitTaksit; r.maliyet=p.unitToptan; r.kar=p.karPct;
     const maliyetL=p.unitToptan*p.adet, bipL=p.unitBip*p.adet, nakitL=p.unitNakit*p.adet, taksitL=p.unitTaksit*p.adet;
-    const valid = r.kod && r.ad!=="— bulunamadı —" && (r.isET? (+r.etToptan>0) : (+r.toptan>0));
+    if(r.isET && +r.etToptan>0 && r.ad==="— bulunamadı —") r.ad=r.kod; // elle maliyet girilince kod adıyla geçerli olur
+    const valid = r.kod && (r.isET ? (+r.etToptan>0) : (r.ad!=="— bulunamadı —" && +r.toptan>0));
     if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0);
       if(!r.isET && r.netStok!=null){ if(r.netStok<=0) uyStokYok.push(r.kod); else if(r.netStok<=3) uyKritik.push(r.kod+" ("+r.netStok+" adet)"); }
       if(p.karPesin<0) uyZararSatir.push(r.kod); }
