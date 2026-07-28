@@ -682,7 +682,8 @@ async function bayiStokYukle(){
 
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
-function addRow(){ quoteRows.push({kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}); renderRows(); }
+function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}; }
+function addRow(){ quoteRows.push(bosSatir()); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
 function toggleManuel(i){
@@ -761,6 +762,13 @@ function calcParts(r,kar,komis){
 }
 function renderRows(){
   const tb=$("rows"); if(!tb) return;
+  // Sepet TAMAMEN boşaldıysa alt panel sıfırlanır: eski hesap asılı kalmaz, yeni müşteriye temiz başlanır
+  if(quoteRows.length===0) quoteRows.push(bosSatir());
+  if(!quoteRows.some(r=>r.kod)){
+    if(manuelToplamPesin!=null||manuelToplamTaksit!=null){ manuelToplamPesin=null; manuelToplamTaksit=null;
+      const a=$("mtPesin"); if(a) a.value=""; const b=$("mtTaksit"); if(b) b.value=""; }
+    if(secilenKampanya.size) secilenKampanya.clear();
+  }
   const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
   tb.innerHTML="";
   let tMaliyet=0,tBip=0,tBipli=0,tAdet=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
@@ -845,7 +853,9 @@ function renderRows(){
   if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||bankaTaksitli||anyMT||manuelToplamTaksit!=null)? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= ((komis>0||bankaTaksitli||manuelToplamTaksit!=null)&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
   if($("komShow")) $("komShow").textContent= (komis>0||bankaTaksitli)? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
-  if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px"; e.innerHTML = tBipli<=0?'—':('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):'')); }
+  if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px";
+    e.innerHTML = tBipli>0 ? ('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):''))
+      : (finalNakit>0 ? '<span class="warn" style="font-size:11px;font-weight:700" title="Kâr hesabı için maliyet gerekli">⚠ maliyet girilmedi<br><span class="mut" style="font-weight:400">satırda Manuel → toptan gir</span></span>' : '—'); }
   renderUyarilar(uyStokYok,uyKritik,uyZararSatir,karPesinTot,tAdet>0&&tBipli>0);
   const kr=$("kampInfoRow");
   if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}${dokumHTML(dag)}`; }
