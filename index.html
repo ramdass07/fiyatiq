@@ -210,8 +210,8 @@
     </div>
     <div class="row" id="manuelToplamRow" style="margin-top:10px;gap:12px;align-items:flex-end;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:10px">
       <span class="mut" style="font-size:12px;align-self:center">✏️ Manuel Fiyat:</span>
-      <div class="fld"><label style="color:var(--acc)">Manuel Peşin Fiyat</label><input id="mtPesin" type="number" placeholder="oto" style="width:140px" oninput="setManuelToplam('pesin',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></div>
-      <div class="fld"><label style="color:var(--acc)">Manuel Taksitli Fiyat</label><input id="mtTaksit" type="number" placeholder="oto" style="width:140px" oninput="setManuelToplam('taksit',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></div>
+      <div class="fld"><label style="color:var(--acc)">Manuel Peşin Fiyat</label><input id="mtPesin" type="text" inputmode="decimal" placeholder="oto" style="width:140px" oninput="setManuelToplam('pesin',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></div>
+      <div class="fld"><label style="color:var(--acc)">Manuel Taksitli Fiyat</label><input id="mtTaksit" type="text" inputmode="decimal" placeholder="oto" style="width:140px" oninput="setManuelToplam('taksit',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></div>
       <button class="ghost sm" onclick="setManuelToplam('sifirla')">↺ Otomatiğe dön</button>
       <span id="mtNot" class="mut" style="font-size:11px;align-self:center;color:var(--acc)"></span>
     </div>
@@ -781,13 +781,13 @@ function renderRows(){
       if(!r.isET && r.netStok!=null){ if(r.netStok<=0) uyStokYok.push(r.kod); else if(r.netStok<=3) uyKritik.push(r.kod+" ("+r.netStok+" adet)"); }
       if(p.karPesin<0) uyZararSatir.push(r.kod); }
     const maliyetCell = r.isET
-      ? `<input type="number" value="${r.etToptan||''}" placeholder="toptan" style="width:78px" onchange="quoteRows[${i}].etToptan=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="text" inputmode="decimal" value="${r.etToptan||''}" placeholder="toptan" style="width:78px" onchange="quoteRows[${i}].etToptan=trSayi(this.value)||0;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(maliyetL);
     const pesinCell = r.isET
-      ? `<input type="number" value="${r.manuelFiyat||''}" placeholder="oto:${fmt(p.unitNakit)}" title="Boş = kâr oranından otomatik peşin. Elle yazarsan o fiyat geçerli olur." style="width:92px" onchange="quoteRows[${i}].manuelFiyat=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="text" inputmode="decimal" value="${r.manuelFiyat||''}" placeholder="oto:${fmt(p.unitNakit)}" title="Boş = kâr oranından otomatik peşin. Elle yazarsan o fiyat geçerli olur." style="width:92px" onchange="quoteRows[${i}].manuelFiyat=trSayi(this.value)||0;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : `${fmt(nakitL)}${r.kod?` <a href="${araLink(r.kod)}" target="_blank" title="sitede ara" style="text-decoration:none">🔍</a>`:""}`;
     const taksitCell = r.isET
-      ? `<input type="number" value="${r.manuelTaksit||''}" placeholder="oto:${fmt(p.unitTaksit)}" title="Boş = otomatik taksitli. Elle yazarsan o taksitli fiyat geçerli olur." style="width:92px" onchange="quoteRows[${i}].manuelTaksit=+this.value;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
+      ? `<input type="text" inputmode="decimal" value="${r.manuelTaksit||''}" placeholder="oto:${fmt(p.unitTaksit)}" title="Boş = otomatik taksitli. Elle yazarsan o taksitli fiyat geçerli olur." style="width:92px" onchange="quoteRows[${i}].manuelTaksit=trSayi(this.value)||0;recalc()" onkeydown="if(event.key==='Enter')this.blur()">`
       : fmt(taksitL);
     const satirTaksitVar = komis>0 || (r.isET && +r.manuelTaksit>0);
     const karCell = !valid ? '<span class="mut">—</span>' : ('P '+karBadge(p.karPesin) + (satirTaksitVar? '<br>T '+karBadge(p.karTaksit):''));
@@ -885,10 +885,18 @@ function renderUyarilar(stokYok, kritik, zararSatir, karPesinTot, hasValid){
 }
 // ===== ELLE NİHAİ FİYAT (pazarlık) — peşin ve/veya taksitli ezme =====
 let manuelToplamPesin=null, manuelToplamTaksit=null;
+// Türkçe sayı yazımını doğru anla: "153.000" = 153000 (binlik nokta), "153,5" = 153.5 (ondalık virgül)
+function trSayi(v){
+  v=String(v==null?'':v).trim().replace(/\s/g,'').replace(/₺|tl/gi,'');
+  if(!v) return null;
+  v=v.replace(/\.(?=\d{3}(\D|$))/g,'');   // 3'lü grup önündeki noktalar = binlik ayracı, at
+  v=v.replace(',','.');                     // virgül = ondalık
+  const n=+v; return isNaN(n)?null:n;
+}
 function setManuelToplam(hangi,val){
   if(hangi==='sifirla'){ manuelToplamPesin=null; manuelToplamTaksit=null; const a=$("mtPesin"),b=$("mtTaksit"); if(a)a.value=""; if(b)b.value=""; }
-  else if(hangi==='pesin'){ manuelToplamPesin=(val===''||val==null)?null:(+val||0); }
-  else if(hangi==='taksit'){ manuelToplamTaksit=(val===''||val==null)?null:(+val||0); }
+  else if(hangi==='pesin'){ const n=trSayi(val); manuelToplamPesin=(n==null)?null:n; }
+  else if(hangi==='taksit'){ const n=trSayi(val); manuelToplamTaksit=(n==null)?null:n; }
   renderRows();
 }
 // ===== KAMPANYA OTOMATİK UYGULAMA (teklif ekranı) =====
