@@ -677,27 +677,37 @@ async function bankaExcelYukle(){
 
 // ===== BAYİLER =====
 async function loadBayiler(){
-  const {data} = await sb.from("profiller").select("id,ad,magaza,rol,abonelik_durumu,marka_erisimi").order("created_at",{ascending:false});
+  const {data} = await sb.from("profiller").select("id,ad,magaza,rol,abonelik_durumu,marka_erisimi,bayi_sahibi").order("created_at",{ascending:false});
   const tb=$("bayiList"); if(!tb) return;
   window._bayiCache={}; (data||[]).forEach(p=>window._bayiCache[p.id]=p);
   tb.innerHTML=(data||[]).map(p=>{
     const aktif=p.abonelik_durumu==="aktif"; const mset=new Set(p.marka_erisimi||[]);
-    const mk=(p.marka_erisimi||[]).join(", ")||"—";
+    const sube=p.bayi_sahibi!=null;
+    const mk=((p.marka_erisimi||[]).join(", ")||"—")+(sube?' · 🏬':'');
     const mBtn=(marka,ad,renk,acikRenk)=>{ const on=mset.has(marka);
       return `<button class="ghost sm" title="${on?ad+' erişimi AÇIK — kapatmak için tıkla':ad+' erişimi kapalı — açmak için tıkla'}" style="${on?`background:${renk};border-color:${acikRenk};color:${acikRenk};font-weight:800`:''}" onclick="setBayiMarka('${p.id}','${marka}')">${on?'✓ ':''}${ad}</button>`; };
+    const subeBtn=`<button class="ghost sm" title="${sube?'ŞUBEN: şirketin ORTAK stok havuzunu ve primli listesini görür. Bağımsız yapmak için tıkla.':'BAĞIMSIZ bayi: kendi stok havuzu vardır, senin stoklarını GÖREMEZ. Şuben yapmak için tıkla.'}" style="${sube?'background:rgba(56,189,248,.22);border-color:var(--acc);color:var(--acc);font-weight:800':''}" onclick="setBayiSube('${p.id}',${sube?'false':'true'})">${sube?'🏬 Şubem':'Bağımsız'}</button>`;
     return `<tr>
       <td><b>${p.ad||"—"}</b><div class="mut" style="font-size:12px">${p.magaza||""}</div></td>
       <td>${mk}</td><td>${p.rol}</td>
       <td><span class="pill ${aktif?'aktif':'pasif'}">${p.abonelik_durumu}</span></td>
       <td>${p.rol==='admin' ? '<span class="badge">👑 Yönetici — her zaman aktif</span>' : `
         <button class="sm ${aktif?'bad':''}" title="${aktif?'Bu bayinin erişimini kapatır':'Bu bayinin erişimini açar'}" onclick="setBayiDurum('${p.id}','${aktif?'pasif':'aktif'}')">${aktif?'Pasif Yap':'Aktif Yap'}</button>
+        ${subeBtn}
         ${mBtn('siemens','Siemens','rgba(34,211,238,.22)','#67e8f9')}
         ${mBtn('bosch','Bosch','rgba(244,63,94,.22)','#fda4af')}
         <button class="ghost sm" onclick="setBayiRol('${p.id}','${p.rol==='personel'?'bayi':'personel'}')">${p.rol==='personel'?'Bayi yap':'Personel yap'}</button>
         <button class="bad sm" onclick="silBayi('${p.id}','${(p.ad||'').replace(/'/g,'')}')">Sil</button>`}
       </td></tr>`;
   }).join("");
-  const msg=$("bayiMsg"); if(msg && !msg.textContent) { msg.className="mut"; msg.style.fontSize="11px"; msg.textContent="✓ işaretli marka bayide AÇIK demektir; tıklayınca açılır/kapanır (ikisi birden açılabilir). Değişiklik, bayi sayfayı yenileyince yansır."; }
+  const msg=$("bayiMsg"); if(msg) { msg.className="mut"; msg.style.fontSize="11px"; msg.textContent="🏬 Şubem = şirketin ORTAK stok havuzunu görür (9 mağazan için). Bağımsız = kendi stoğunu kendi yükler, seninkileri göremez. ✓ işaretli marka açıktır. Değişiklikler bayi sayfayı yenileyince yansır."; }
+}
+// Şube / Bağımsız geçişi: şube = bayi_sahibi ADMIN'e bağlanır → ortak stok/primli havuzu
+async function setBayiSube(id,yap){
+  const {data:{user}}=await sb.auth.getUser();
+  const {error}=await sb.from("profiller").update({bayi_sahibi: (yap==='true'||yap===true) ? user.id : null}).eq("id",id);
+  if(error){ alert("Kaydedilemedi: "+error.message); return; }
+  loadBayiler();
 }
 async function setBayiDurum(id,durum){ await sb.from("profiller").update({abonelik_durumu:durum}).eq("id",id); loadBayiler(); }
 // Marka butonları AÇ/KAPA çalışır: tıklanan marka ekleniyor/çıkarılıyor; en az bir marka açık kalmalı
