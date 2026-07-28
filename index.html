@@ -772,6 +772,8 @@ function renderRows(){
   const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
   tb.innerHTML="";
   let tMaliyet=0,tBip=0,tBipli=0,tAdet=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
+  // Maliyeti OLMAYAN ürünler (FL'de toptan yok + Manuel toptan da girilmemiş) — kâr hesabı bunlarsız YANILTICI olur
+  const uyMaliyetsiz=quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —" && !(r.isET?(+r.etToptan>0):(+r.toptan>0))).map(r=>r.kod);
   quoteRows.forEach((r,i)=>{
     const p=calcParts(r,kar,komis);
     r.nakit=p.unitNakit; r.taksit=p.unitTaksit; r.maliyet=p.unitToptan; r.kar=p.karPct;
@@ -840,23 +842,29 @@ function renderRows(){
   const mtP=$("mtPesin"), mtT=$("mtTaksit"), mtN=$("mtNot");
   if(mtP && manuelToplamPesin==null) mtP.placeholder="oto: "+fmt(autoNakit);
   if(mtT && manuelToplamTaksit==null) mtT.placeholder="oto: "+fmt(autoTaksit);
-  if(mtN) mtN.textContent=(manuelToplamPesin!=null||manuelToplamTaksit!=null)?"● Manuel fiyat aktif — kâr bu fiyata göre":"";
+  if(mtN) mtN.innerHTML=(manuelToplamPesin!=null||manuelToplamTaksit!=null)
+    ? (uyMaliyetsiz.length
+        ? `● Manuel fiyat aktif — <span class="blink">⚠ ${uyMaliyetsiz.join(", ")} maliyetsiz, kâr hesaplanamaz</span>`
+        : `● Manuel fiyat aktif — KÂR: <b style="font-size:14px">Peşin ${karBadge(karPesinTot)}${hasTaksitTot?' · Taksit '+karBadge(karTaksitTot):''}</b>`)
+    : "";
   lastTot={finalNakit,finalTaksit,karPct,komis,hakedis,musteriInd,tMaliyet,dip,appliedNames:applied.map(k=>k.ad),baseNakit,baseTaksit,manuelP:manuelToplamPesin,manuelT:manuelToplamTaksit,dagilim:dag.dagilim||{}};
   $("tAdet").textContent=fmt(tAdet);
   $("tMaliyet").textContent=fmt(tMaliyet);
   $("tBip").textContent=fmt(tBip);
   $("tNakit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0));
   $("tTaksit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0));
-  const tKarEl=$("tKar"); if(tKarEl){ tKarEl.className="num"; tKarEl.style.fontSize="12px"; tKarEl.style.lineHeight="1.3"; tKarEl.innerHTML = tBipli<=0?'—':('P '+karBadge(karPesinTot)+(hasTaksitTot?'<br>T '+karBadge(karTaksitTot):'')); }
+  const maliyetUyariHTML='<span class="blink" style="font-size:11px" title="Maliyeti olmayan ürün var — kâr hesabı yanıltıcı olur. Satırdaki toptan kutusuna maliyeti gir.">⚠ MALİYETSİZ ÜRÜN<br><span style="font-weight:400">kâr hesaplanamaz</span></span>';
+  const tKarEl=$("tKar"); if(tKarEl){ tKarEl.className="num"; tKarEl.style.fontSize="12px"; tKarEl.style.lineHeight="1.3"; tKarEl.innerHTML = uyMaliyetsiz.length? maliyetUyariHTML : (tBipli<=0?'—':('P '+karBadge(karPesinTot)+(hasTaksitTot?'<br>T '+karBadge(karTaksitTot):''))); }
   const anyMT=hasTaksitTot;
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
   if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||bankaTaksitli||anyMT||manuelToplamTaksit!=null)? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= ((komis>0||bankaTaksitli||manuelToplamTaksit!=null)&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
   if($("komShow")) $("komShow").textContent= (komis>0||bankaTaksitli)? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px";
-    e.innerHTML = tBipli>0 ? ('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):''))
-      : (finalNakit>0 ? '<span class="warn" style="font-size:11px;font-weight:700" title="Kâr hesabı için maliyet gerekli">⚠ maliyet girilmedi<br><span class="mut" style="font-weight:400">satırda Manuel → toptan gir</span></span>' : '—'); }
-  renderUyarilar(uyStokYok,uyKritik,uyZararSatir,karPesinTot,tAdet>0&&tBipli>0);
+    e.innerHTML = uyMaliyetsiz.length ? maliyetUyariHTML
+      : (tBipli>0 ? ('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):''))
+      : (finalNakit>0 ? '<span class="warn" style="font-size:11px;font-weight:700" title="Kâr hesabı için maliyet gerekli">⚠ maliyet girilmedi<br><span class="mut" style="font-weight:400">satırda Manuel → toptan gir</span></span>' : '—')); }
+  renderUyarilar(uyStokYok,uyKritik,uyZararSatir,karPesinTot,tAdet>0&&tBipli>0&&!uyMaliyetsiz.length,uyMaliyetsiz);
   const kr=$("kampInfoRow");
   if(kr){ if(applied.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${applied.length} kampanya UYGULANDI: müşteri indirimi <b style="color:var(--ok)">${fmt(musteriInd)} ₺</b> · hakediş <b style="color:var(--acc)">${fmt(hakedis)} ₺</b> dip maliyete işlendi.${uygunsuzSecili.length?` <span style="color:var(--bad)">⚠ ${uygunsuzSecili.length} tanesi sepete uygun değil — mutlaka Diva kontrolü yapın.</span>`:''}${dokumHTML(dag)}`; }
     else if(ks.length){ kr.style.display=""; $("kampInfo").innerHTML=`🎁 ${ks.length} kampanya uygun olabilir — panelden <b>"Uygula"</b> de.`; }
@@ -864,9 +872,12 @@ function renderRows(){
   renderKampanyaPanel();
 }
 // Satış uyarıları: stok yok / kritik stok / düşük kâr — büyük kırmızı yanıp söner
-function renderUyarilar(stokYok, kritik, zararSatir, karPesinTot, hasValid){
+function renderUyarilar(stokYok, kritik, zararSatir, karPesinTot, hasValid, maliyetsiz){
   const box=$("uyariKutu"); if(!box) return;
   const parts=[];
+  if(maliyetsiz&&maliyetsiz.length){
+    parts.push(`<div class="uyari-kritik"><span class="big-red">⛔ FİYATSIZ ÜRÜN</span><span><b>${maliyetsiz.join(", ")}</b> — FL'de toptan fiyatı YOK, kâr hesabı yapılamıyor. Satırdaki <b>toptan kutusuna maliyeti gir</b>, yoksa bu teklife güvenme!</span></div>`);
+  }
   if(stokYok.length){
     parts.push(`<div class="uyari-kritik"><span class="big-red">⛔ STOKSUZ ÜRÜN</span><span><b>${stokYok.join(", ")}</b> hiçbir depoda yok — satmadan önce stok/tedarik teyidi al.</span></div>`);
   }
@@ -1099,6 +1110,7 @@ async function refetch(r){
   if(row && (row.urun_adi || row.toptan_fiyat!=null)){
     r.ad=row.urun_adi||r.kod; r.toptan=row.toptan_fiyat; r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
     if(row.toptan_fiyat!=null) r.isET=false;
+    else if(!(+r.etToptan>0)) r.isET=true; // üründe TOPTAN YOK → otomatik Manuel moda geç, maliyet elle girilsin
   } else { r.ad = pr ? r.kod : "— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; } // primli ama listede yoksa: kodu göster, manuel toptan
   r.marsMevcut=r.horozMevcut=r.kadikoyMevcut=r.marsAyrilan=r.horozAyrilan=null; r.sKadikoy=0; r.netStok=null;
   {
