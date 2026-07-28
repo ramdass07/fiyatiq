@@ -260,6 +260,35 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
     </div>
     <div class="row" id="kampInfoRow" style="margin-top:6px;display:none"><span id="kampInfo" class="mut" style="font-size:12px"></span></div>
     </div>
+    <div class="card" id="siparisBilgiCard">
+      <h2 style="cursor:pointer;user-select:none;margin:0" onclick="const b=$('sbBody');const kapali=b.style.display==='none';b.style.display=kapali?'':'none';$('sbArrow').textContent=kapali?'▼':'▶'"><span id="sbArrow">▶</span> 📋 Müşteri & Sipariş Bilgileri <span class="badge">sipariş formuna yazılır</span></h2>
+      <div id="sbBody" style="display:none;margin-top:12px">
+        <div class="row">
+          <div class="fld"><label>Müşteri Adı Soyadı</label><input id="mAd" style="width:220px"></div>
+          <div class="fld"><label>GSM 1</label><input id="mTel" style="width:145px" inputmode="tel"></div>
+          <div class="fld"><label>GSM 2</label><input id="mGsm2" style="width:145px" inputmode="tel"></div>
+          <div class="fld"><label>TC Kimlik No</label><input id="mTC" style="width:145px" maxlength="11" inputmode="numeric"></div>
+          <div class="fld"><label>E-posta</label><input id="mEmail" style="width:200px"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="fld"><label>Sipariş Tarihi</label><input id="mSipT" type="date"></div>
+          <div class="fld"><label>Sevk Tarihi</label><input id="mSevkT" type="date"></div>
+          <div class="fld"><label>Tahmini Teslim</label><input id="mTesT" type="date"></div>
+          <div class="fld"><label>İleri Teslim</label><input id="mIleriT" type="date"></div>
+          <div class="fld"><label>Ödeme Şekli</label><select id="mOdeme"><option value=""></option><option>E-FLOW</option><option>EXCEL</option><option>VİRMAN</option><option>HAVALE</option><option>KREDİ KARTI</option><option>NAKİT</option></select></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="fld"><label>İlçe / İl</label><input id="mIlceIl" style="width:200px" placeholder="Üsküdar / İstanbul"></div>
+          <div class="fld" style="flex:1;min-width:300px"><label>Sevk Adresi</label><input id="mSevkAdres" style="width:100%"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="fld"><label>Şirket Ünvanı (faturalıysa)</label><input id="mUnvan" style="width:230px"></div>
+          <div class="fld" style="flex:1;min-width:240px"><label>Fatura Adresi</label><input id="mFaturaAdres" style="width:100%"></div>
+          <div class="fld"><label>Vergi No</label><input id="mVergiNo" style="width:130px"></div>
+          <div class="fld"><label>Vergi Dairesi</label><input id="mVergiD" style="width:140px"></div>
+        </div>
+      </div>
+    </div>
     <div class="row" style="justify-content:flex-end">
       <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
       <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
@@ -302,7 +331,12 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
         <span id="depoAdiMsg" class="msg"></span>
       </div>
       <p class="mut" style="font-size:12px;margin:6px 0 0">Stok tablosundaki üçüncü depo sütunu bu adla görünür ve stok dosyanın adında bu kelime geçerse otomatik tanınır. <b>Mars</b> ve <b>Horoz</b> herkes için BSH resmi lojistiğidir, değişmez.</p>
-    </div>
+      <div class="row" style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">
+        <div class="fld" style="flex:1;min-width:260px"><label>Mağaza Adresi (sipariş formunda görünür)</label><input id="mgAdres" style="width:100%" onchange="try{localStorage.setItem('fq_mg_adres',this.value)}catch(e){}"></div>
+        <div class="fld"><label>Mağaza Telefonu</label><input id="mgTel" style="width:150px" onchange="try{localStorage.setItem('fq_mg_tel',this.value)}catch(e){}"></div>
+        <div class="fld"><label>Mağaza E-postası</label><input id="mgEposta" style="width:210px" onchange="try{localStorage.setItem('fq_mg_eposta',this.value)}catch(e){}"></div>
+        <div class="fld"><label>Çağrı Merkezi</label><input id="mgCagri" style="width:120px" placeholder="444 6 333" onchange="try{localStorage.setItem('fq_mg_cagri',this.value)}catch(e){}"></div>
+      </div>
 
     <div class="card" id="bayilerCard">
       <h2>Bayiler <span class="badge">kayıt onayı / yönetim</span></h2>
@@ -476,6 +510,8 @@ async function showApp(session){
   $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent=depoAdi(); $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H";
   { let stored=null; try{stored=localStorage.getItem("fq_basit");}catch(e){} basitMod = stored!=null ? (stored==="1") : (profil.rol==="bayi"); applyGorunum(); } // bayi varsayılan basit, admin detaylı; düğmeyle değişir
   try{ const p=localStorage.getItem("fq_personel"); if(p && $("satisPersonel")) $("satisPersonel").value=p; }catch(e){}
+  try{ [["fq_mg_adres","mgAdres"],["fq_mg_tel","mgTel"],["fq_mg_eposta","mgEposta"],["fq_mg_cagri","mgCagri"]].forEach(([k,id])=>{ const v=localStorage.getItem(k); const el=$(id); if(v&&el) el.value=v; }); }catch(e){}
+  { const st=$("mSipT"); if(st&&!st.value) st.value=_bugun(); } // sipariş tarihi varsayılan bugün
   await loadAktifDonem();
   await loadPrimli();
   await loadBanks();
@@ -1347,6 +1383,47 @@ function printDoc(kind){
       <li>Satışı yapılan ürünlerin belirtilen teslim tarihinde teslim alınması önem taşımaktadır.</li>
       <li>Teslim sırasında ürünlerin ambalajını açarak ve kontrol ederek teslim almanızı önemle rica ederiz.</li>
     </ul></div>`:"";
+  // Sipariş formu: mağazanın kağıt formuyla aynı düzen (üst blok + sağ bilgi sütunu + fatura alanları)
+  const v=id=>((($(id))||{}).value||"").trim();
+  const dtr=d=>d?d.split("-").reverse().join("."):"";
+  const ls=k=>{ try{ return localStorage.getItem(k)||""; }catch(e){ return ""; } };
+  const markaBuyuk=brand==="bosch"?"BOSCH":"SIEMENS";
+  const magazaAd=(profil&&profil.magaza)||"";
+  const sipUst = kind==="siparis" ? `
+  <table style="margin-top:0;font-size:12px"><tr>
+    <td style="width:34%;text-align:center;vertical-align:top">
+      <div style="font-weight:800;font-size:15px">${magazaAd||markaBuyuk}</div>
+      <div>${ls('fq_mg_adres')}</div><div>${ls('fq_mg_tel')}</div><div>${ls('fq_mg_eposta')}</div>
+    </td>
+    <td style="width:33%;text-align:center;vertical-align:top">
+      <div style="font-weight:800;letter-spacing:2px;font-size:16px">SİPARİŞ FORMU</div>
+      <div style="font-weight:700;margin-top:2px">ÇAĞRI MERKEZİ</div>
+      <div style="font-size:18px;font-weight:800">${ls('fq_mg_cagri')||'444 6 333'}</div>
+      <div>7/24 HİZMETİNİZDE</div>
+    </td>
+    <td style="width:33%;vertical-align:top;padding:0">
+      <table style="margin:0;font-size:11.5px">
+        <tr><td style="font-weight:700">SİPARİŞ TARİHİ</td><td>${dtr(v('mSipT'))||new Date().toLocaleDateString('tr-TR')}</td></tr>
+        <tr><td style="font-weight:700">SEVK TARİHİ</td><td>${dtr(v('mSevkT'))}</td></tr>
+        <tr><td style="font-weight:700">TAHMİNİ TESLİM</td><td>${dtr(v('mTesT'))}</td></tr>
+        <tr><td style="font-weight:700">İLERİ TESLİM</td><td>${dtr(v('mIleriT'))}</td></tr>
+        <tr><td style="font-weight:700">ÖDEME</td><td>${v('mOdeme')}</td></tr>
+        <tr><td style="font-weight:700">GSM 1</td><td>${tel}</td></tr>
+        <tr><td style="font-weight:700">GSM 2</td><td>${v('mGsm2')}</td></tr>
+        <tr><td style="font-weight:700">TC NO</td><td>${v('mTC')}</td></tr>
+        <tr><td style="font-weight:700">E-MAİL</td><td>${v('mEmail')}</td></tr>
+        <tr><td style="font-weight:700">DÜZENLEYEN</td><td>${personel}</td></tr>
+      </table>
+    </td></tr></table>
+  <table style="margin-top:6px;font-size:12px">
+    <tr><td style="width:16%;font-weight:700">MÜŞTERİ ADI</td><td colspan="3">${ad}</td></tr>
+    <tr><td style="font-weight:700">İLÇE / İL</td><td colspan="3">${v('mIlceIl')}</td></tr>
+    <tr><td style="font-weight:700">SEVK ADRESİ</td><td colspan="3">${v('mSevkAdres')}</td></tr>
+    <tr><td style="font-weight:700">ŞİRKET ÜNVANI</td><td colspan="3">${v('mUnvan')}</td></tr>
+    <tr><td style="font-weight:700">FATURA ADRESİ</td><td colspan="3">${v('mFaturaAdres')}</td></tr>
+    <tr><td style="font-weight:700">VERGİ NO</td><td>${v('mVergiNo')}</td><td style="width:14%;font-weight:700">VERGİ D.</td><td>${v('mVergiD')}</td></tr>
+  </table>
+  <div style="text-align:center;font-weight:800;margin-top:10px;letter-spacing:1px">SİPARİŞ BİLGİLERİ</div>` : "";
   const w=window.open("","_blank"); if(!w){ alert("Açılır pencere engellendi."); return; }
   w.document.write(`<html><head><meta charset="utf-8"><title>${baslik}</title>
   <style>body{font-family:Arial;color:#1e293b;padding:24px}h1{color:#1e40af;text-align:center;margin:0;letter-spacing:3px;font-weight:800}
@@ -1354,8 +1431,10 @@ function printDoc(kind){
   .info{display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
   table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px}th{background:#eff6ff;color:#1e40af}
   .tot{text-align:right;font-size:18px;font-weight:800;color:#1e40af;margin-top:12px}.foot{margin-top:18px;font-size:11px;color:#64748b}</style></head>
-  <body><h1>fiyatiq</h1><div class="sub">${baslik}</div>
-  <div class="info"><div><b>Teklif No:</b> ${getTeklifNo()}</div><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div>${personel?`<div><b>Satış Personeli:</b> ${personel}</div>`:""}<div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>
+  <body>${kind==="siparis"
+    ? `<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:26px;font-weight:900">${markaBuyuk}</span><span style="font-size:20px;font-weight:900;color:#1e40af">fiyat<span style="color:#16a34a">iq</span></span></div>${sipUst}<div style="font-size:11px;color:#64748b;margin-top:2px">Teklif No: ${getTeklifNo()}</div>`
+    : `<h1>fiyatiq</h1><div class="sub">${baslik}</div>
+  <div class="info"><div><b>Teklif No:</b> ${getTeklifNo()}</div><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div>${personel?`<div><b>Satış Personeli:</b> ${personel}</div>`:""}<div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>`}
   <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>${ind>0?'<th>İndirim</th>':''}<th>Peşin Fiyat</th>${taksitliVar?'<th>Taksitli Fiyat</th>':''}</tr></thead><tbody>${tr}</tbody></table>
   ${(ind>0&&kampNames.length)?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ilgili ürünlerin fiyatlarına işlenmiştir)</div>`:(ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Toplam indirim:</b> ${fmt(ind)} ₺ (fiyatlara işlenmiştir)</div>`:"")}
   <div class="tot">PEŞİN TOPLAM: ${fmt(Math.round(finalP))} ₺${taksitliVar?`<br>TAKSİTLİ TOPLAM: ${fmt(Math.round(finalT))} ₺ &nbsp;(${bk} ${tk} Taksit — Aylık ${fmt(Math.round(finalT/tk))} ₺)`:""}</div>
