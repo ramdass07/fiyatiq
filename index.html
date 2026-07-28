@@ -275,7 +275,8 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
           <div class="fld"><label>Sevk Tarihi</label><input id="mSevkT" type="date"></div>
           <div class="fld"><label>Tahmini Teslim</label><input id="mTesT" type="date"></div>
           <div class="fld"><label>İleri Teslim</label><input id="mIleriT" type="date"></div>
-          <div class="fld"><label>Ödeme Şekli</label><select id="mOdeme"><option value=""></option><option>E-FLOW</option><option>EXCEL</option><option>VİRMAN</option><option>HAVALE</option><option>KREDİ KARTI</option><option>NAKİT</option></select></div>
+          <div class="fld"><label>Ödeme Şekli</label><select id="mOdeme"><option value=""></option><option>NAKİT</option><option>HAVALE</option><option>KREDİ KARTI</option><option>KISMİ ÖDEME</option></select></div>
+          <div class="fld"><label>Çıkış Deposu</label><select id="mCikisDepo"><option value=""></option><option>MAĞAZA</option><option id="mCikisKendi">KENDİ DEPO</option><option>HOROZ</option><option>MARS</option><option>DİĞER</option></select></div>
         </div>
         <div class="row" style="margin-top:8px">
           <div class="fld"><label>İlçe / İl</label><input id="mIlceIl" style="width:200px" placeholder="Üsküdar / İstanbul"></div>
@@ -512,6 +513,7 @@ async function showApp(session){
   try{ const p=localStorage.getItem("fq_personel"); if(p && $("satisPersonel")) $("satisPersonel").value=p; }catch(e){}
   try{ [["fq_mg_adres","mgAdres"],["fq_mg_tel","mgTel"],["fq_mg_eposta","mgEposta"],["fq_mg_cagri","mgCagri"]].forEach(([k,id])=>{ const v=localStorage.getItem(k); const el=$(id); if(v&&el) el.value=v; }); }catch(e){}
   { const st=$("mSipT"); if(st&&!st.value) st.value=_bugun(); } // sipariş tarihi varsayılan bugün
+  { const ck=$("mCikisKendi"); if(ck){ ck.textContent=depoAdi().toUpperCase(); ck.value=depoAdi().toUpperCase(); } } // çıkış deposu: kendi depo adı (Kadıköy vb.)
   await loadAktifDonem();
   await loadPrimli();
   await loadBanks();
@@ -1370,6 +1372,8 @@ function printDoc(kind){
     const tCol= taksitliVar? `<td style="text-align:right">${fmt(x.netT)} ₺</td>`:"";
     return `<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td>${indCol}<td style="text-align:right">${fmt(x.netP)} ₺</td>${tCol}</tr>`;
   }).join("");
+  const servis= kind==="siparis"?`<table style="margin-top:10px;font-size:12px"><tr><td style="font-weight:800;width:14%;vertical-align:top">SERVİS /<br>MONTAJ</td>
+    <td><div style="min-height:44px;line-height:22px;color:#94a3b8">________________________________________________________________________<br>________________________________________________________________________</div></td></tr></table>`:"";
   const imza= kind==="siparis"?`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:13px"><div>Müşteri İmza<br><br>____________________</div><div>Mağaza İmza<br><br>____________________</div></div>`:"";
   const bilgi= kind==="siparis"?`<div style="margin-top:18px;font-size:11.5px;line-height:1.55;border-top:1px solid #e2e8f0;padding-top:10px">
     <b>Değerli Müşterimiz,</b><br>Satın almış olduğunuz ürünlerin teslimat ve montaj sürecinde herhangi bir aksaklık yaşanmaması için aşağıdaki bilgilendirmeleri dikkatle incelemenizi rica ederiz.
@@ -1408,6 +1412,8 @@ function printDoc(kind){
         <tr><td style="font-weight:700">TAHMİNİ TESLİM</td><td>${dtr(v('mTesT'))}</td></tr>
         <tr><td style="font-weight:700">İLERİ TESLİM</td><td>${dtr(v('mIleriT'))}</td></tr>
         <tr><td style="font-weight:700">ÖDEME</td><td>${v('mOdeme')}</td></tr>
+        <tr><td style="font-weight:700">ÇIKIŞ DEPOSU</td><td>${v('mCikisDepo')}</td></tr>
+        <tr><td style="font-weight:700">E-FLOW ☐</td><td style="font-weight:700">EXCEL ☐</td></tr>
         <tr><td style="font-weight:700">GSM 1</td><td>${tel}</td></tr>
         <tr><td style="font-weight:700">GSM 2</td><td>${v('mGsm2')}</td></tr>
         <tr><td style="font-weight:700">TC NO</td><td>${v('mTC')}</td></tr>
@@ -1423,6 +1429,11 @@ function printDoc(kind){
     <tr><td style="font-weight:700">FATURA ADRESİ</td><td colspan="3">${v('mFaturaAdres')}</td></tr>
     <tr><td style="font-weight:700">VERGİ NO</td><td>${v('mVergiNo')}</td><td style="width:14%;font-weight:700">VERGİ D.</td><td>${v('mVergiD')}</td></tr>
   </table>
+  <table style="margin-top:6px;font-size:12px"><tr>
+    <td style="width:33%"><b>DİVA NO:</b> ____________</td>
+    <td style="width:33%"><b>HOROZ SİPARİŞ NO:</b> ____________</td>
+    <td style="width:34%"><b>MARS SİPARİŞ NO:</b> ____________</td>
+  </tr></table>
   <div style="text-align:center;font-weight:800;margin-top:10px;letter-spacing:1px">SİPARİŞ BİLGİLERİ</div>` : "";
   const w=window.open("","_blank"); if(!w){ alert("Açılır pencere engellendi."); return; }
   w.document.write(`<html><head><meta charset="utf-8"><title>${baslik}</title>
@@ -1438,7 +1449,7 @@ function printDoc(kind){
   <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>${ind>0?'<th>İndirim</th>':''}<th>Peşin Fiyat</th>${taksitliVar?'<th>Taksitli Fiyat</th>':''}</tr></thead><tbody>${tr}</tbody></table>
   ${(ind>0&&kampNames.length)?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ilgili ürünlerin fiyatlarına işlenmiştir)</div>`:(ind>0?`<div style="margin-top:8px;font-size:12px;color:#1e40af"><b>Toplam indirim:</b> ${fmt(ind)} ₺ (fiyatlara işlenmiştir)</div>`:"")}
   <div class="tot">PEŞİN TOPLAM: ${fmt(Math.round(finalP))} ₺${taksitliVar?`<br>TAKSİTLİ TOPLAM: ${fmt(Math.round(finalT))} ₺ &nbsp;(${bk} ${tk} Taksit — Aylık ${fmt(Math.round(finalT/tk))} ₺)`:""}</div>
-  ${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
+  ${servis}${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();
 }
