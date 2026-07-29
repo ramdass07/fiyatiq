@@ -222,7 +222,6 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <button data-b="bosch" onclick="setBrand('bosch')">Bosch</button>
     </div>
     <button id="adminBtn" class="ghost sm" style="display:none" onclick="toggleAdmin()">⚙ Yönetim</button>
-    <button id="asBtn" class="ghost sm" onclick="asAc()">🤖 Asistan</button>
     <div class="grow"></div>
     <span id="who" class="mut"></span>
     <button class="ghost sm" onclick="signOut()">Çıkış</button>
@@ -399,6 +398,12 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <div id="ksSonuc" style="margin-top:12px"></div>
       <div id="ksFarkBox"></div>
       <div class="row" style="margin-top:10px;display:none" id="ksKaydetRow"><button id="ksKaydet" onclick="kampSihirbazKaydet()">✓ Seçili Kampanyaları Kaydet</button><span id="ksKayMsg" class="msg"></span></div>
+    </div>
+
+    <div class="card" id="asistanCard" style="display:none">
+      <h2>🤖 Satış Asistanı <span class="badge">yalnızca sana açık</span></h2>
+      <p class="mut" style="font-size:12px;margin:0 0 8px">Doğal dille sor — "3 kapılı buzdolabı, 60 bin bütçe" gibi. Sadece o an <b>stokta olan</b> ürünlerden, gerçek fiyatlarla öneri yapar. Mağazalarda görünmez.</p>
+      <button class="sm" onclick="asAc()">🤖 Asistanı Aç</button>
     </div>
 
     <div class="card" id="kampIceCard">
@@ -655,6 +660,9 @@ function applyAdminAccess(){
   const ed=isEditor();
   ["kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama","importers"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
   const bc=$("bayilerCard"); if(bc) bc.style.display=profil.rol==="admin"?"":"none";
+  // Satış Asistanı: yalnızca admin. Mağaza/personel hesaplarında ne kart ne panel açılır.
+  const ac=$("asistanCard"); if(ac) ac.style.display=profil.rol==="admin"?"":"none";
+  if(profil.rol!=="admin") asKapat();
   const tg=$("topluGuncelleme");
   if(tg){ const p=tg.querySelector("p.mut"); if(p && !ed) p.innerHTML="Kendi <b>stok dosyalarını</b> buraya bırak (dosya adında <b>Mars</b>, <b>Horoz</b> ya da kendi depo adın <b>"+depoAdi()+"</b> geçsin). Fiyat listeleri ve kampanyalar merkezden gelir, sen yüklemezsin."; }
   const di=$("depoAdiInp"); if(di && !di.value) di.value=depoAdi();
@@ -1794,6 +1802,7 @@ async function asKatalog(){
   return asKatalogCache;
 }
 function asAc(){
+  if(!profil || profil.rol!=="admin") return;   // Satış Asistanı yalnızca yöneticiye açık
   const p=$("asPanel"); if(!p) return;
   p.style.display="flex"; $("asInput").focus();
   if(!asGecmis.length) asYaz("asistan","Merhaba! Müşterinin ne aradığını yaz — örneğin \"3 kapılı buzdolabı, 60 bin bütçe\" ya da \"çamaşır + kurutma seti öner\". Sadece "+markaAd(brand)+" stoğundan öneri yaparım.");
