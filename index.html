@@ -860,7 +860,8 @@ function calcParts(r,kar,komis){
   else unitTaksit = (komis>0&&komis<100) ? unitNakit/(1-komis/100) : unitNakit;
   const unitNetTaksit = unitTaksit*(1-komis/100);
   const karPesin = unitBipli>0 ? (unitNakit/unitBipli -1)*100 : 0;
-  const karTaksit = unitBipli>0 ? (unitNetTaksit/unitBipli -1)*100 : 0;
+  // Taksit kârı MAĞAZA EXCELİ (KREDİ KARTI satırı) ile birebir: kâr ÷ (maliyet + komisyon tutarı)
+  const karTaksit = unitBipli>0 ? (unitTaksit/(unitBipli + unitTaksit*(komis/100)) -1)*100 : 0;
   const karPct = komis>0?karTaksit:karPesin;
   return {adet,unitToptan,unitBip,unitBipli,unitNakit,unitTaksit,karPct,karPesin,karTaksit};
 }
@@ -936,9 +937,10 @@ function renderRows(){
   if(manuelToplamTaksit!=null) finalTaksit=Math.max(0,manuelToplamTaksit);
   const dip=Math.max(0,tBipli-hakedis);
   const netTaksit=finalTaksit*(1-komis/100);
-  const karPct=dip>0?((komis>0?netTaksit:finalNakit)/dip-1)*100:0;
   const karPesinTot=dip>0?(finalNakit/dip-1)*100:0;
-  const karTaksitTot=dip>0?(netTaksit/dip-1)*100:0;
+  // Taksit kârı MAĞAZA EXCELİ (KREDİ KARTI satırı) ile birebir: kâr ÷ (maliyet + komisyon tutarı)
+  const karTaksitTot=dip>0?(finalTaksit/(dip+finalTaksit*(komis/100))-1)*100:0;
+  const karPct=komis>0?karTaksitTot:karPesinTot;
   const tk=+(($("taksit")||{}).value)||0;
   // %0 komisyonlu banka (ör. BEKO GARANTİ) da taksitlidir — banka+taksit seçiliyse taksitli fiyat GÖSTERİLİR
   const bankaTaksitli = tk>1 && ((($("banka")||{}).value)||"")!=="";
