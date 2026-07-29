@@ -40,9 +40,9 @@
   #grid{font-size:13px}
   #grid th,#grid td{padding:6px 7px}
   #grid input{padding:5px 6px}
-  #grid.basit th:nth-child(11),#grid.basit td:nth-child(11),
-  #grid.basit th:nth-child(12),#grid.basit td:nth-child(12),
-  #grid.basit th:nth-child(13),#grid.basit td:nth-child(13){display:none}
+  #grid.basit th:nth-child(13),#grid.basit td:nth-child(13),
+  #grid.basit th:nth-child(14),#grid.basit td:nth-child(14),
+  #grid.basit th:nth-child(15),#grid.basit td:nth-child(15){display:none}
   th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
   td input{width:130px;text-align:left}
@@ -230,10 +230,10 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
         <button class="sm" onclick="addRow()">+ Ürün satırı</button>
       </div>
       <div id="gridWrap"><table id="grid"><thead><tr>
-        <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Maliyet</th><th>BİP</th><th>Peşin Fiyat</th><th>Taksitli Fiyat</th>
+        <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Maliyet</th><th>BİP</th><th title="Maliyet − BİP (net maliyet)">Net Maliyet</th><th title="BSH resmi perakende (etiket) fiyatı">Perakende</th><th>Peşin Fiyat</th><th>Taksitli Fiyat</th>
         <th>Kâr %</th><th id="thStok1">Mars</th><th id="thStok2">Horoz</th><th id="thStok3">Kadıköy</th><th id="thStok4" title="Ayrılan Mars">Ayr.M</th><th id="thStok5" title="Ayrılan Horoz">Ayr.H</th><th></th>
       </tr></thead><tbody id="rows"></tbody>
-      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="6"></th></tr></tfoot></table></div>
+      <tfoot><tr><th colspan="2">TOPLAM</th><th class="num" id="tAdet">0</th><th class="num" id="tMaliyet">0</th><th class="num" id="tBip">0</th><th class="num" id="tBipliF">0</th><th class="num" id="tPerakende">0</th><th class="num" id="tNakit">0</th><th class="num" id="tTaksit">0</th><th class="num" id="tKar">—</th><th colspan="6"></th></tr></tfoot></table></div>
     </div>
     <div id="uyariKutu" style="display:none;margin-bottom:18px"></div>
     <div class="card" id="kampPanel" style="display:none;border:1px solid var(--ok)">
@@ -882,7 +882,7 @@ function renderRows(){
   const apc=$("altPanelCard"); if(apc) apc.style.display = quoteRows.some(r=>r.kod) ? "" : "none";
   const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
   tb.innerHTML="";
-  let tMaliyet=0,tBip=0,tBipli=0,tAdet=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
+  let tMaliyet=0,tBip=0,tBipli=0,tAdet=0,tPer=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
   // Maliyeti OLMAYAN ürünler (FL'de toptan yok / kod tanınmadı, Manuel toptan da girilmemiş) — kâr hesabı bunlarsız YANILTICI olur
   const uyMaliyetsiz=quoteRows.filter(r=>r.kod && !(r.isET?(+r.etToptan>0):(+r.toptan>0))).map(r=>r.kod);
   quoteRows.forEach((r,i)=>{
@@ -891,7 +891,7 @@ function renderRows(){
     const maliyetL=p.unitToptan*p.adet, bipL=p.unitBip*p.adet, nakitL=p.unitNakit*p.adet, taksitL=p.unitTaksit*p.adet;
     if(r.isET && +r.etToptan>0 && r.ad==="— bulunamadı —") r.ad=r.kod; // elle maliyet girilince kod adıyla geçerli olur
     const valid = r.kod && (r.isET ? (+r.etToptan>0) : (r.ad!=="— bulunamadı —" && +r.toptan>0));
-    if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0);
+    if(valid){ tMaliyet+=maliyetL; tBip+=bipL; tBipli+=p.unitBipli*p.adet; tAdet+=(+p.adet||0); if(+r.etiket>0) tPer+=(+r.etiket)*p.adet;
       if(!r.isET && r.netStok!=null){ if(r.netStok<=0) uyStokYok.push(r.kod); else if(r.netStok<=3) uyKritik.push(r.kod+" ("+r.netStok+" adet)"); }
       if(p.karPesin<0) uyZararSatir.push(r.kod); }
     const maliyetCell = r.isET
@@ -914,6 +914,8 @@ function renderRows(){
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
+      <td class="num" title="Maliyet − BİP">${(p.unitBipli>0)?fmt(p.unitBipli*p.adet):'<span class="mut">—</span>'}</td>
+      <td class="num" title="BSH resmi perakende (etiket) fiyatı">${(+r.etiket>0)?fmt((+r.etiket)*p.adet):'<span class="mut">—</span>'}</td>
       <td class="num">${pesinCell}</td>
       <td class="num">${taksitCell}</td>
       <td class="num" style="font-size:12px;line-height:1.3">${karCell}</td>
@@ -964,6 +966,8 @@ function renderRows(){
   $("tAdet").textContent=fmt(tAdet);
   $("tMaliyet").textContent=fmt(tMaliyet);
   $("tBip").textContent=fmt(tBip);
+  { const e1=$("tBipliF"); if(e1) e1.textContent=fmt(tBipli);
+    const e2=$("tPerakende"); if(e2) e2.textContent=tPer>0?fmt(tPer):"—"; }
   $("tNakit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0));
   $("tTaksit").textContent=fmt(quoteRows.reduce((a,r)=>a+(r.taksit||0)*(r.adet||1),0));
   const maliyetUyariHTML='<span class="blink" style="font-size:11px" title="Maliyeti olmayan ürün var — kâr hesabı yanıltıcı olur. Satırdaki toptan kutusuna maliyeti gir.">⚠ MALİYETSİZ ÜRÜN<br><span style="font-weight:400">kâr hesaplanamaz</span></span>';
@@ -1348,14 +1352,20 @@ function shareWhatsApp(){
   const TS=teklifSatirlar(items);
   const {redP,finalP,finalT}=TS.D;
   const ind=redP;
+  // BSH resmi perakende (liste) fiyatı: tüm satırlarda varsa ve avantaj çıkıyorsa mesaja eklenir
+  const listeTopW=TS.rows.reduce((a,x)=>a+Math.round((+x.r.etiket||0)*(x.r.adet||1)),0);
+  const listeGosterW=TS.rows.length>0 && TS.rows.every(x=>+x.r.etiket>0) && (listeTopW-Math.round(finalP))>0;
   let m="*FİYAT TEKLİFİ*\n"+`Teklif No: ${getTeklifNo()}\n`+"═".repeat(16)+"\n\n";
   TS.rows.forEach((x,i)=>{ const r=x.r; const kd=r.sKadikoy>0?" [KD]":"";
-    m+=`${i+1}. *${r.kod}*${kd}${r.ad?(" - "+r.ad):""} × ${r.adet}\n   Peşin: ${fmt(x.netP)} ₺\n`;
+    m+=`${i+1}. *${r.kod}*${kd}${r.ad?(" - "+r.ad):""} × ${r.adet}\n`;
+    if(listeGosterW){ const lL=Math.round((+r.etiket||0)*(r.adet||1)); if(lL>x.netP) m+=`   Liste: ~${fmt(lL)} ₺~\n`; }
+    m+=`   Peşin: ${fmt(x.netP)} ₺\n`;
     if(taksitliVar) m+=`   Taksitli: ${fmt(x.netT)} ₺\n`;
     m+="\n";
   });
   m+="─".repeat(16)+`\n*PEŞİN TOPLAM:* ${fmt(Math.round(finalP))} ₺\n`;
   if(taksitliVar) m+=`💳 *TAKSİTLİ TOPLAM:* ${fmt(Math.round(finalT))} ₺ (${bk} ${tk} Taksit | Aylık ${fmt(Math.round(finalT/tk))} ₺)\n`;
+  if(listeGosterW) m+=`🏷️ *Toplam avantajınız: ${fmt(listeTopW-Math.round(finalP))} ₺* (tavsiye edilen perakende fiyatlarına göre)\n`;
   if(ind>0&&kampNames.length) m+=`🎁 Kampanya: ${kampNames.join(", ")} (toplam ${fmt(ind)} ₺ indirim fiyatlara dahil)\n`;
   else if(ind>0) m+=`🎁 Toplam indirim: ${fmt(ind)} ₺ (fiyatlara dahil)\n`;
   const personel=(($("satisPersonel")||{}).value)||""; if(personel) m+=`👤 Satış Personeli: ${personel}\n`;
@@ -1374,11 +1384,20 @@ function printDoc(kind){
   const ind=redP;
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
   const taksitliVar=(tk>1)&&(komisOran>0 || ((($("banka")||{}).value)||"")!=="");
+  // BSH resmi perakende (liste) fiyatı: SADECE teklifte, TÜM satırlarda fiyat varsa ve gerçekten avantaj çıkıyorsa gösterilir
+  const listeTop = TS.rows.reduce((a,x)=>a+Math.round((+x.r.etiket||0)*(x.r.adet||1)),0);
+  const listeVar = kind!=="siparis" && TS.rows.length>0 && TS.rows.every(x=>+x.r.etiket>0);
+  const avantajTop = listeTop - Math.round(finalP);
+  const listeGoster = listeVar && avantajTop>0;
   const tr=TS.rows.map((x,i)=>{ const r=x.r;
     const iP=Math.round(x.line)-x.netP;
-    const indCol= ind>0? `<td style="text-align:right;color:#dc2626">${iP>0?('-'+fmt(iP)+' ₺'):'—'}</td>`:"";
+    const listeL=Math.round((+r.etiket||0)*(r.adet||1));
+    const avn=Math.max(0,listeL-x.netP);
+    const listeCol= listeGoster? `<td style="text-align:right;color:#64748b"><s>${fmt(listeL)} ₺</s></td>`:"";
+    const avnCol= listeGoster? `<td style="text-align:right;color:#16a34a;font-weight:700">${avn>0?('-'+fmt(avn)+' ₺'):'—'}</td>`:"";
+    const indCol= (!listeGoster&&ind>0)? `<td style="text-align:right;color:#dc2626">${iP>0?('-'+fmt(iP)+' ₺'):'—'}</td>`:"";
     const tCol= taksitliVar? `<td style="text-align:right">${fmt(x.netT)} ₺</td>`:"";
-    return `<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td>${indCol}<td style="text-align:right">${fmt(x.netP)} ₺</td>${tCol}</tr>`;
+    return `<tr><td>${i+1}</td><td>${r.kod}${r.sKadikoy>0?' <b>[KD]</b>':''}</td><td>${r.ad||""}</td><td style="text-align:center">${r.adet}</td>${listeCol}${avnCol}${indCol}<td style="text-align:right">${fmt(x.netP)} ₺</td>${tCol}</tr>`;
   }).join("");
   const servis= kind==="siparis"?`<table style="margin-top:5px;font-size:10px"><tr><td style="font-weight:800;width:14%;vertical-align:top">SERVİS /<br>MONTAJ</td>
     <td><div style="min-height:26px;line-height:15px;color:#94a3b8">________________________________________________________________________<br>________________________________________________________________________</div></td></tr></table>`:"";
@@ -1454,7 +1473,8 @@ function printDoc(kind){
     ? `<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:17px;font-weight:900">${markaBuyuk}</span><span style="font-size:14px;font-weight:900;color:#1e40af">fiyat<span style="color:#16a34a">iq</span></span></div>${sipUst}<div style="font-size:9px;color:#64748b;margin-top:1px">Teklif No: ${getTeklifNo()}</div>`
     : `<h1>fiyatiq</h1><div class="sub">${baslik}</div>
   <div class="info"><div><b>Teklif No:</b> ${getTeklifNo()}</div><div><b>Müşteri:</b> ${ad}</div><div><b>Tel:</b> ${tel}</div>${personel?`<div><b>Satış Personeli:</b> ${personel}</div>`:""}<div><b>Tarih:</b> ${new Date().toLocaleDateString("tr-TR")}</div></div>`}
-  <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>${ind>0?'<th>İndirim</th>':''}<th>Peşin Fiyat</th>${taksitliVar?'<th>Taksitli Fiyat</th>':''}</tr></thead><tbody>${tr}</tbody></table>
+  <table><thead><tr><th>#</th><th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th>${listeGoster?'<th>Liste Fiyatı</th><th>İndiriminiz</th>':''}${(!listeGoster&&ind>0)?'<th>İndirim</th>':''}<th>Peşin Fiyat</th>${taksitliVar?'<th>Taksitli Fiyat</th>':''}</tr></thead><tbody>${tr}</tbody></table>
+  ${listeGoster?`<div style="margin-top:8px;font-size:13px;color:#16a34a;font-weight:800">Toplam avantajınız: ${fmt(avantajTop)} ₺ &nbsp;<span style="color:#64748b;font-weight:400;font-size:11px">(${markaBuyuk} tavsiye edilen perakende satış fiyatlarına göre)</span></div>`:""}
   ${(ind>0&&kampNames.length)?`<div style="margin-top:${kind==="siparis"?4:8}px;font-size:${kind==="siparis"?10:12}px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${kampNames.join(", ")} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ilgili ürünlerin fiyatlarına işlenmiştir)</div>`:(ind>0?`<div style="margin-top:${kind==="siparis"?4:8}px;font-size:${kind==="siparis"?10:12}px;color:#1e40af"><b>Toplam indirim:</b> ${fmt(ind)} ₺ (fiyatlara işlenmiştir)</div>`:"")}
   <div class="tot">PEŞİN TOPLAM: ${fmt(Math.round(finalP))} ₺${taksitliVar?`<br>TAKSİTLİ TOPLAM: ${fmt(Math.round(finalT))} ₺ &nbsp;(${bk} ${tk} Taksit — Aylık ${fmt(Math.round(finalT/tk))} ₺)`:""}</div>
   ${servis}${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
