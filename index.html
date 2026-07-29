@@ -198,6 +198,22 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 
 <div id="ac" class="autocomplete"></div>
 
+<!-- Satış Asistanı: sağ altta açılan sohbet paneli. Sadece stoktaki ürünlerden öneri yapar. -->
+<div id="asPanel" style="display:none;position:fixed;right:16px;bottom:16px;z-index:200;width:380px;max-width:calc(100vw - 24px);height:520px;max-height:calc(100vh - 40px);background:var(--panel);border:1px solid #ffffff22;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.55);display:none;flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #ffffff18;background:var(--field)">
+    <b style="font-size:14px">🤖 Satış Asistanı</b>
+    <span id="asDurum" class="badge" style="font-size:9px">hazırlanıyor</span>
+    <span style="flex:1"></span>
+    <button class="ghost sm" style="padding:2px 8px" title="Sohbeti temizle" onclick="asTemizle()">🗑</button>
+    <button class="ghost sm" style="padding:2px 9px" onclick="asKapat()">✕</button>
+  </div>
+  <div id="asAkis" style="flex:1;overflow:auto;padding:12px;font-size:13px;line-height:1.5"></div>
+  <div style="display:flex;gap:6px;padding:10px;border-top:1px solid #ffffff18">
+    <input id="asInput" placeholder="Müşteri ne istiyor?" style="flex:1" autocomplete="off" onkeydown="if(event.key==='Enter')asGonder()">
+    <button class="sm" id="asGonderBtn" onclick="asGonder()">Sor</button>
+  </div>
+</div>
+
 <div id="appView" style="display:none">
   <header>
     <h1 class="brand">fiyat<span class="q">iq</span></h1>
@@ -206,6 +222,7 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <button data-b="bosch" onclick="setBrand('bosch')">Bosch</button>
     </div>
     <button id="adminBtn" class="ghost sm" style="display:none" onclick="toggleAdmin()">⚙ Yönetim</button>
+    <button id="asBtn" class="ghost sm" onclick="asAc()">🤖 Asistan</button>
     <div class="grow"></div>
     <span id="who" class="mut"></span>
     <button class="ghost sm" onclick="signOut()">Çıkış</button>
@@ -1672,7 +1689,7 @@ async function topluTara(files){
   box.innerHTML="<span class='mut'>Taranıyor...</span>"; window.topluItems=[];
   const donem=_donem(), bugun=_bugun();
   for(const f of files){
-    const c=tclassify(f.name); const res={name:f.name, brand:c.brand, kind:c.kind, depo:c.depo, tip:c.tip, ok:false, detay:""};
+    const c=tclassify(f.name); const res={name:f.name, brand:c.brand, kind:c.kind, depo:c.depo, tip:c.tip, ok:false, detay:"", _f:f};
     try{
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
       // Marka: dosya adı > içerik > panelde seçili marka. Panelle çelişki varsa karışmasın diye atla.
@@ -1694,10 +1711,125 @@ async function topluTara(files){
     }catch(e){ res.detay="okunamadı: "+e.message; }
     window.topluItems.push(res);
   }
-  box.innerHTML=window.topluItems.map(r=>`<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b><br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind==="stok"?"stok":"fiyat listesi"} — ${r.detay}</span></div>`).join("");
+  topluRender();
+}
+// Tarama sonucu listesi. Okunamayan fiyat dosyaları için "🤖 AI ile Oku" butonu çıkar.
+function topluRender(){
+  const box=$("topluSonuc"); if(!box) return;
+  box.innerHTML=window.topluItems.map((r,i)=>{
+    const aiBtn=(!r.ok && r.kind!=="stok" && r._f && isEditor())
+      ? ` <button class="ghost sm" style="padding:2px 9px;font-size:12px" onclick="aiListeOku(${i})">🤖 AI ile Oku</button>` : "";
+    return `<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b>${aiBtn}<br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind==="stok"?"stok":"fiyat listesi"} — ${r.detay}</span></div>`;
+  }).join("");
   const okcount=window.topluItems.filter(r=>r.ok).length;
-  $("topluYaz").disabled = okcount===0;
-  $("topluYaz").textContent = okcount? `✓ Onayla ve Yükle (${okcount} dosya)` : "✓ Onayla ve Yükle";
+  const btn=$("topluYaz"); if(!btn) return;
+  btn.disabled = okcount===0;
+  btn.textContent = okcount? `✓ Onayla ve Yükle (${okcount} dosya)` : "✓ Onayla ve Yükle";
+}
+// "Akıllı Tara" sütunları tanıyamadıysa dosyayı yapay zekâya okutur.
+// Anahtar sunucuda (Vercel > ANTHROPIC_API_KEY); tarayıcıya hiç inmez.
+async function aiListeOku(i){
+  const r=window.topluItems[i]; if(!r||!r._f) return;
+  const msg=$("topluMsg"); const say=t=>{ if(msg){ msg.className="msg"; msg.textContent=t; } };
+  const donem=_donem(); const mk=r.brand||brand;
+  try{
+    say("📄 "+r.name+" okunuyor...");
+    const metin=await ksMetinCikar(r._f);
+    if(metin.trim().length<20){ if(msg){msg.className="msg bad";msg.textContent="Dosyadan metin çıkmadı (taranmış görüntü PDF olabilir).";} return; }
+    say("🤖 Yapay zekâ listeyi çözüyor... (10-30 saniye sürebilir)");
+    const resp=await fetch("/api/liste-oku",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({marka:mk,metin})});
+    const data=await resp.json();
+    if(!resp.ok||data.error){ if(msg){msg.className="msg bad";msg.textContent="AI hatası: "+(data.error||resp.status);} return; }
+    const sat=data.satirlar||[];
+    if(!sat.length){ if(msg){msg.className="msg bad";msg.textContent="AI de ürün bulamadı."+(data.not?" ("+data.not+")":"");} return; }
+    r.topRows = sat.filter(s=>s.toptan>0).map(s=>({model_kodu:s.model_kodu,marka:mk,donem,toptan_fiyat:s.toptan}));
+    r.perRows = sat.filter(s=>s.perakende>0).map(s=>({model_kodu:s.model_kodu,marka:mk,donem,nakit_fiyat:s.perakende}));
+    r.bipRows = sat.filter(s=>s.bip>0).map(s=>({model_kodu:s.model_kodu,marka:mk,donem,bip_tutar:s.bip}));
+    r.brand=mk; r.kind="fiyat"; r.ok=true;
+    const parts=[]; if(r.topRows.length)parts.push(r.topRows.length+" toptan");
+    if(r.perRows.length)parts.push(r.perRows.length+" perakende"); if(r.bipRows.length)parts.push(r.bipRows.length+" BİP");
+    r.detay="🤖 AI okudu: "+parts.join(" + ")+(data.not?" · "+data.not:"");
+    window.aiOrnek=sat.slice(0,8);
+    topluRender();
+    if(msg){ msg.className="msg ok";
+      msg.innerHTML="✓ AI "+sat.length+" ürün çıkardı. <b>Yüklemeden önce birkaçını kontrol et:</b><br>"+
+        sat.slice(0,5).map(s=>`<span class="mut" style="font-size:12px">${s.model_kodu} — toptan ${s.toptan||"-"} · perakende ${s.perakende||"-"} · BİP ${s.bip||"-"}</span>`).join("<br>"); }
+  }catch(e){ if(msg){ msg.className="msg bad"; msg.textContent="Bağlantı hatası: "+e.message; } }
+}
+
+// ===== SATIŞ ASİSTANI =====
+// Personel doğal dille sorar; asistan SADECE stoktaki ürünlerden, gerçek fiyatlarla öneri yapar.
+let asGecmis=[], asKatalogCache=null, asKatalogMarka=null, asMesgul=false;
+// PostgREST tek seferde en fazla 1000 satır döndürür — hepsini almak için sayfalayarak çekiyoruz.
+async function sbTumu(tablo,sec,uygula){
+  let out=[], from=0;
+  for(let g=0; g<40; g++){
+    let q=sb.from(tablo).select(sec); if(uygula) q=uygula(q);
+    const {data,error}=await q.range(from,from+999);
+    if(error) throw error;
+    out=out.concat(data||[]);
+    if(!data || data.length<1000) break;
+    from+=1000;
+  }
+  return out;
+}
+async function asKatalog(){
+  if(asKatalogCache && asKatalogMarka===brand) return asKatalogCache;
+  const donem=aktifDonem||_donem();
+  const [stk,urn,per,top]=await Promise.all([
+    sbTumu("stok","model_kodu,tip,adet",q=>q.eq("marka",brand)),
+    sbTumu("urunler","model_kodu,urun_adi",q=>q.eq("marka",brand)),
+    sbTumu("perakende_fiyatlar","model_kodu,nakit_fiyat",q=>q.eq("marka",brand).eq("donem",donem)),
+    sbTumu("toptan_fiyatlar","model_kodu,toptan_fiyat",q=>q.eq("marka",brand).eq("donem",donem))
+  ]);
+  const net={}; stk.forEach(s=>{ const k=s.model_kodu; net[k]=(net[k]||0)+((s.tip==="ayrilmis"?-1:1)*(+s.adet||0)); });
+  const ad={}; urn.forEach(u=>{ ad[u.model_kodu]=u.urun_adi||""; });
+  const pf={}; per.forEach(p=>{ pf[p.model_kodu]=+p.nakit_fiyat||0; });
+  const tf={}; top.forEach(t=>{ tf[t.model_kodu]=+t.toptan_fiyat||0; });
+  asKatalogCache=Object.keys(net).filter(k=>net[k]>0)
+    .map(k=>({k,ad:ad[k]||"",adet:net[k],pesin:pf[k]||0,toptan:tf[k]||0}))
+    .filter(u=>u.pesin>0||u.toptan>0);
+  asKatalogMarka=brand;
+  return asKatalogCache;
+}
+function asAc(){
+  const p=$("asPanel"); if(!p) return;
+  p.style.display="flex"; $("asInput").focus();
+  if(!asGecmis.length) asYaz("asistan","Merhaba! Müşterinin ne aradığını yaz — örneğin \"3 kapılı buzdolabı, 60 bin bütçe\" ya da \"çamaşır + kurutma seti öner\". Sadece "+markaAd(brand)+" stoğundan öneri yaparım.");
+  asKatalog().then(l=>{ const d=$("asDurum"); if(d){ d.textContent=l.length+" ürün stokta"; } })
+    .catch(e=>{ const d=$("asDurum"); if(d) d.textContent="katalog okunamadı"; });
+}
+function asKapat(){ const p=$("asPanel"); if(p) p.style.display="none"; }
+function asTemizle(){ asGecmis=[]; const a=$("asAkis"); if(a) a.innerHTML=""; asAc(); }
+function asYaz(rol,metin){
+  asGecmis.push({rol,metin});
+  const a=$("asAkis"); if(!a) return;
+  const ben=rol==="kullanici";
+  const div=document.createElement("div");
+  div.style.cssText="margin:0 0 10px;display:flex;justify-content:"+(ben?"flex-end":"flex-start");
+  div.innerHTML='<div style="max-width:85%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;'+
+    (ben?'background:var(--brand);color:var(--brandink)':'background:var(--field);border:1px solid #ffffff14')+'">'+
+    (metin||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))+'</div>';
+  a.appendChild(div); a.scrollTop=a.scrollHeight;
+}
+async function asGonder(){
+  if(asMesgul) return;
+  const inp=$("asInput"); const soru=(inp.value||"").trim(); if(!soru) return;
+  inp.value=""; asYaz("kullanici",soru);
+  asMesgul=true; const btn=$("asGonderBtn"); if(btn){ btn.disabled=true; btn.textContent="..."; }
+  const bekle=document.createElement("div"); bekle.className="mut"; bekle.style.cssText="font-size:12px;margin-bottom:10px";
+  bekle.textContent="🤖 düşünüyor..."; $("asAkis").appendChild(bekle); $("asAkis").scrollTop=99999;
+  try{
+    const urunler=await asKatalog();
+    const resp=await fetch("/api/asistan",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({marka:brand,soru,gecmis:asGecmis.slice(0,-1).slice(-8),urunler})});
+    const data=await resp.json();
+    bekle.remove();
+    if(!resp.ok||data.error) asYaz("asistan","⚠ "+(data.error||("Hata "+resp.status)));
+    else asYaz("asistan",data.cevap||"(boş cevap)");
+  }catch(e){ bekle.remove(); asYaz("asistan","⚠ Bağlantı hatası: "+e.message); }
+  asMesgul=false; if(btn){ btn.disabled=false; btn.textContent="Sor"; }
 }
 async function topluYaz(){
   const items=window.topluItems.filter(r=>r.ok); const msg=$("topluMsg"); const btn=$("topluYaz");
