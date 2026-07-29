@@ -1279,6 +1279,10 @@ async function setKomis(){
 function onBankChange(){ loadTaksit(); }
 function onTaksitChange(){ setKomis(); }
 function calcBank(){ renderRows(); }
+// Durum (Teklif/Satıldı/Kaybedildi) kaydı: veritabanında 'durum' sütunu varsa oraya,
+// yoksa teklifin satirlar JSON'una, o da olmazsa bu tarayıcıya yazılır. Böylece SQL beklemeden çalışır.
+function durumYerelOku(id){ try{ return (JSON.parse(localStorage.getItem("fq_durumlar")||"{}"))[String(id)]||null; }catch(e){ return null; } }
+function durumYerelYaz(id,val){ try{ const m=JSON.parse(localStorage.getItem("fq_durumlar")||"{}"); m[String(id)]=val; localStorage.setItem("fq_durumlar",JSON.stringify(m)); }catch(e){} }
 let tfCache=[];   // ham teklif listesi — filtreler bunun üzerinde çalışır (her tuşta veritabanına gidilmez)
 async function loadTeklifler(){
   const tb=$("tekliflerList"); if(!tb) return;
@@ -1291,7 +1295,7 @@ async function loadTeklifler(){
     return { id:t.id, no:arr?"—":(s.no||"—"), personel:arr?"—":(s.personel||"—"),
       magaza:(!arr&&s.magaza)||(pmap[t.bayi_id]&&(pmap[t.bayi_id].magaza||pmap[t.bayi_id].ad))||"—",
       tarih:t.created_at||null, musteri:t.musteri_ad||"", tel:t.musteri_tel||"", marka:t.marka||"",
-      toplam:+t.toplam||0, durum:t.durum||"teklif", urunler:items.map(x=>x.model).filter(Boolean).join(", ") };
+      toplam:+t.toplam||0, durum:t.durum||(!arr&&s.durum)||durumYerelOku(t.id)||"teklif", satirlarObj:(!arr?s:null), urunler:items.map(x=>x.model).filter(Boolean).join(", ") };
   });
   const sel=$("tfMagaza");
   if(sel){ const mevcut=sel.value; const mg=[...new Set(tfCache.map(x=>x.magaza).filter(m=>m&&m!=="—"))].sort();
@@ -1335,10 +1339,18 @@ function renderTeklifler(){
 }
 async function setTeklifDurum(id,val){
   const m=$("tekliflerMsg"); if(m){ m.textContent="Kaydediliyor..."; m.className="msg"; }
-  const {error}=await sb.from("teklifler").update({durum:val}).eq("id",id);
-  if(error){ if(m){ m.textContent="Durum kaydedilemedi: "+error.message+"  —  Veritabanında 'durum' sütunu yoksa Claude'un verdiği tek satırlık SQL'i çalıştır."; m.className="msg bad"; } return; }
-  const t=tfCache.find(x=>String(x.id)===String(id)); if(t) t.durum=val;
-  if(m){ m.textContent="✓ Durum güncellendi."; m.className="msg ok"; }
+  const t=tfCache.find(x=>String(x.id)===String(id));
+  let nerede="";
+  const r1=await sb.from("teklifler").update({durum:val}).eq("id",id);
+  if(!r1.error) nerede="";
+  else if(t&&t.satirlarObj){                                   // 'durum' sütunu yok: teklifin kendi JSON'una yaz (tüm cihazlarda görünür)
+    const yeni=Object.assign({},t.satirlarObj,{durum:val});
+    const r2=await sb.from("teklifler").update({satirlar:yeni}).eq("id",id);
+    if(!r2.error){ t.satirlarObj=yeni; nerede=""; }
+    else { durumYerelYaz(id,val); nerede=" (yalnız bu bilgisayarda)"; }
+  } else { durumYerelYaz(id,val); nerede=" (yalnız bu bilgisayarda)"; }
+  if(t) t.durum=val;
+  if(m){ m.textContent="✓ Durum güncellendi"+nerede+"."; m.className="msg ok"; }
   renderTeklifler();
 }
 function teklifExcel(){
