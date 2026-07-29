@@ -1810,7 +1810,9 @@ function asYaz(rol,metin){
   div.style.cssText="margin:0 0 10px;display:flex;justify-content:"+(ben?"flex-end":"flex-start");
   div.innerHTML='<div style="max-width:85%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;'+
     (ben?'background:var(--brand);color:var(--brandink)':'background:var(--field);border:1px solid #ffffff14')+'">'+
-    (metin||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))+'</div>';
+    (metin||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))
+      .replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>")   // modelin **kalın** işaretlerini gerçek kalına çevir
+      +'</div>';
   a.appendChild(div); a.scrollTop=a.scrollHeight;
 }
 async function asGonder(){
