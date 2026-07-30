@@ -1400,7 +1400,7 @@ function musteriKontrol(){
   if(ad.length>=2 && tel.length>=10) return true;
   const el = ad.length<2 ? $("mAd") : $("mTel");
   if(el){ el.style.outline="2px solid #ef4444"; el.focus(); el.scrollIntoView({block:"center",behavior:"smooth"}); setTimeout(()=>{ el.style.outline=""; },3000); }
-  alert("Önce MÜŞTERİ ADI ve GSM numarasını yaz.\n\nBu bilgiler teklif kaydına işleniyor; yönetim teklifleri buradan takip ediyor.\n(GSM en az 10 hane olmalı.)");
+  alert("Müşteri adı ve telefonu eksik.\n\nTeklifi sonra bulabilmek ve müşteriye geri dönebilmek için gerekiyor.\n(Telefon en az 10 hane)");
   return false;
 }
 let savedTeklifId=null;
