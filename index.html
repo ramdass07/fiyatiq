@@ -116,6 +116,44 @@
   th{border-bottom:1px solid color-mix(in srgb,var(--brand) 16%,var(--line))}
   tfoot th{border-top:1px solid color-mix(in srgb,var(--brand) 22%,var(--line));font-size:13px}
   header{border-bottom:1px solid color-mix(in srgb,var(--brand) 18%,var(--line))}
+  /* ---- Nasıl kullanılır (yardım) ---- */
+  #yardimBack{position:fixed;inset:0;background:rgba(2,8,20,.72);backdrop-filter:blur(3px);z-index:400;display:none}
+  #yardimPanel{position:fixed;z-index:401;top:4vh;left:50%;transform:translateX(-50%);width:min(880px,94vw);height:92vh;display:none;
+    flex-direction:column;background:var(--panel);border:1px solid color-mix(in srgb,var(--brand) 28%,var(--line));border-radius:16px;
+    box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+  #yardimPanel .yHead{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.04),transparent)}
+  #yardimPanel .yHead h2{margin:0;font-size:16px}
+  #yardimBody{padding:18px 22px;overflow:auto;line-height:1.55}
+  #yardimBody h3{font-size:15px;margin:20px 0 6px;padding-left:9px;border-left:3px solid var(--brand);color:var(--txt)}
+  #yardimBody h3:first-child{margin-top:0}
+  #yardimBody p,#yardimBody li{font-size:13.5px}
+  #yardimBody p{margin:0 0 7px}
+  #yardimBody ol,#yardimBody ul{margin:0 0 9px;padding-left:20px}
+  #yardimBody li{margin-bottom:4px}
+  #yardimBody table{width:100%;border-collapse:collapse;margin:8px 0 12px;font-size:13px}
+  #yardimBody th,#yardimBody td{border:1px solid var(--line);padding:6px 9px;text-align:left;white-space:normal;text-transform:none;letter-spacing:0;font-size:13px}
+  #yardimBody th{background:var(--field);color:var(--mut)}
+  #yardimBody .k{display:inline-block;background:var(--field);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-weight:700;font-size:12.5px;white-space:nowrap}
+  #yardimBody .box{border-radius:10px;padding:10px 13px;margin:9px 0;font-size:13px;border-left:4px solid var(--brand);background:rgba(56,189,248,.08)}
+  #yardimBody .box.w{border-left-color:var(--warn);background:rgba(245,158,11,.10)}
+  #yardimBody .box.d{border-left-color:var(--bad);background:rgba(239,68,68,.10)}
+  #yardimBody .gold{background:var(--field);border:1px solid color-mix(in srgb,var(--brand) 30%,var(--line));border-radius:12px;padding:12px 16px;margin-top:18px}
+  #yardimBody .gold h4{margin:0 0 6px;font-size:14px;color:var(--brand)}
+  /* Yardım penceresi açıkken yazdırılırsa sadece kılavuz basılsın */
+  @media print{
+    body.yardim-print{background:#fff;color:#000}
+    body.yardim-print>*{display:none!important}
+    body.yardim-print>#yardimPanel{display:block!important;position:static;transform:none;width:auto;height:auto;
+      border:0;box-shadow:none;border-radius:0;background:#fff;color:#000;overflow:visible}
+    body.yardim-print #yardimPanel .yHead .seg,body.yardim-print #yardimPanel .yHead button{display:none!important}
+    body.yardim-print #yardimBody{overflow:visible;padding:0;color:#000}
+    body.yardim-print #yardimBody h3{color:#000}
+    body.yardim-print #yardimBody th{background:#eef2f6;color:#000}
+    body.yardim-print #yardimBody .k{background:#eef2f6;color:#000;border-color:#ccd6de}
+    body.yardim-print #yardimBody .gold{background:#f6f9fb;border-color:#ccd6de}
+    body.yardim-print #yardimBody .gold h4{color:#0e9488}
+    body.yardim-print .mut{color:#555}
+  }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
@@ -214,6 +252,189 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
   </div>
 </div>
 
+<!-- Nasıl kullanılır: rolüne göre sekmeli yardım penceresi. PDF kılavuzlarının kısa hâli. -->
+<div id="yardimBack" onclick="yardimKapat()"></div>
+<div id="yardimPanel" role="dialog" aria-label="Nasıl kullanılır">
+  <div class="yHead">
+    <h2>❓ Nasıl kullanılır</h2>
+    <div class="seg" id="ySeg">
+      <button data-y="satis" class="on" onclick="yardimSekme('satis')">Satış ekranı</button>
+      <button data-y="bayi" onclick="yardimSekme('bayi')">Mağaza sahibi</button>
+    </div>
+    <span class="grow"></span>
+    <button class="ghost sm" onclick="yardimYazdir()" title="Kılavuzu yazdır">🖨</button>
+    <button class="ghost sm" onclick="yardimKapat()">✕</button>
+  </div>
+  <div id="yardimBody">
+
+    <div id="yTabSatis">
+      <p class="mut">Müşteri karşısındayken doğru fiyatı ve gerçek stoğu saniyede görmen için. <b>Fiyat listelerini sen yüklemiyorsun</b> — merkezden geliyor.</p>
+
+      <h3>1 · Marka seçimi</h3>
+      <p>Üstteki <span class="k">Siemens</span> / <span class="k">Bosch</span> düğmeleri her şeyi belirler: fiyat da, stok da, kampanya da. Teklife başlamadan doğru markada olduğunu kontrol et — en sık yapılan hata bu.</p>
+
+      <h3>2 · Hızlı Stok Sorgu</h3>
+      <p>Müşteri "şu var mı?" dediğinde en üstteki <b>🔎 Hızlı Stok Sorgu</b> kutusunu kullan. Kodun ya da adın <b>3 harfi yeter</b>, öneriler açılır. Sonuçta hangi depoda kaç adet olduğunu ve fiyatı görürsün.</p>
+      <div class="box">Teklif hazırlamadan önce buradan bakmak, sonradan "stok yokmuş" diye müşteriye geri dönmekten iyidir.</div>
+
+      <h3>3 · Teklif hazırlama</h3>
+      <div class="box"><b>Hesap mağazaya aittir</b>, kişiye değil. Teklifi kimin hazırladığı <b>Satış Personeli</b> alanından anlaşılır — bu yüzden başında bir kez adını yaz; bilgisayar hatırlar, başka biri geçtiğinde adı değiştirsin.</div>
+      <ol>
+        <li><b>Satış Personeli</b> alanına adını yaz — bir kere yeter, tarayıcı hatırlar; teklifin altında adın çıkar. Boşsa çıktı alınmaz.</li>
+        <li><b>Müşteri Adı Soyadı</b> ve <b>Müşteri GSM</b> zorunlu: teklifi sonra bulup müşteriyi arayabilmek için.</li>
+        <li><span class="k">+ Ürün satırı</span> → <b>Ürün Kodu</b> hücresine yazmaya başla, öneriden doğru olanı seç.</li>
+        <li>Seçtiğin an ürün adı, maliyet, BİP, perakende fiyat ve depo stokları <b>otomatik dolar</b>.</li>
+        <li><b>Adet</b> yaz. Birden fazla ürün için tekrar <span class="k">+ Ürün satırı</span>.</li>
+      </ol>
+      <p>Tablo kalabalık geliyorsa <span class="k">📋 Basite geç</span> ile iç sütunları gizle, <span class="k">📊 Detaylıya geç</span> ile geri aç. Seçimin hatırlanır.</p>
+
+      <h3>4 · Fiyatı belirleme</h3>
+      <table>
+        <tr><th style="width:32%">Alan</th><th>Ne yapar</th></tr>
+        <tr><td><b>Kâr Oranı %</b></td><td>Peşin fiyatı maliyet üstüne bu oranla hesaplar. Varsayılan 4. Değiştirdiğin an bütün fiyatlar yenilenir.</td></tr>
+        <tr><td><b>Banka + Taksit</b></td><td>Komisyon eklenir; Taksitli Toplam ve Aylık Taksit hesaplanır. Peşinse Banka'yı "peşin"de bırak.</td></tr>
+        <tr><td><b>Manuel Peşin / Taksitli</b></td><td>Pazarlıkta yuvarlak fiyat vereceksen buraya yaz; kâr oranı geri hesaplanır. <span class="k">↺ Otomatiğe dön</span> eski hâline döndürür.</td></tr>
+      </table>
+      <p>Müşteriye fiyat söylemeden önce <b>Kâr</b> rakamına bak.</p>
+
+      <h3>5 · Kampanyalar</h3>
+      <p>Ürünlere uyan kampanya varsa <b>🎁 Kampanyalar</b> paneli kendiliğinden çıkar. Başlığa tıkla, uygulayacaklarını seç — indirim fiyata işlenir, teklifin altında kampanya adı yazar.</p>
+      <div class="box w"><b>Kampanya seçmek senin kararın, sistem zorlamaz.</b> Ama satışı kapatmadan önce kampanyanın geçerli olduğunu <b>DİVA'dan teyit et</b>. Bitmişse fark sende kalır.</div>
+
+      <h3>6 · Kırmızı uyarılar</h3>
+      <p>Ekranın ortasında büyük kırmızı uyarı varsa devam etmeden önce çöz:</p>
+      <table>
+        <tr><th style="width:30%">Uyarı</th><th>Anlamı ve ne yapmalısın</th></tr>
+        <tr><td><b>⛔ FİYATSIZ ÜRÜN</b></td><td>Bu dönem listesinde maliyeti yok, kâr hesabı yanlış çıkar. Maliyeti elle gir ya da mağaza sahibine sor.</td></tr>
+        <tr><td><b>⛔ STOKSUZ ÜRÜN</b></td><td>Hiçbir depoda yok. <b>Teyit almadan söz verme</b>; tedarik süresini öğren.</td></tr>
+        <tr><td><b>⚠ KRİTİK STOK</b></td><td>Çok az kalmış; sen teklif verirken başkası satmış olabilir. Stok teyidi al.</td></tr>
+        <tr><td><b>⛔ ZARAR SATIŞ</b></td><td>Teklif zararına. İndirim ve manuel fiyatı kontrol et; sahibinin onayı olmadan verme.</td></tr>
+        <tr><td><b>⚠ DÜŞÜK KÂR</b></td><td>Kâr çok ince. Bilerek yapıyorsan sorun yok, farkında olman için uyarıyor.</td></tr>
+      </table>
+
+      <h3>7 · Teklifi müşteriye verme</h3>
+      <table>
+        <tr><th style="width:30%">Düğme</th><th>Ne yapar</th></tr>
+        <tr><td><span class="k">🖨 Teklif Yazdır</span></td><td>Müşteriye verilecek düzgün çıktı. Yazıcıya basabilir ya da PDF kaydedebilirsin.</td></tr>
+        <tr><td><span class="k">WhatsApp</span></td><td>Teklifi düzenli mesaj hâline getirip müşterinin numarasına gönderir. <b>Teklifi otomatik kaydeder.</b></td></tr>
+        <tr><td><span class="k">📋 Sipariş Formu</span></td><td>Satış kesinleştiğinde doldurulacak formu çıkarır.</td></tr>
+        <tr><td><span class="k">Teklifi Kaydet</span></td><td>Müşteri "düşüneyim" derse mutlaka kaydet — teklif numarasından bulunur.</td></tr>
+      </table>
+
+      <h3>8 · Sipariş formu ek bilgileri</h3>
+      <p>Satış kapandığında <b>📋 Müşteri &amp; Sipariş Ek Bilgileri</b> başlığını aç: TC kimlik, ikinci telefon, e-posta, sevk/teslim tarihleri, ödeme şekli, çıkış deposu, sevk adresi, faturalıysa ünvan ve vergi bilgileri. Girdiğin her şey sipariş formu çıktısına yazılır.</p>
+
+      <h3>9 · Sık karşılaşılan durumlar</h3>
+      <table>
+        <tr><th style="width:38%">Durum</th><th>Çözüm</th></tr>
+        <tr><td>Kodu yazıyorum, öneri çıkmıyor</td><td>Marka yanlış olabilir, diğerine geç. İlk 3-4 karakteri yazdığından emin ol.</td></tr>
+        <tr><td>Ürün geliyor ama fiyat boş</td><td>Bu dönem listesinde yok. Maliyeti elle gir, mağaza sahibine haber ver.</td></tr>
+        <tr><td>Stok yanlış görünüyor</td><td>Stok dosyası gün içinde bir kez yükleniyor. Kritik satışta depodan teyit al.</td></tr>
+        <tr><td>Taksitli toplam çıkmıyor</td><td>Banka ve taksit sayısının ikisini de seçmelisin.</td></tr>
+        <tr><td>Giriş yapamıyorum</td><td>Mağaza sahibine söyle, hesabını o kontrol eder.</td></tr>
+        <tr><td>Teklifte başkasının adı çıkıyor</td><td>Hesap mağazanın; <b>Satış Personeli</b> alanındaki adı kendi adınla değiştir.</td></tr>
+      </table>
+
+      <div class="gold">
+        <h4>Altın kurallar</h4>
+        <ol>
+          <li>Teklife başlamadan <b>doğru markada</b> olduğunu ve <b>Satış Personeli</b> alanında kendi adının yazdığını kontrol et.</li>
+          <li><b>Kırmızı uyarıyı</b> görmezden gelme; fiyat söylemeden önce çöz.</li>
+          <li>Kampanyayı satıştan önce <b>DİVA'dan teyit et</b>.</li>
+          <li>Müşteri düşünmeye gittiyse <b>teklifi kaydet</b>.</li>
+          <li>Fiyat listesi yüklemek senin işin değil; eksik gördüğünü <b>haber ver</b>.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div id="yTabBayi" style="display:none">
+      <p class="mut">Mağaza sahibi / bayi için: sistem ne yapar, personelini nasıl alırsın, stoğunu nasıl yüklersin.</p>
+
+      <h3>1 · FiyatIQ nedir</h3>
+      <p>Bosch ve Siemens yetkili satıcılarının güncel fiyat, stok ve kampanya bilgisini tek ekranda görüp müşteriye anında teklif çıkarmasını sağlar. Kurulum yok; tarayıcıdan <b>fiyatiq.com</b>, telefondan da çalışır.</p>
+      <p>En önemli farkı: <b>fiyat listelerini sen yüklemiyorsun.</b> Aylık toptan listeler, perakende fiyatlar, BİP tutarları ve kampanyalar merkezden yüklenir, bütün bayilere aynı anda yansır.</p>
+
+      <h3>2 · Ne kazandırır</h3>
+      <table>
+        <tr><th style="width:34%">Eskiden</th><th>FiyatIQ ile</th></tr>
+        <tr><td>Excel'de fiyat aramak, hangi dosya güncel diye tereddüt etmek</td><td>Kodun 3 harfi yazılır, güncel fiyat ekrana gelir</td></tr>
+        <tr><td>Kâr hesabını kafadan yapmak</td><td>Kâr oranı, banka komisyonu, taksit otomatik; zarara satışta ekran kırmızı uyarır</td></tr>
+        <tr><td>"Stokta var mı?" için depoyu aramak</td><td>Hangi depoda kaç adet olduğu satırın yanında</td></tr>
+        <tr><td>Elle yazılan dağınık teklif kâğıtları</td><td>Tek tuşla düzgün çıktı ya da WhatsApp mesajı</td></tr>
+        <tr><td>Verilen tekliflerin takibi yok</td><td>Her teklif numarasıyla kayıtlı; müşteri döndüğünde bulunur</td></tr>
+        <tr><td>Bitmiş kampanyadan indirim vermek</td><td>Kampanyalar sistemden gelir, DİVA teyidi hatırlatılır</td></tr>
+      </table>
+
+      <h3>3 · Nasıl başlanır</h3>
+      <ol>
+        <li><b>fiyatiq.com</b> → <span class="k">Hesabın yok mu? Kayıt ol</span>.</li>
+        <li>Ad soyad, mağaza adı, marka, e-posta, şifre (en az 6 karakter) → <span class="k">Kayıt Ol</span>.</li>
+        <li>Kaydın <b>yönetici onayına</b> düşer — yanlış kişilerin bayi fiyatlarını görmesini engellemek için.</li>
+        <li>Onaylandığında aynı bilgilerle giriş yaparsın.</li>
+      </ol>
+      <div class="box">Kayıt <b>mağaza başınadır</b>: bir mağaza, bir hesap. Personel sayısı kaç olursa olsun ek hesap açılmaz. Marka erişimin (Siemens, Bosch ya da ikisi) yönetici tarafından ayarlanır.</div>
+
+      <h3>4 · Hesap mağazanın, personelin değil</h3>
+      <p><b>Personel için ayrı hesap açılmaz.</b> Mağazanın tek hesabı olur; personel değişince, işe giren-çıkan olunca hesapla uğraşmazsın.</p>
+      <p>Teklifi kimin hazırladığı, satış ekranındaki <b>Satış Personeli</b> alanına yazılan isimden anlaşılır. Bilgisayar bu ismi hatırlar; başka biri geçtiğinde adını değiştirmesi yeterli. Alan boşken çıktı alınamaz, o yüzden teklifin altında her zaman bir isim olur.</p>
+      <p>Personel için ayrı bir kılavuz var; bir çıktı alıp kasanın yanında bulundurmak en pratiği (bu penceredeki "Satış ekranı" sekmesi de aynı içerik).</p>
+
+      <h3>5 · Stoğunu yükleme</h3>
+      <p>Fiyatlar merkezden gelir ama <b>senin depondaki stok sana ait</b>. Yükleme yeri: <span class="k">⚙ Yönetim</span> → <b>🚀 Aylık Veri Güncelleme</b> kutusu.</p>
+      <ol>
+        <li>Bir kez <b>🏬 Mağaza Ayarları</b>'ndan <b>kendi depo adını</b> yaz (ör. Kadıköy, Maltepe) ve kaydet.</li>
+        <li>Stok dosyanın <b>adında depo adı geçsin</b>: <i>Bosch Kadıköy Stok.xlsx</i>, <i>Siemens Mars Stok.xlsx</i> gibi. Sistem markayı ve tipi dosya adından tanır.</li>
+        <li>Dosyaları kutuya sürükle (hepsini birden atabilirsin) → listeyi kontrol et → <span class="k">✓ Onayla ve Yükle</span>.</li>
+        <li>Her yükleme o depodaki <b>önceki stoğun yerine geçer</b> — eklemez, değiştirir. En güncel dosyayı atman yeterli.</li>
+      </ol>
+      <div class="box"><b>Mars</b> ve <b>Horoz</b> BSH resmi lojistik depolarıdır, herkes için aynıdır. Üçüncü sütun senin kendi deponun adıyla görünür.</div>
+      <div class="box w">Stok, dosyayı yüklediğin andaki durumdur. Gün içi satışlar otomatik düşmez; kritik satışta depodan teyit alınmasını personeline söyle.</div>
+
+      <h3>6 · Şube mi, bağımsız mı</h3>
+      <table>
+        <tr><th style="width:26%">Tür</th><th>Ne demek</th></tr>
+        <tr><td><b>Bağımsız bayi</b></td><td>Kendi stoğunu kendi yükler, sadece kendi havuzunu görür. Varsayılan budur.</td></tr>
+        <tr><td><b>Şube</b></td><td>Aynı şirketin birden çok mağazası <b>ortak stok havuzunu</b> görür; birinde olmayan ürün diğerinden satılabilir.</td></tr>
+      </table>
+      <p>Bu ayarı yönetici yapar. Birden fazla mağazan varsa ve ortak stok istiyorsan söylemen yeterli.</p>
+
+      <h3>7 · Aylık düzen</h3>
+      <p>BSH listeleri her ay yenilenir; yeni dönem merkezden yüklendiğinde güncel fiyatı otomatik görürsün. Dönem başında bir iki gün <b>fiyatsız</b> görünen ürün olabilir — yanlış fiyat gösterilmez. Böyle bir ürün gördüğünde haber vermen listenin tamamlanmasını hızlandırır.</p>
+
+      <h3>8 · Bilmen gereken sınırlar</h3>
+      <ul>
+        <li><b>Kampanya teyidi:</b> Sistem gösterir, son söz DİVA'dadır.</li>
+        <li><b>Stok anlık değil:</b> Yüklenen dosya kadar günceldir.</li>
+        <li><b>Fiyat listesi yükleme bayide değil:</b> Bilerek böyle — tek yanlış dosya bütün mağazalarda yanlış fiyata yol açar.</li>
+        <li><b>Çıktıdaki fiyatlar KDV dahildir</b> ve kampanyaların devamlılığına bağlıdır.</li>
+      </ul>
+
+      <h3>9 · Sık sorulanlar</h3>
+      <table>
+        <tr><th style="width:38%">Soru</th><th>Cevap</th></tr>
+        <tr><td>Program kurmam gerekiyor mu?</td><td>Hayır. Tarayıcıdan fiyatiq.com — bilgisayar, tablet, telefon.</td></tr>
+        <tr><td>Verilerim başka bayiler görür mü?</td><td>Hayır. Stoğun ve teklifleriniz size özeldir; sadece şube olarak bağlı mağazalarla ortak havuz paylaşılır.</td></tr>
+        <tr><td>Personel sayısı sınırlı mı?</td><td>Hayır. Hesap mağazanın; kaç personel kullanırsa kullansın fark etmez, ek hesap açılmaz.</td></tr>
+        <tr><td>İnternet kesilirse?</td><td>Sistem çevrimiçi çalışır; gelince kaldığın yerden devam eder, kayıtlı teklifler kaybolmaz.</td></tr>
+        <tr><td>Personel işten ayrıldı</td><td>Bir şey yapmana gerek yok — hesap mağazaya ait. Sadece şifreyi değiştirmek istersen yöneticiye söyle.</td></tr>
+        <tr><td>Hangi teklifi kim verdi?</td><td>Teklifin altında <b>Satış Personeli</b> alanına yazılan isim çıkar; kayıtlarda da o isimle durur.</td></tr>
+      </table>
+
+      <div class="gold">
+        <h4>Kısa özet</h4>
+        <ol>
+          <li>fiyatiq.com → Kayıt ol → yönetici onayı → giriş. <b>Mağaza başına tek hesap.</b></li>
+          <li>Personel için hesap açılmaz; teklifi hazırlayan <b>Satış Personeli</b> alanına adını yazar.</li>
+          <li>Stok dosyanı <b>⚙ Yönetim → Aylık Veri Güncelleme</b>'den yükle; dosya adında depo adı geçsin.</li>
+          <li>Fiyat ve kampanya merkezden gelir — takip etmen gerekmez.</li>
+          <li>Fiyatsız ya da hatalı gördüğün bir şey olursa haber ver.</li>
+        </ol>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <div id="appView" style="display:none">
   <header>
     <h1 class="brand">fiyat<span class="q">iq</span></h1>
@@ -222,6 +443,7 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <button data-b="bosch" onclick="setBrand('bosch')">Bosch</button>
     </div>
     <button id="adminBtn" class="ghost sm" style="display:none" onclick="toggleAdmin()">⚙ Yönetim</button>
+    <button id="yardimBtn" class="ghost sm" onclick="yardimAc()" title="Nasıl kullanılır">❓ Nasıl kullanılır</button>
     <div class="grow"></div>
     <span id="who" class="mut"></span>
     <button class="ghost sm" onclick="signOut()">Çıkış</button>
@@ -1395,6 +1617,14 @@ function genTeklifNo(){ const d=new Date(),yy=String(d.getFullYear()).slice(2),m
 function getTeklifNo(){ if(!currentTeklifNo) currentTeklifNo=genTeklifNo(); return currentTeklifNo; }
 // Çıktı alınmadan önce müşteri adı + GSM ŞART: her basılan teklifin sahibi kayıtta görünsün
 function musteriKontrol(){
+  // Hesaplar mağaza bazlı olduğu için teklifi kimin hazırladığı sadece bu alandan anlaşılıyor.
+  const pers=((($("satisPersonel")||{}).value)||"").trim();
+  if(pers.length<2){
+    const pe=$("satisPersonel");
+    if(pe){ pe.style.outline="2px solid #f59e0b"; pe.focus(); pe.scrollIntoView({block:"center",behavior:"smooth"}); setTimeout(()=>{ pe.style.outline=""; },3000); }
+    alert("Satış Personeli alanına adını yaz.\n\nTeklifin altında kimin hazırladığı görünsün diye gerekiyor.\n(Bir kere yazman yeterli, bu bilgisayar hatırlar.)");
+    return false;
+  }
   const ad=((($("mAd")||{}).value)||"").trim();
   const tel=((($("mTel")||{}).value)||"").replace(/\D/g,"");
   if(ad.length>=2 && tel.length>=10) return true;
@@ -1810,6 +2040,35 @@ function asAc(){
     .catch(e=>{ const d=$("asDurum"); if(d) d.textContent="katalog okunamadı"; });
 }
 function asKapat(){ const p=$("asPanel"); if(p) p.style.display="none"; }
+
+/* ---- Nasıl kullanılır (yardım penceresi) ---- */
+function yardimSekme(hangi){
+  const s=$("yTabSatis"), b=$("yTabBayi");
+  if(s) s.style.display = hangi==="satis" ? "" : "none";
+  if(b) b.style.display = hangi==="bayi"  ? "" : "none";
+  const seg=$("ySeg"); if(seg) [...seg.querySelectorAll("button")].forEach(x=>x.classList.toggle("on",x.dataset.y===hangi));
+  const body=$("yardimBody"); if(body) body.scrollTop=0;
+}
+function yardimAc(){
+  const p=$("yardimPanel"), bk=$("yardimBack"); if(!p) return;
+  // Personel hesabında "Mağaza sahibi" sekmesi gizlenir.
+  const rol = (typeof profil!=="undefined" && profil) ? profil.rol : "";
+  const bayiTabBtn = $("ySeg") ? $("ySeg").querySelector('button[data-y="bayi"]') : null;
+  if(bayiTabBtn) bayiTabBtn.style.display = (rol==="personel") ? "none" : "";
+  yardimSekme(rol==="bayi" ? "bayi" : "satis");
+  p.style.display="flex"; if(bk) bk.style.display="block";
+}
+function yardimKapat(){
+  const p=$("yardimPanel"), bk=$("yardimBack");
+  if(p) p.style.display="none"; if(bk) bk.style.display="none";
+}
+function yardimYazdir(){
+  document.body.classList.add("yardim-print");
+  const geri=()=>document.body.classList.remove("yardim-print");
+  window.addEventListener("afterprint",geri,{once:true});
+  setTimeout(()=>{ try{window.print()}finally{ setTimeout(geri,1500); } },30);
+}
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") yardimKapat(); });
 function asTemizle(){ asGecmis=[]; const a=$("asAkis"); if(a) a.innerHTML=""; asAc(); }
 function asYaz(rol,metin){
   asGecmis.push({rol,metin});
