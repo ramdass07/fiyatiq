@@ -484,6 +484,11 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <div class="fld"><label>Kâr Oranı %</label><input id="karOrani" type="number" step="0.5" value="4" style="width:100px" oninput="recalc()"></div>
       <div class="fld"><label>Banka</label><select id="banka" onchange="onBankChange()"></select></div>
       <div class="fld"><label>Taksit</label><select id="taksit" onchange="onTaksitChange()"></select></div>
+      <div class="fld" id="elleKomFld" style="display:none"><label style="color:#f59e0b">✏️ Banka adı &amp; Komisyon %</label>
+        <span style="display:flex;gap:6px">
+          <input id="elleBanka" type="text" placeholder="banka adı" style="width:150px" oninput="renderRows()" onkeydown="if(event.key==='Enter')this.blur()">
+          <input id="elleOran" type="text" inputmode="decimal" placeholder="oran" style="width:80px;border-color:#f59e0b" oninput="elleOranDegisti()" onkeydown="if(event.key==='Enter')this.blur()">
+        </span></div>
       <div class="grow"></div>
       <div class="fld" style="text-align:right"><label>Peşin Toplam</label><span class="big" id="sumNakit">—</span></div>
       <div class="fld" style="text-align:right"><label>Taksitli Toplam</label><span class="big" id="sumTaksit">—</span></div>
@@ -1238,7 +1243,7 @@ function renderRows(){
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
   if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||bankaTaksitli||anyMT||manuelToplamTaksit!=null)? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= ((komis>0||bankaTaksitli||manuelToplamTaksit!=null)&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
-  if($("komShow")) $("komShow").textContent= (komis>0||bankaTaksitli)? ("%"+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
+  if($("komShow")) $("komShow").textContent= (komis>0||bankaTaksitli)? ((elleModu()?"✏️ elle %":"%")+komis+(tk?` · ${tk} tks`:"")) : "— (peşin)";
   if($("karPct")){ const e=$("karPct"); e.className="big"; e.style.fontSize="15px";
     e.innerHTML = uyMaliyetsiz.length ? maliyetUyariHTML
       : (tBipli>0 ? ('Peşin '+karBadge(karPesinTot)+(hasTaksitTot?'<br>Taksit '+karBadge(karTaksitTot):''))
@@ -1509,16 +1514,37 @@ async function refetch(r){
 async function loadBanks(){
   const {data}=await sb.from("banka_komisyonlari").select("banka").order("banka");
   const uniq=[...new Set((data||[]).map(x=>x.banka))];
-  $("banka").innerHTML='<option value="">— peşin —</option>'+uniq.map(b=>`<option>${b}</option>`).join(""); await loadTaksit();
+  $("banka").innerHTML='<option value="">— peşin —</option>'+uniq.map(b=>`<option>${b}</option>`).join("")
+    +'<option value="__elle__">✏️ Elle gireceğim…</option>'; await loadTaksit();
 }
+// Satış anında banka listede yoksa / oran değiştiyse: "✏️ Elle gireceğim" seçilir,
+// satışçı banka adını ve komisyon oranını kendi yazar. Kaydedilen orana dokunmaz.
+function elleModu(){ return (($("banka")||{}).value||"")==="__elle__"; }
+function bankaAdi(){
+  const b=(($("banka")||{}).value)||"";
+  if(b!=="__elle__") return b;
+  return ((($("elleBanka")||{}).value)||"").trim() || "Kredi Kartı";
+}
+function elleOranOku(){
+  const s=((($("elleOran")||{}).value)||"").replace("%","").replace(",",".").trim();
+  const n=parseFloat(s); return (isNaN(n)||n<0||n>100)?0:n;
+}
+function elleOranDegisti(){ komisOran=elleOranOku(); renderRows(); }
 async function loadTaksit(){
   const bk=$("banka").value;
+  const ef=$("elleKomFld"); if(ef) ef.style.display = (bk==="__elle__") ? "" : "none";
+  if(bk==="__elle__"){
+    $("taksit").innerHTML=Array.from({length:11},(_,i)=>`<option>${i+2}</option>`).join("");
+    const eo=$("elleOran"); if(eo) eo.focus();
+    komisOran=elleOranOku(); renderRows(); return;
+  }
   if(!bk){ $("taksit").innerHTML='<option value="">—</option>'; await setKomis(); return; }
   const {data}=await sb.from("banka_komisyonlari").select("taksit_sayisi").eq("banka",bk).order("taksit_sayisi");
   $("taksit").innerHTML=(data||[]).map(x=>`<option>${x.taksit_sayisi}</option>`).join(""); await setKomis();
 }
 async function setKomis(){
   const bk=$("banka").value, tk=+$("taksit").value;
+  if(bk==="__elle__"){ komisOran=elleOranOku(); renderRows(); return; }
   if(!bk||!tk){ komisOran=0; renderRows(); return; }
   const {data}=await sb.from("banka_komisyonlari").select("oran").eq("banka",bk).eq("taksit_sayisi",tk).maybeSingle();
   komisOran = data? +data.oran : 0; renderRows();
@@ -1703,7 +1729,7 @@ function shareWhatsApp(){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   if(!musteriKontrol()) return;
   saveQuote(true);   // teklif müşteriye gidiyorsa kaydı otomatik düşer
-  const tk=+$("taksit").value, bk=$("banka").value;
+  const tk=+$("taksit").value, bk=bankaAdi();
   const taksitliVar=(tk>1)&&(komisOran>0 || ((($("banka")||{}).value)||"")!=="");
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
   const TS=teklifSatirlar(items);
@@ -1735,7 +1761,7 @@ function printDoc(kind){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
   if(!musteriKontrol()) return;
   saveQuote(true);   // çıktı alınan her teklif otomatik kayda düşer
-  const ad=(($("mAd")||{}).value)||"", tel=(($("mTel")||{}).value)||"", personel=(($("satisPersonel")||{}).value)||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=$("banka").value;
+  const ad=(($("mAd")||{}).value)||"", tel=(($("mTel")||{}).value)||"", personel=(($("satisPersonel")||{}).value)||"", toplam=teklifToplam(items), tk=+$("taksit").value, bk=bankaAdi();
   const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
   // ÇIKTI = EKRAN: indirim İLGİLİ ürüne dağıtılır; PRİMLİ ürün fiyatı sabit; satırlar tam liraya yuvarlı
   const TS=teklifSatirlar(items);
