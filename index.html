@@ -708,14 +708,14 @@ function araLink(code){ return "https://www.google.com/search?q="+encodeURICompo
 
 // ===== Ayrı yükleme kutuları tanımı =====
 const IMPORTERS = {
-  toptan:{ title:"Toptan Fiyat", target:"toptan_fiyatlar", conflict:"model_kodu,marka,donem", donem:true, alsoUrunler:true,
+  toptan:{ title:"Toptan Fiyat", target:"toptan_fiyatlar", conflict:"model_kodu,marka,donem", donem:true, alsoUrunler:true, skipSheetRe:/perakende/i,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
           {key:"urun_adi",label:"Ürün Adı (ops.)",type:"text",optional:true,skw:["tanim","aciklama","urun adi"]},
           {key:"toptan_fiyat",label:"Toptan Fiyat",type:"num",skw:["toptan"],sneg:["kampanyasiz"]}] },
-  toptan_bagimsiz:{ title:"Toptan Fiyat · BAĞIMSIZ BAYİ (ham liste)", target:"toptan_fiyatlar", conflict:"model_kodu,marka,donem", donem:true,
+  toptan_bagimsiz:{ title:"Toptan Fiyat · BAĞIMSIZ BAYİ (ham liste)", target:"toptan_fiyatlar", conflict:"model_kodu,marka,donem", donem:true, skipSheetRe:/perakende/i,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
           {key:"toptan_fiyat_bagimsiz",label:"Toptan Fiyat (zamsız/ham)",type:"num",skw:["toptan"],sneg:["kampanyasiz"]}] },
-  perakende:{ title:"Perakende Fiyat (1.seçenek peşin)", target:"perakende_fiyatlar", conflict:"model_kodu,marka,donem", donem:true,
+  perakende:{ title:"Perakende Fiyat (1.seçenek peşin)", target:"perakende_fiyatlar", conflict:"model_kodu,marka,donem", donem:true, skipSheetRe:/toptan/i,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
           {key:"nakit_fiyat",label:"Peşin Fiyat (1.seçenek)",type:"num",skw:["pesin"],sneg:["kampanyasiz"]}] },
   bip:{ title:"BİP (KDV dahil)", target:"bip", conflict:"model_kodu,marka,donem", donem:true,
@@ -1544,7 +1544,9 @@ async function refetch(r){
 }
 async function loadBanks(){
   const {data}=await sb.from("banka_komisyonlari").select("banka").order("banka");
-  const uniq=[...new Set((data||[]).map(x=>x.banka))];
+  let uniq=[...new Set((data||[]).map(x=>x.banka))];
+  // Koç grubu (BEKO ...) oranları bize özel — bağımsız/dış bayilere gösterilmez.
+  if(disBayiMi()) uniq=uniq.filter(b=>!/^BEKO\b/i.test((b||"").trim()));
   $("banka").innerHTML='<option value="">— peşin —</option>'+uniq.map(b=>`<option>${b}</option>`).join("")
     +'<option value="__elle__">✏️ Elle gireceğim…</option>'; await loadTaksit();
 }
@@ -2205,7 +2207,11 @@ function tkey(s){ return (""+(s==null?"":s)).normalize("NFKD").replace(/[̀-ͯ]/
 function tkc(s){ return tkey(s).replace(/[^a-z0-9]/g,""); } // boşluk/noktalama atılmış sıkı anahtar
 const CODE_RE=/^(?=.*\d)[A-Z0-9]{5,}$/;
 function isCode(v){ return CODE_RE.test((""+(v==null?"":v)).trim().toUpperCase()); }
-function colMatches(cell,c){ if(!c.skw) return false; const t=tkey(cell); if(!c.skw.some(w=>t.includes(w))) return false; if(c.sneg&&c.sneg.some(w=>t.includes(w))) return false; return true; }
+function colMatches(cell,c){ if(!c.skw) return false; const t=tkey(cell);
+  if(t.length>45) return false; // uzun metin = sayfa başlığı ("... HEMEN TESLİM TOPTAN FİYAT LİSTESİ"), sütun başlığı değil
+  if(!c.skw.some(w=>t.includes(w))) return false; if(c.sneg&&c.sneg.some(w=>t.includes(w))) return false; return true; }
+// Bulunan sütun gerçekten sayı içeriyor mu? (başlık satırı yanlış seçilirse kod sütununa denk gelebilir)
+function colHasNums(aoa,dataStart,idx){ if(idx<0) return false; let n=0; for(let i=dataStart;i<Math.min(aoa.length,dataStart+60);i++){ const r=aoa[i]||[]; if(isNum(r[idx])) n++; if(n>=3) return true; } return false; }
 function detectCodeCol(aoa,dataStart){
   const cand={}; for(let i=dataStart;i<Math.min(aoa.length,dataStart+60);i++){ const r=aoa[i]||[]; for(let j=0;j<Math.min(8,r.length);j++){ if(isCode(r[j])) cand[j]=(cand[j]||0)+1; } }
   let col=0,mx=-1; for(const j in cand){ if(cand[j]>mx){mx=cand[j];col=+j;} } return col;
@@ -2262,13 +2268,16 @@ async function smartScan(k){
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true}); lastWb=wb;
       const pre=files.length>1?(f.name.replace(/\.[^.]+$/,"").slice(0,10)+"·"):"";
       wb.SheetNames.forEach(sn=>{
+        if(cfg.skipSheetRe && cfg.skipSheetRe.test(sn)){ detail.push(`${pre}${sn}:atlandı`); return; }
         const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
         if(cfg.stockMode){ const out=parseStockRows(aoa); out.forEach(o=>{ if(!seen.has(o.model_kodu)){ seen.add(o.model_kodu); all.push(o); } }); detail.push(`${pre}${sn}:${out.length}`); return; }
         let hr=-1,best=0;
         if(valCols.some(c=>c.skw)){ for(let r=0;r<Math.min(aoa.length,15);r++){ const row=aoa[r]||[]; let sc=0; valCols.forEach(c=>{ if(c.skw && row.some(cell=>colMatches(cell,c))) sc++; }); if(sc>best){best=sc;hr=r;} } }
         const dataStart= hr<0?0:hr+1;
         const codeCol=detectCodeCol(aoa,dataStart);
-        const vmap={}; valCols.forEach(c=>{ let idx=-1; if(hr>=0&&c.skw){ const row=aoa[hr]||[]; for(let j=0;j<row.length;j++){ if(colMatches(row[j],c)){ idx=j; break; } } } if(idx<0&&c.type==="num") idx=numFallback(aoa,dataStart,codeCol); vmap[c.key]=idx; });
+        const vmap={}; valCols.forEach(c=>{ let idx=-1; if(hr>=0&&c.skw){ const row=aoa[hr]||[]; for(let j=0;j<row.length;j++){ if(colMatches(row[j],c)){ idx=j; break; } } }
+          if(c.type==="num" && (idx===codeCol || !colHasNums(aoa,dataStart,idx))) idx=-1;
+          if(idx<0&&c.type==="num") idx=numFallback(aoa,dataStart,codeCol); vmap[c.key]=idx; });
         let cnt=0;
         for(let i=dataStart;i<aoa.length;i++){ const r=aoa[i]||[]; if(!isCode(r[codeCol])) continue; const kod=(""+r[codeCol]).trim().toUpperCase(); if(seen.has(kod)) continue;
           const obj={model_kodu:kod}; let has=false;
