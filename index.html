@@ -712,6 +712,9 @@ const IMPORTERS = {
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
           {key:"urun_adi",label:"Ürün Adı (ops.)",type:"text",optional:true,skw:["tanim","aciklama","urun adi"]},
           {key:"toptan_fiyat",label:"Toptan Fiyat",type:"num",skw:["toptan"],sneg:["kampanyasiz"]}] },
+  toptan_bagimsiz:{ title:"Toptan Fiyat · BAĞIMSIZ BAYİ (ham liste)", target:"toptan_fiyatlar", conflict:"model_kodu,marka,donem", donem:true,
+    cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
+          {key:"toptan_fiyat_bagimsiz",label:"Toptan Fiyat (zamsız/ham)",type:"num",skw:["toptan"],sneg:["kampanyasiz"]}] },
   perakende:{ title:"Perakende Fiyat (1.seçenek peşin)", target:"perakende_fiyatlar", conflict:"model_kodu,marka,donem", donem:true,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
           {key:"nakit_fiyat",label:"Peşin Fiyat (1.seçenek)",type:"num",skw:["pesin"],sneg:["kampanyasiz"]}] },
@@ -775,6 +778,7 @@ async function showApp(session){
   { const ck=$("mCikisKendi"); if(ck){ ck.textContent=depoAdi().toUpperCase(); ck.value=depoAdi().toUpperCase(); } } // çıkış deposu: kendi depo adı (Kadıköy vb.)
   await loadAktifDonem();
   await loadPrimli();
+  await loadBagimsizToptan();
   await loadBanks();
   await loadAktifKampanyalar();
   if(quoteRows.length===0) addRow();
@@ -827,11 +831,37 @@ async function primliYukle(files){
 }
 async function loadProfil(uid){
   // depo_adi kolonu migrasyondan önce yoksa eski kolonlara düş (giriş asla kırılmasın)
-  let {data,error} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad,depo_adi").eq("id",uid).maybeSingle();
-  if(error){ const r2=await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad").eq("id",uid).maybeSingle(); data=r2.data; }
+  let {data,error} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad,depo_adi,bayi_sahibi").eq("id",uid).maybeSingle();
+  if(error){ const r2=await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad,bayi_sahibi").eq("id",uid).maybeSingle(); data=r2.data; }
   if(data) profil = data;
 }
 function depoAdi(){ return (profil&&profil.depo_adi)?profil.depo_adi:"Kadıköy"; }
+// ── DIŞ BAYİ TOPTAN LİSTESİ ────────────────────────────────────────────────
+// Bizim yüklediğimiz toptan liste patron kuralı gereği BAZI ürünlerde zamlı.
+// Dışarıdan (bağımsız) bayiler o listeyi görmemeli → onlar için AYRI bir ham liste
+// yüklenir (⚙ Yönetim → "Toptan Fiyat · BAĞIMSIZ BAYİ"), aynı satırın
+// toptan_fiyat_bagimsiz sütununa yazılır. Dış bayi ürün açtığında o fiyat gösterilir.
+// Dış bayi = rolü "bayi" VE şube değil (bayi_sahibi boş). Bizim mağazalarımız şube olduğu için etkilenmez.
+// Not: bayi_sahibi okunamazsa İÇERİ sayılır — kendi mağazalarımızın ekranı asla kazara değişmesin.
+function disBayiMi(){ return !!(profil && profil.rol==="bayi" && ("bayi_sahibi" in profil) && profil.bayi_sahibi==null); }
+let bagimsizToptan={};   // MODEL KODU -> ham toptan fiyat (sadece dış bayide dolar)
+async function loadBagimsizToptan(){
+  bagimsizToptan={};
+  if(!disBayiMi()) return;
+  try{
+    const rows=await sbTumu("toptan_fiyatlar","model_kodu,toptan_fiyat_bagimsiz",
+      q=>q.eq("marka",brand).eq("donem",aktifDonem||_donem()).not("toptan_fiyat_bagimsiz","is",null));
+    (rows||[]).forEach(r=>{ const k=(r.model_kodu||"").toUpperCase();
+      if(k && r.toptan_fiyat_bagimsiz!=null) bagimsizToptan[k]=+r.toptan_fiyat_bagimsiz; });
+  }catch(e){ bagimsizToptan={}; }   // sütun/SQL yoksa sessizce eski davranış
+}
+// Dış bayide ayrı listede fiyat varsa ONU göster; yoksa normal listeye düş (fiyatsız bırakma).
+function toptanGoster(v,kod){
+  if(!disBayiMi()) return v;
+  const k=(kod||"").toUpperCase();
+  if(k && bagimsizToptan[k]!=null) return bagimsizToptan[k];
+  return v;
+}
 function isEditor(){ return profil.rol==="admin"||profil.rol==="personel"; }
 async function depoAdiKaydet(){
   const v=(($("depoAdiInp")||{}).value||"").trim(); const m=$("depoAdiMsg");
@@ -863,6 +893,7 @@ function setBrand(b){
   loadAktifKampanyalar().then(()=>renderRows());
   if(typeof topluTemizle==="function") topluTemizle(); // marka değişince eski yükleme sonucu ekranda kalmasın
   loadPrimli().then(()=>renderRows());
+  loadBagimsizToptan().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   syncAdminBrand();
 }
 function syncAdminBrand(){
@@ -1000,7 +1031,7 @@ async function loadBayiler(){
         <button class="bad sm" onclick="silBayi('${p.id}','${(p.ad||'').replace(/'/g,'')}')">Sil</button>`}
       </td></tr>`;
   }).join("");
-  const msg=$("bayiMsg"); if(msg) { msg.className="mut"; msg.style.fontSize="11px"; msg.textContent="🏬 Şubem = şirketin ORTAK stok havuzunu görür (9 mağazan için). Bağımsız = kendi stoğunu kendi yükler, seninkileri göremez. ✓ işaretli marka açıktır. Değişiklikler bayi sayfayı yenileyince yansır."; }
+  const msg=$("bayiMsg"); if(msg) { msg.className="mut"; msg.style.fontSize="11px"; msg.innerHTML="🏬 <b>Şubem</b> = şirketin ORTAK stok havuzunu görür ve <b>bizim toptan listemizi</b> görür. <b>Bağımsız</b> = kendi stoğunu kendi yükler, seninkileri göremez ve <b>\"BAĞIMSIZ BAYİ\" toptan listesini</b> görür. ⚠ Kendi mağazalarının hepsi 🏬 <b>Şubem</b> olmalı — Bağımsız kalan bir mağaza yanlış fiyat listesini görür. ✓ işaretli marka açıktır. Değişiklikler bayi sayfayı yenileyince yansır."; }
 }
 // Şube / Bağımsız geçişi: şube = bayi_sahibi ADMIN'e bağlanır → ortak stok/primli havuzu
 async function setBayiSube(id,yap){
@@ -1096,7 +1127,7 @@ async function stokSorgula(){
   const pm=primliMap[q];
   const pmTxt=(pm&&pm.fiyat)?`<span class="chip" style="background:var(--bad);color:#fff;border-color:var(--bad)">⭐ Primli Satış ${fmt(pm.fiyat)} ₺</span>`:"";
   const pTxt=(row&&row.nakit_fiyat)?`<span class="chip pesin">Peşin ${fmt(row.nakit_fiyat)} ₺</span>`:"";
-  const tTxt=(row&&row.toptan_fiyat!=null)?`<span class="chip toptan">Toptan ${fmt(row.toptan_fiyat)} ₺</span>`:"";
+  const tTxt=(row&&row.toptan_fiyat!=null)?`<span class="chip toptan">Toptan ${fmt(toptanGoster(row.toptan_fiyat,q))} ₺</span>`:"";
   const bTxt=(row&&row.bip_tutar)?`<span class="chip bip">BİP ${fmt(row.bip_tutar)} ₺</span>`:"";
   const fiyat=(pmTxt+pTxt+tTxt+bTxt)?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">${pmTxt}${pTxt}${tTxt}${bTxt}</div>`:"";
   const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null && !pm)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
@@ -1492,7 +1523,7 @@ async function refetch(r){
   const pr=primliMap[(r.kod||"").toUpperCase()]; // primli ürün mü?
   r.primliFiyat = (pr && pr.fiyat) ? pr.fiyat : null; // belirlenen primli satış fiyatı (varsayılan peşin)
   if(row && (row.urun_adi || row.toptan_fiyat!=null)){
-    r.ad=row.urun_adi||r.kod; r.toptan=row.toptan_fiyat; r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
+    r.ad=row.urun_adi||r.kod; r.toptan=toptanGoster(row.toptan_fiyat,r.kod); r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
     if(row.toptan_fiyat!=null) r.isET=false;
     else if(!(+r.etToptan>0)) r.isET=true; // üründe TOPTAN YOK → otomatik Manuel moda geç, maliyet elle girilsin
   } else { r.ad = pr ? r.kod : "— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; } // primli ama listede yoksa: kodu göster, manuel toptan
@@ -2050,7 +2081,7 @@ async function asKatalog(){
   const net={}; stk.forEach(s=>{ const k=s.model_kodu; net[k]=(net[k]||0)+((s.tip==="ayrilmis"?-1:1)*(+s.adet||0)); });
   const ad={}; urn.forEach(u=>{ ad[u.model_kodu]=u.urun_adi||""; });
   const pf={}; per.forEach(p=>{ pf[p.model_kodu]=+p.nakit_fiyat||0; });
-  const tf={}; top.forEach(t=>{ tf[t.model_kodu]=+t.toptan_fiyat||0; });
+  const tf={}; top.forEach(t=>{ tf[t.model_kodu]=toptanGoster(+t.toptan_fiyat||0,t.model_kodu)||0; });
   asKatalogCache=Object.keys(net).filter(k=>net[k]>0)
     .map(k=>({k,ad:ad[k]||"",adet:net[k],pesin:pf[k]||0,toptan:tf[k]||0}))
     .filter(u=>u.pesin>0||u.toptan>0);
