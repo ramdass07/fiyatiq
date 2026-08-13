@@ -606,9 +606,9 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <div id="tekliflerMsg" class="msg"></div>
     </div>
 
-    <h2 style="margin:4px 0 0" id="merkeziBaslik">Merkezi Veri Yükleme <span id="aktifMarka" class="badge">Aktif: Siemens</span></h2>
-    <p class="mut" style="font-size:13px;margin:4px 0 12px" id="merkeziAciklama">Yüklemeler <b>üstten seçili markaya</b> yazılır (Siemens/Bosch). Fiyat kutularına <b>birden çok parça dosyayı aynı anda</b> seçebilirsin; "Akıllı Tara" hepsini birleştirip sütunları otomatik tanır.</p>
-    <div id="importers"></div>
+    <h2 style="margin:4px 0 0;cursor:pointer;user-select:none" id="merkeziBaslik" onclick="merkeziAc()"><span id="merkeziOk">▶</span> 🔧 Elle Yükleme <span class="badge">gelişmiş · normalde gerekmez</span> <span id="aktifMarka" class="badge">Aktif: Siemens</span></h2>
+    <p class="mut" style="font-size:13px;margin:4px 0 12px" id="merkeziAciklama">Normal aylık güncelleme için yukarıdaki <b>🚀 Aylık Veri Güncelleme</b> kutusu yeterlidir — toptan, perakende ve BİP'i tek dosyadan kendi ayıklar. Buradaki kutuları yalnızca tek bir listeyi ayrıca düzeltmen gerektiğinde kullan.</p>
+    <div id="importers" style="display:none"></div>
 
     <div class="card" id="kampSihirbazCard" style="border:2px solid var(--brand)">
       <h2>🤖 Kampanya Sihirbazı <span class="badge">Opus · otomatik ayıklar</span></h2>
@@ -916,7 +916,10 @@ function toggleAdmin(){
 // FL/kampanya/banka MERKEZDEN (admin/personel) yüklenir — ortak veridir.
 function applyAdminAccess(){
   const ed=isEditor();
-  ["kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama","importers"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  ["kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  // "Elle Yükleme" kutuları kapalı başlar — başlığa tıklayınca açılır (bkz. merkeziAc)
+  const imp=$("importers"); if(imp) imp.style.display="none";
+  const mo=$("merkeziOk"); if(mo) mo.textContent="▶";
   const bc=$("bayilerCard"); if(bc) bc.style.display=profil.rol==="admin"?"":"none";
   // Satış Asistanı: yalnızca admin. Mağaza/personel hesaplarında ne kart ne panel açılır.
   const ac=$("asistanCard"); if(ac) ac.style.display=profil.rol==="admin"?"":"none";
@@ -2182,6 +2185,8 @@ async function topluYaz(){
   }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; btn.disabled=false; }
 }
 
+function merkeziAc(){ const el=$("importers"); if(!el) return; const kapali=el.style.display==="none";
+  el.style.display=kapali?"":"none"; const ok=$("merkeziOk"); if(ok) ok.textContent=kapali?"▼":"▶"; }
 function buildImporters(){
   const c=$("importers"); if(!c) return;
   const ym=new Date(); const mon=ym.getFullYear()+"-"+String(ym.getMonth()+1).padStart(2,"0");
