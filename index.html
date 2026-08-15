@@ -699,6 +699,7 @@ function toggleGorunum(){ basitMod=!basitMod; try{localStorage.setItem("fq_basit
 let kampAcik=false;
 function toggleKampPanel(){ kampAcik=!kampAcik; const l=$("kampList"); if(l) l.style.display=kampAcik?"":"none"; const a=$("kampArrow"); if(a) a.textContent=kampAcik?"▼":"▶"; }
 let profil = {rol:"bayi", marka_erisimi:["siemens","bosch"], abonelik_durumu:"pasif"};
+let authUid = null; // giris yapan kullanicinin auth id'si — stokSahibi() bunu kullanir
 let impState = {};
 
 function fmt(n){ if(n==null||isNaN(n)) return "—"; return Number(n).toLocaleString("tr-TR",{maximumFractionDigits:0}); }
@@ -762,6 +763,7 @@ async function signUp(){
 async function signOut(){ await sb.auth.signOut(); quoteRows=[]; }
 
 async function showApp(session){
+  authUid = session.user.id;
   await loadProfil(session.user.id);
   if(profil.rol!=="admin" && profil.abonelik_durumu==="pasif"){ show("pendingView"); return; }
   show("appView"); appReady=true;
@@ -850,7 +852,7 @@ function disBayiMi(){ return !!(profil && profil.rol==="bayi" && ("bayi_sahibi" 
 // onların stok sahibi, bağlı oldukları merkezdir. Bağımsız bayide sahip kendisidir.
 // Bu fonksiyon HEM okuma HEM yazma HEM silme sorgularında kullanılır —
 // güvenlik yalnızca RLS'e bırakılmaz, kodda da açıkça filtrelenir.
-function stokSahibi(){ return (profil && profil.bayi_sahibi) ? profil.bayi_sahibi : (user && user.id) || null; }
+function stokSahibi(){ return (profil && profil.bayi_sahibi) ? profil.bayi_sahibi : authUid; }
 let bagimsizToptan={};   // MODEL KODU -> ham toptan fiyat (sadece dış bayide dolar)
 async function loadBagimsizToptan(){
   bagimsizToptan={};
