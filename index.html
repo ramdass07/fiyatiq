@@ -83,7 +83,6 @@
   .kd{display:inline-block;background:var(--warn);color:#3b2600;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:800;margin-left:5px}
   .nostock{display:inline-block;color:var(--bad);font-weight:800;margin-left:6px;font-size:11px}
   .prim-badge{display:inline-block;background:var(--bad);color:#fff;font-weight:800;font-size:10px;padding:2px 8px;border-radius:999px;letter-spacing:.3px;box-shadow:0 0 8px rgba(239,68,68,.5)}
-  .online-badge{display:inline-block;background:#7c3aed;color:#fff;font-weight:800;font-size:10px;padding:2px 8px;border-radius:999px;letter-spacing:.3px;box-shadow:0 0 8px rgba(124,58,237,.55)}
   .diva-uyari{background:rgba(245,158,11,.15);border:1px solid var(--warn);color:var(--warn);padding:7px 11px;border-radius:8px;margin-bottom:10px;font-weight:700;font-size:13px}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px}
   .pill.aktif{background:#0c2f1a;color:var(--ok);border:1px solid #1f5236}
@@ -568,22 +567,6 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <div id="primliMsg" class="msg"></div>
     </div>
 
-    <div class="card" id="onlineCard" style="border:2px solid #7c3aed">
-      <h2>🌐 Online Kampanya <span class="badge" style="background:#7c3aed;color:#fff">tarih aralıklı</span></h2>
-      <p class="mut" style="font-size:13px;margin:4px 0 10px">BSH'ın <b>online kampanya</b> listesini buraya bırak (Ürün Kodu · Online Fiyat sütunlu Excel). Üstten <b>doğru markayı</b> seç, <b>tarih aralığını</b> gir. Kampanya süresi içinde o ürünler teklif ekranında ve stok sorgusunda <b style="color:#a78bfa">🌐 ONLİNE</b> rozetiyle uyarır, online fiyatı görünür. <b>Kâr/peşin/taksit hesabına karışmaz</b> — sadece uyarıdır.</p>
-      <div class="row" style="align-items:flex-end;margin-bottom:10px">
-        <div class="fld"><label>Başlangıç</label><input id="onlineBas" type="date" style="width:160px"></div>
-        <div class="fld"><label>Bitiş</label><input id="onlineBit" type="date" style="width:160px"></div>
-      </div>
-      <label id="onlineDrop" ondragover="event.preventDefault();this.style.background='#4c1d9533'" ondragleave="this.style.background='var(--field)'" ondrop="event.preventDefault();this.style.background='var(--field)';onlineYukle(event.dataTransfer.files)" style="display:block;border:2px dashed #7c3aed;border-radius:12px;padding:20px;text-align:center;cursor:pointer;background:var(--field)">
-        <input id="onlineFile" type="file" accept=".xlsx,.xls,.csv" multiple style="display:none" onchange="onlineYukle(this.files)">
-        <div style="font-size:15px;font-weight:700">🌐 Online kampanya Excel'ini bırak, ya da tıkla</div>
-        <div class="mut" style="font-size:12px;margin-top:4px">Sütunlar: Ürün Kodu · Online Fiyat (fiyat yoksa yalnızca uyarı çıkar)</div>
-      </label>
-      <div id="onlineMsg" class="msg"></div>
-      <div id="onlineListe" style="margin-top:10px"></div>
-    </div>
-
     <div class="card" id="magazaAyarCard">
       <h2>🏬 Mağaza Ayarları <span class="badge">kendi depon</span></h2>
       <div class="row" style="align-items:flex-end">
@@ -710,7 +693,7 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 const SUPABASE_URL = "https://xooknwhvxmkfoiaaosui.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Hq44fpVzfZfTvcPQZL-5xw_8kmLRl19";
 
-let sb, brand="siemens", quoteRows=[], appReady=false, basitMod=false, aktifDonem=null, primliMap={}, onlineMap={};
+let sb, brand="siemens", quoteRows=[], appReady=false, basitMod=false, aktifDonem=null, primliMap={};
 function applyGorunum(){ const g=$("grid"); if(g) g.classList.toggle("basit",basitMod); const b=$("gorunumBtn"); if(b) b.textContent=basitMod?"📊 Detaylıya geç":"📋 Basite geç"; }
 function toggleGorunum(){ basitMod=!basitMod; try{localStorage.setItem("fq_basit",basitMod?"1":"0");}catch(e){} applyGorunum(); }
 let kampAcik=false;
@@ -795,7 +778,6 @@ async function showApp(session){
   { const ck=$("mCikisKendi"); if(ck){ ck.textContent=depoAdi().toUpperCase(); ck.value=depoAdi().toUpperCase(); } } // çıkış deposu: kendi depo adı (Kadıköy vb.)
   await loadAktifDonem();
   await loadPrimli();
-  await loadOnline();
   await loadBagimsizToptan();
   await loadBanks();
   await loadAktifKampanyalar();
@@ -847,103 +829,6 @@ async function primliYukle(files){
     $("primliFile").value="";
   }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; }
 }
-// ── ONLİNE KAMPANYA ────────────────────────────────────────────────────────
-// BSH'ın belirli tarih aralığında yaptığı online kampanyalar. Ortak veri (admin yükler,
-// herkes görür). SADECE UYARI amaçlıdır: kâr/peşin/taksit hesabına KARIŞMAZ.
-// onlineMap[kod]={fiyat, bas, bit}
-async function loadOnline(){
-  onlineMap={};
-  try{
-    const b=_bugun();
-    const {data}=await sb.from("online_kampanyalar").select("model_kodu,online_fiyat,baslangic,bitis")
-      .eq("marka",brand).lte("baslangic",b).gte("bitis",b);
-    (data||[]).forEach(x=>{ onlineMap[(x.model_kodu||"").toUpperCase()]={fiyat:x.online_fiyat,bas:x.baslangic,bit:x.bitis}; });
-  }catch(e){}
-}
-function onlineRozet(kod){
-  const o=onlineMap[(kod||"").toUpperCase()]; if(!o) return "";
-  return ` <span class="online-badge" title="Bu üründe ONLİNE kampanya var (${fmtTarih(o.bas)} – ${fmtTarih(o.bit)})${o.fiyat?' · online fiyat '+fmt(o.fiyat)+' ₺':''}. Bilgi amaçlıdır, kâr hesabına katılmaz.">🌐 ONLİNE${o.fiyat?' '+fmt(o.fiyat)+'₺':''}</span>`;
-}
-// Online kampanya Excel'i: Ürün Kodu + Online Fiyat sütunu. Tarihler formdaki kutulardan gelir.
-async function onlineYukle(files){
-  const msg=$("onlineMsg"); if(!files||!files.length) return;
-  const bas=(($("onlineBas")||{}).value||"").trim(), bit=(($("onlineBit")||{}).value||"").trim();
-  if(!bas||!bit){ msg.className="msg bad"; msg.textContent="Önce kampanyanın başlangıç ve bitiş tarihini seç."; $("onlineFile").value=""; return; }
-  if(bit<bas){ msg.className="msg bad"; msg.textContent="Bitiş tarihi başlangıçtan önce olamaz."; $("onlineFile").value=""; return; }
-  msg.className="msg"; msg.textContent="Okunuyor...";
-  const rows=[], seen={};
-  try{
-    for(const f of files){
-      const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
-      wb.SheetNames.forEach(sn=>{
-        const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
-        let hr=-1;
-        for(let r=0;r<Math.min(aoa.length,15);r++){ const t=(aoa[r]||[]).map(tkc); if(t.some(x=>x.includes("urun")||x.includes("model")||x.includes("kod"))){ hr=r; break; } }
-        if(hr<0) hr=0;
-        const H=(aoa[hr]||[]).map(tkc);
-        const cc=detectCodeCol(aoa,hr+1);
-        // fiyat sütunu: başlıkta "online" geçen fiyat > "fiyat" geçen ilk sütun
-        let cf=H.findIndex(h=>h.includes("online")&&h.includes("fiyat"));
-        if(cf<0) cf=H.findIndex(h=>h.includes("fiyat"));
-        for(let i=hr+1;i<aoa.length;i++){
-          const row=aoa[i]||[]; const kod=(""+(row[cc]==null?"":row[cc])).trim().toUpperCase();
-          if(!isCode(kod)||seen[kod]) continue; seen[kod]=1;
-          let fiyat=(cf>=0&&isNum(row[cf]))?+row[cf]:null;
-          if(fiyat==null){ // fiyat sütunu bulunamadıysa koddan sonraki ilk pozitif sayı
-            for(let j=cc+1;j<row.length;j++){ if(isNum(row[j])&&+row[j]>0){ fiyat=+row[j]; break; } } }
-          rows.push({marka:brand,model_kodu:kod,online_fiyat:fiyat,baslangic:bas,bitis:bit});
-        }
-      });
-    }
-  }catch(e){ msg.className="msg bad"; msg.textContent="Okuma hatası: "+e.message; return; }
-  if(!rows.length){ msg.className="msg bad"; msg.textContent="Ürün kodu bulunamadı. Excel'de bir sütunda ürün kodu, yanında online fiyat olmalı."; return; }
-  msg.textContent="Yükleniyor ("+rows.length+" ürün)...";
-  try{
-    // aynı marka + aynı tarih aralığı yeniden yüklenirse eskisinin yerine geçer
-    await sb.from("online_kampanyalar").delete().eq("marka",brand).eq("baslangic",bas).eq("bitis",bit);
-    await upsert("online_kampanyalar",rows,"marka,model_kodu,baslangic,bitis");
-    await loadOnline(); renderRows(); onlineListele();
-    const fs=rows.filter(r=>r.online_fiyat==null).length;
-    msg.className="msg ok";
-    msg.textContent="✓ "+rows.length+" ürün yüklendi ("+(brand==="bosch"?"Bosch":"Siemens")+" · "+fmtTarih(bas)+" – "+fmtTarih(bit)+")."
-      +(fs?" "+fs+" üründe online fiyat okunamadı, sadece uyarı çıkacak.":"")+" Satışçı bu ürünleri teklife eklediğinde 🌐 ONLİNE uyarısı görür.";
-    $("onlineFile").value="";
-  }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message+" (online_kampanya.sql çalıştırıldı mı?)"; }
-}
-// Yönetimdeki liste: yüklü online kampanyalar (marka bazlı), süresi geçenler soluk
-async function onlineListele(){
-  const box=$("onlineListe"); if(!box) return;
-  try{
-    const {data,error}=await sb.from("online_kampanyalar").select("id,model_kodu,online_fiyat,baslangic,bitis")
-      .eq("marka",brand).order("bitis",{ascending:false}).order("model_kodu");
-    if(error) throw error;
-    const list=data||[];
-    if(!list.length){ box.innerHTML='<span class="mut" style="font-size:12px">Bu markada yüklü online kampanya yok.</span>'; return; }
-    const b=_bugun(); const grup={};
-    list.forEach(x=>{ const k=x.baslangic+"|"+x.bitis; (grup[k]=grup[k]||[]).push(x); });
-    box.innerHTML=Object.keys(grup).map(k=>{
-      const [bas,bit]=k.split("|"); const arr=grup[k]; const aktif=(bas<=b&&bit>=b);
-      const ids=arr.map(x=>x.id).join(",");
-      return `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--field);opacity:${aktif?1:.55}">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <b>${fmtTarih(bas)} – ${fmtTarih(bit)}</b>
-          <span class="badge" style="background:${aktif?'#7c3aed':'#475569'};color:#fff">${aktif?'AKTİF':'süresi geçti'}</span>
-          <span class="mut" style="font-size:12px">${arr.length} ürün</span>
-          <button class="ghost sm" style="margin-left:auto" onclick="onlineSil('${ids}')">✕ Sil</button>
-        </div>
-        <div class="mut" style="font-size:11px;margin-top:4px">${arr.slice(0,14).map(x=>x.model_kodu+(x.online_fiyat?' ('+fmt(x.online_fiyat)+'₺)':'')).join(" · ")}${arr.length>14?" … +"+(arr.length-14):""}</div>
-      </div>`;
-    }).join("");
-  }catch(e){ box.innerHTML='<span class="msg bad">Liste okunamadı: '+e.message+'</span>'; }
-}
-async function onlineSil(ids){
-  const arr=(ids||"").split(",").filter(Boolean); if(!arr.length) return;
-  const m=$("onlineMsg");
-  try{ const {error}=await sb.from("online_kampanyalar").delete().in("id",arr); if(error) throw error;
-       await loadOnline(); renderRows(); onlineListele();
-       m.className="msg ok"; m.textContent="✓ Silindi ("+arr.length+" satır).";
-  }catch(e){ m.className="msg bad"; m.textContent="Silinemedi: "+e.message; }
-}
 async function loadProfil(uid){
   // depo_adi kolonu migrasyondan önce yoksa eski kolonlara düş (giriş asla kırılmasın)
   let {data,error} = await sb.from("profiller").select("rol,marka_erisimi,abonelik_durumu,magaza,ad,depo_adi,bayi_sahibi").eq("id",uid).maybeSingle();
@@ -959,6 +844,13 @@ function depoAdi(){ return (profil&&profil.depo_adi)?profil.depo_adi:"Kadıköy"
 // Dış bayi = rolü "bayi" VE şube değil (bayi_sahibi boş). Bizim mağazalarımız şube olduğu için etkilenmez.
 // Not: bayi_sahibi okunamazsa İÇERİ sayılır — kendi mağazalarımızın ekranı asla kazara değişmesin.
 function disBayiMi(){ return !!(profil && profil.rol==="bayi" && ("bayi_sahibi" in profil) && profil.bayi_sahibi==null); }
+// ── STOK SAHİPLİĞİ (çok bayili izolasyon) ─────────────────────────────────
+// Her bayi KENDİ Mars/Horoz/kendi deposu stoğunu yükler ve SADECE onu görür.
+// Bizim 9 mağazamız (🏬 Şubem = bayi_sahibi dolu) ortak havuzu paylaşır:
+// onların stok sahibi, bağlı oldukları merkezdir. Bağımsız bayide sahip kendisidir.
+// Bu fonksiyon HEM okuma HEM yazma HEM silme sorgularında kullanılır —
+// güvenlik yalnızca RLS'e bırakılmaz, kodda da açıkça filtrelenir.
+function stokSahibi(){ return (profil && profil.bayi_sahibi) ? profil.bayi_sahibi : (user && user.id) || null; }
 let bagimsizToptan={};   // MODEL KODU -> ham toptan fiyat (sadece dış bayide dolar)
 async function loadBagimsizToptan(){
   bagimsizToptan={};
@@ -1008,7 +900,6 @@ function setBrand(b){
   loadAktifKampanyalar().then(()=>renderRows());
   if(typeof topluTemizle==="function") topluTemizle(); // marka değişince eski yükleme sonucu ekranda kalmasın
   loadPrimli().then(()=>renderRows());
-  loadOnline().then(()=>{ renderRows(); onlineListele(); });
   loadBagimsizToptan().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   syncAdminBrand();
 }
@@ -1025,7 +916,6 @@ function toggleAdmin(){
   a.style.display = showAdmin?"block":"none"; b.style.display = showAdmin?"none":"block";
   if(showAdmin){ applyAdminAccess(); syncAdminBrand();
     if(isEditor()){ loadKampanyalar(); loadBankaPanel(); loadTeklifler(); }
-    if(profil.rol==="admin") onlineListele();
     if(profil.rol==="admin") loadBayiler();
     const di=$("depoAdiInp"); if(di) di.value=depoAdi(); }
 }
@@ -1038,8 +928,6 @@ function applyAdminAccess(){
   const imp=$("importers"); if(imp) imp.style.display="none";
   const mo=$("merkeziOk"); if(mo) mo.textContent="▶";
   const bc=$("bayilerCard"); if(bc) bc.style.display=profil.rol==="admin"?"":"none";
-  // Online kampanya ortak veridir (DB yazma yetkisi is_admin()) → kartı yalnızca admin görür
-  const oc=$("onlineCard"); if(oc) oc.style.display=profil.rol==="admin"?"":"none";
   // Satış Asistanı: yalnızca admin. Mağaza/personel hesaplarında ne kart ne panel açılır.
   const ac=$("asistanCard"); if(ac) ac.style.display=profil.rol==="admin"?"":"none";
   if(profil.rol!=="admin") asKapat();
@@ -1234,7 +1122,7 @@ async function stokSorgula(){
   const row=f&&f[0];
   let stokHtml="";
   {
-    const {data:st}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",q).eq("marka",brand);
+    const {data:st}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",q).eq("marka",brand).eq("bayi_id",stokSahibi());
     const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}}; let kadikoyTarih=null;
     (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); if(x.depo==='kadikoy'&&x.stok_tarihi) kadikoyTarih=x.stok_tarihi; });
     const net=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
@@ -1248,16 +1136,14 @@ async function stokSorgula(){
   const ad=row&&row.urun_adi?row.urun_adi:q;
   const pm=primliMap[q];
   const pmTxt=(pm&&pm.fiyat)?`<span class="chip" style="background:var(--bad);color:#fff;border-color:var(--bad)">⭐ Primli Satış ${fmt(pm.fiyat)} ₺</span>`:"";
-  const om=onlineMap[q];
-  const omTxt=om?`<span class="chip" style="background:#7c3aed;color:#fff;border-color:#7c3aed" title="ONLİNE kampanya ${fmtTarih(om.bas)} – ${fmtTarih(om.bit)}">🌐 Online ${om.fiyat?fmt(om.fiyat)+" ₺":"kampanyası var"}</span>`:"";
   const pTxt=(row&&row.nakit_fiyat)?`<span class="chip pesin">Peşin ${fmt(row.nakit_fiyat)} ₺</span>`:"";
   const tTxt=(row&&row.toptan_fiyat!=null)?`<span class="chip toptan">Toptan ${fmt(toptanGoster(row.toptan_fiyat,q))} ₺</span>`:"";
   const bTxt=(row&&row.bip_tutar)?`<span class="chip bip">BİP ${fmt(row.bip_tutar)} ₺</span>`:"";
-  const fiyat=(pmTxt+omTxt+pTxt+tTxt+bTxt)?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">${pmTxt}${omTxt}${pTxt}${tTxt}${bTxt}</div>`:"";
+  const fiyat=(pmTxt+pTxt+tTxt+bTxt)?`<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">${pmTxt}${pTxt}${tTxt}${bTxt}</div>`:"";
   const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null && !pm)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
   box.innerHTML=`<div class="card" style="background:var(--field);margin:0;padding:14px;position:relative">
     <button class="ghost sm" title="Sonucu kapat" style="position:absolute;top:8px;right:8px;padding:2px 9px;font-size:13px" onclick="stokSorguKapat()">✕</button>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:34px"><b style="font-size:16px">${ad}</b> <span class="badge" style="font-size:9px">${brand}</span>${primliRozet(q)}${onlineRozet(q)}${yok}</div>${fiyat}${stokHtml}</div>`;
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:34px"><b style="font-size:16px">${ad}</b> <span class="badge" style="font-size:9px">${brand}</span>${primliRozet(q)}${yok}</div>${fiyat}${stokHtml}</div>`;
 }
 function stokSorguKapat(){ const b=$("stokSorguSonuc"); if(b) b.innerHTML=""; const i=$("stokSorguInput"); if(i) i.value="";
 }
@@ -1332,7 +1218,7 @@ function renderRows(){
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();setTimeout(()=>{const rr=quoteRows[${i}]; if(rr&&rr.kod)refetch(rr);},250)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
-      <td>${r.ad||""}${primliRozet(r.kod)}${onlineRozet(r.kod)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+      <td>${r.ad||""}${primliRozet(r.kod)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -1653,8 +1539,9 @@ async function refetch(r){
   } else { r.ad = pr ? r.kod : "— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; } // primli ama listede yoksa: kodu göster, manuel toptan
   r.marsMevcut=r.horozMevcut=r.kadikoyMevcut=r.marsAyrilan=r.horozAyrilan=null; r.sKadikoy=0; r.netStok=null;
   {
-    // Tüm kullanıcılar MERKEZ stoğu görür (Mars/Horoz/Kadıköy + ayrılan)
-    const {data:st}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",r.kod).eq("marka",brand);
+    // Her bayi YALNIZCA kendi stok havuzunu görür (Mars/Horoz/kendi deposu + ayrılan).
+    // 🏬 Şubem hesapları merkezin havuzunu paylaşır — bkz. stokSahibi().
+    const {data:st}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",r.kod).eq("marka",brand).eq("bayi_id",stokSahibi());
     const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
     let kadikoyTarih=null;
     (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); if(x.depo==='kadikoy' && x.stok_tarihi) kadikoyTarih=x.stok_tarihi; });
@@ -2120,7 +2007,7 @@ async function topluTara(files){
       if(!c.brand){ res.detay="marka tanınamadı"; }
       else if(c.kind==="stok"){ let rows=[]; const seen={};
         wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
-          parseStockRows(aoa).forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; rows.push({model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
+          parseStockRows(aoa).forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; rows.push({bayi_id:stokSahibi(),model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
         res.stokRows=rows; res.ok=rows.length>0; res.detay=rows.length+" stok · "+c.depo+"/"+c.tip; }
       else if(!isEditor()){ // bayi rolü: fiyat/kampanya dosyası yükleyemez — merkezden gelir
         res.detay="Bu bir fiyat listesi görünüyor — fiyatlar MERKEZDEN yüklenir. Sen sadece STOK dosyası yükleyebilirsin (dosya adında Mars, Horoz ya da '"+depoAdi()+"' geçsin)."; }
@@ -2199,7 +2086,7 @@ async function asKatalog(){
   if(asKatalogCache && asKatalogMarka===brand) return asKatalogCache;
   const donem=aktifDonem||_donem();
   const [stk,urn,per,top]=await Promise.all([
-    sbTumu("stok","model_kodu,tip,adet",q=>q.eq("marka",brand)),
+    sbTumu("stok","model_kodu,tip,adet",q=>q.eq("marka",brand).eq("bayi_id",stokSahibi())),
     sbTumu("urunler","model_kodu,urun_adi",q=>q.eq("marka",brand)),
     sbTumu("perakende_fiyatlar","model_kodu,nakit_fiyat",q=>q.eq("marka",brand).eq("donem",donem)),
     sbTumu("toptan_fiyatlar","model_kodu,toptan_fiyat",q=>q.eq("marka",brand).eq("donem",donem))
@@ -2291,7 +2178,9 @@ async function topluYaz(){
   try{
     for(const r of items){
       [...(r.topRows||[]),...(r.perRows||[])].forEach(x=>{ if(x.donem && (!r_maxDonem || x.donem>r_maxDonem)) r_maxDonem=x.donem; });
-      if(r.kind==="stok"){ await sb.from("stok").delete().eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"bayi_id,model_kodu,marka,depo,tip","model_kodu,marka,depo,tip"); }
+      if(r.kind==="stok"){ await sb.from("stok").delete().eq("bayi_id",stokSahibi()).eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"bayi_id,model_kodu,marka,depo,tip"); }
+      // NOT: eski (bayi_id'siz) benzersiz anahtara geri düşme KALDIRILDI — çok bayili
+      // kullanımda o yedek yol bir bayinin satırını diğerinin üzerine yazardı.
       else { if(r.topRows&&r.topRows.length) await upsert("toptan_fiyatlar",r.topRows,"model_kodu,marka,donem");
              if(r.perRows&&r.perRows.length) await upsert("perakende_fiyatlar",r.perRows,"model_kodu,marka,donem");
              if(r.bipRows&&r.bipRows.length) await upsert("bip",r.bipRows,"model_kodu,marka,donem");
