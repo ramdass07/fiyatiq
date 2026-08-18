@@ -1364,7 +1364,7 @@ async function loadAktifKampanyalar(){
     const today=new Date().toISOString().slice(0,10);
     const {data}=await sb.from("kampanyalar").select("*");
     // Üstte seçili markanın (+ "ikisi") kampanyaları — Bosch'tayken Bosch, Siemens'teyken Siemens
-    aktifKampanyalar=(data||[]).filter(k=>(!k.bitis_tarihi || k.bitis_tarihi>=today) && (!k.marka || k.marka===brand));
+    aktifKampanyalar=(data||[]).filter(k=>k.aktif!==false && (!k.bitis_tarihi || k.bitis_tarihi>=today) && (!k.marka || k.marka===brand));
   }catch(e){ aktifKampanyalar=[]; }
 }
 function matchKampanyalar(){
