@@ -610,6 +610,22 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
     <p class="mut" style="font-size:13px;margin:4px 0 12px" id="merkeziAciklama">Normal aylık güncelleme için yukarıdaki <b>🚀 Aylık Veri Güncelleme</b> kutusu yeterlidir — toptan, perakende ve BİP'i tek dosyadan kendi ayıklar. Buradaki kutuları yalnızca tek bir listeyi ayrıca düzeltmen gerektiğinde kullan.</p>
     <div id="importers" style="display:none"></div>
 
+    <div class="card" id="hizliKampCard" style="border:2px solid var(--ok)">
+      <h2>⚡ Hızlı Kampanya <span class="badge">2-3 günlük özel indirim</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Belirli ürünlere kısa süreli indirim. Ürün kodlarını yaz, tutarları ve tarihleri gir, <b>Ekle</b> de. Marka: <b id="hkMarka">—</b></p>
+      <div class="row"><div class="fld" style="flex:1"><label>Kampanya adı</label><input id="hkAd" placeholder="Hafta sonu buzdolabı fırsatı" style="width:100%"></div></div>
+      <div class="row" style="margin-top:8px"><div class="fld" style="flex:1"><label>Ürün kodları (virgülle ayır)</label><input id="hkKod" placeholder="KG86PFIC0N, KG76NCIE0N" style="width:100%"></div></div>
+      <div class="row" style="margin-top:8px">
+        <div class="fld"><label>Müşteri indirimi ₺</label><input id="hkInd" type="number" value="0" style="width:150px"></div>
+        <div class="fld"><label>Hakediş ₺</label><input id="hkHak" type="number" value="0" style="width:150px"></div>
+        <div class="fld"><label>Başlangıç</label><input id="hkBas" type="date"></div>
+        <div class="fld"><label>Bitiş</label><input id="hkBit" type="date"></div>
+        <button onclick="hizliKampanya()">Ekle</button>
+      </div>
+      <div id="hkMsg" class="msg"></div>
+      <div id="hkList" style="margin-top:12px"></div>
+    </div>
+
     <div class="card" id="kampSihirbazCard" style="border:2px solid var(--brand)">
       <h2>🤖 Kampanya Sihirbazı <span class="badge">Opus · otomatik ayıklar</span></h2>
       <p class="mut" style="font-size:13px;margin:4px 0 10px">Bosch kampanya <b>PDF</b>'lerini (broşür + uygulama yazısı) veya Siemens <b>Excel</b>'ini <b>hepsini birden</b> buraya bırak. Yapay zekâ kampanyaları çıkarır → aşağıda kontrol edip kaydedersin. Üstten <b>doğru markayı</b> seçmeyi unutma.</p>
@@ -783,6 +799,7 @@ async function showApp(session){
   await loadBagimsizToptan();
   await loadBanks();
   await loadAktifKampanyalar();
+  if(typeof isEditor==="function" && isEditor() && typeof hkInit==="function") hkInit();
   if(quoteRows.length===0) addRow();
 }
 // Yüklü en güncel dönemi bul; sorgular sadece bu döneme bakar (eski ay verisi sızmaz, marka karışmaz)
@@ -900,6 +917,7 @@ function setBrand(b){
   if(typeof setManuelToplam==='function') setManuelToplam('sifirla'); // marka değişince elle fiyat sıfırlanır
   quoteRows.forEach(r=>refetch(r)); loadBanks();
   loadAktifKampanyalar().then(()=>renderRows());
+  if(typeof isEditor==="function" && isEditor() && typeof hkInit==="function") hkInit();
   if(typeof topluTemizle==="function") topluTemizle(); // marka değişince eski yükleme sonucu ekranda kalmasın
   loadPrimli().then(()=>renderRows());
   loadBagimsizToptan().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
@@ -925,7 +943,7 @@ function toggleAdmin(){
 // FL/kampanya/banka MERKEZDEN (admin/personel) yüklenir — ortak veridir.
 function applyAdminAccess(){
   const ed=isEditor();
-  ["kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  ["hizliKampCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
   // "Elle Yükleme" kutuları kapalı başlar — başlığa tıklayınca açılır (bkz. merkeziAc)
   const imp=$("importers"); if(imp) imp.style.display="none";
   const mo=$("merkeziOk"); if(mo) mo.textContent="▶";
@@ -2458,6 +2476,46 @@ async function kampBitir(id){
 }
 async function kampMarkaSet(id,val){ await sb.from("kampanyalar").update({marka:val||null}).eq("id",id); }
 async function delKampanya(id){ await sb.from("kampanyalar").delete().eq("id",id); loadKampanyalar(); }
+// ===== HIZLI KAMPANYA (2-3 günlük, jargonsuz) =====
+function hkInit(){
+  const mk=$("hkMarka"); if(mk) mk.textContent=markaAd(brand);
+  const b=$("hkBas"), e=$("hkBit");
+  if(b&&e){ const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const t=new Date(); if(!b.value) b.value=iso(t); if(!e.value) e.value=iso(new Date(t.getTime()+3*86400000)); }
+  loadHizliKampList();
+}
+async function hizliKampanya(){
+  try{
+    const ad=$("hkAd").value.trim();
+    const kod=parseModeller($("hkKod").value);
+    const ind=+$("hkInd").value||0, hak=+$("hkHak").value||0;
+    const bas=$("hkBas").value||_bugun(), bit=$("hkBit").value||null;
+    if(!ad){ adminMsgEl("hkMsg","Kampanya adı gir.","bad"); return; }
+    if(!kod.length){ adminMsgEl("hkMsg","En az bir ürün kodu gir (örn: KG86PFIC0N).","bad"); return; }
+    if(bit && bit<bas){ adminMsgEl("hkMsg","Bitiş tarihi başlangıçtan önce olamaz.","bad"); return; }
+    const rec={ad, marka:brand, match_type:"model_list", kategoriler:[], secili_modeller:kod,
+      musteri_indirimi:ind, hakedis:hak, baslangic:bas, bitis_tarihi:bit, aktif:true};
+    const {error}=await sb.from("kampanyalar").insert(rec); if(error) throw new Error(error.message);
+    adminMsgEl("hkMsg",`✓ Eklendi — ${kod.length} ürün, ${bas} → ${bit||"süresiz"}.`,"ok");
+    $("hkAd").value=""; $("hkKod").value=""; $("hkInd").value="0"; $("hkHak").value="0";
+    hkInit();
+    if(typeof loadKampanyalar==="function") loadKampanyalar();
+    if(typeof loadAktifKampanyalar==="function") loadAktifKampanyalar().then(()=>{ if(typeof renderRows==="function") renderRows(); });
+  }catch(e){ adminMsgEl("hkMsg","Hata: "+e.message,"bad"); }
+}
+async function loadHizliKampList(){
+  const box=$("hkList"); if(!box) return;
+  const bugun=_bugun();
+  try{
+    const {data}=await sb.from("kampanyalar").select("*").or(`marka.eq.${brand},marka.is.null`).order("created_at",{ascending:false});
+    const rows=(data||[]).filter(k=>k.aktif!==false && (!k.bitis_tarihi||k.bitis_tarihi>=bugun));
+    if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Şu an geçerli kampanya yok.</div>'; return; }
+    box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">Şu an geçerli kampanyalar ('+markaAd(brand)+'):</div>'
+      +'<table><thead><tr><th>Ad</th><th class="num">İndirim ₺</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
+      +rows.map(k=>`<tr><td>${k.ad}</td><td class="num">${fmt(k.musteri_indirimi)}</td><td>${k.baslangic||"—"}</td><td>${k.bitis_tarihi||"süresiz"}</td><td style="white-space:nowrap"><button class="ghost sm" onclick="kampBitir('${k.id}');setTimeout(loadHizliKampList,400)">Bitir</button> <button class="ghost sm" onclick="delKampanya('${k.id}');setTimeout(loadHizliKampList,400)">✕</button></td></tr>`).join("")
+      +'</tbody></table>';
+  }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi.</div>'; }
+}
 
 // ===== KAMPANYA SİHİRBAZI (Opus ile otomatik ayıklama) =====
 async function ksMetinCikar(file){
