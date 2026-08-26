@@ -490,7 +490,8 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
           <input id="elleOran" type="text" inputmode="decimal" placeholder="oran" style="width:80px;border-color:#f59e0b" oninput="elleOranDegisti()" onkeydown="if(event.key==='Enter')this.blur()">
         </span></div>
       <div class="grow"></div>
-      <div class="fld" style="text-align:right"><label>Peşin Toplam <span class="mut" style="font-size:9px">kart tek çekim / nakit</span></label><span class="big" id="sumNakit">—</span></div>
+      <div class="fld" style="text-align:right" id="sumNakitOdeBox"><label style="color:#22c55e">💵 Nakit Toplam <span class="mut" style="font-size:9px">elden / havale</span></label><span class="big" id="sumNakitOde" style="color:#22c55e">—</span></div>
+      <div class="fld" style="text-align:right"><label>Peşin Toplam <span class="mut" style="font-size:9px">kart tek çekim</span></label><span class="big" id="sumNakit">—</span></div>
       <div class="fld" style="text-align:right"><label>Taksitli Toplam <span class="mut" style="font-size:9px">karta bölerek</span></label><span class="big" id="sumTaksit">—</span></div>
       <div class="fld" style="text-align:right"><label>Aylık Taksit</label><span id="aylik" class="mut">—</span></div>
       <div class="fld" style="text-align:right"><label>Komisyon</label><span id="komShow" class="mut">—</span></div>
@@ -1389,6 +1390,16 @@ function renderRows(){
   const maliyetUyariHTML='<span class="blink" style="font-size:11px" title="Maliyeti olmayan ürün var — kâr hesabı yanıltıcı olur. Satırdaki toptan kutusuna maliyeti gir.">⚠ MALİYETSİZ ÜRÜN<br><span style="font-weight:400">kâr hesaplanamaz</span></span>';
   const tKarEl=$("tKar"); if(tKarEl){ tKarEl.className="num"; tKarEl.style.fontSize="12px"; tKarEl.style.lineHeight="1.3"; tKarEl.innerHTML = uyMaliyetsiz.length? maliyetUyariHTML : (tBipli<=0?'—':('P '+karBadge(karPesinTot)+(hasTaksitTot?'<br>T '+karBadge(karTaksitTot):''))); }
   const anyMT=hasTaksitTot;
+  // 💵 NAKİT TOPLAM — sepette nakit fiyatı tanımlı ürün varsa otomatik görünür (butona basmaya gerek yok).
+  // Nakit fiyatı olmayan satırlar peşin payıyla toplanır ki karışık sepette de gerçek nakit toplamı çıksın.
+  { let nakitVar=false, nakitTop=0;
+    quoteRows.forEach(r=>{ if(!r.kod) return; const adet=r.adet??1;
+      const h=(typeof nakitHedefi==='function')?nakitHedefi(r):null;
+      if(h>0){ nakitVar=true; nakitTop+=h*adet; }
+      else { const pp=calcParts(r,kar,komis); nakitTop+=pp.unitNakit*adet; } });
+    const box=$("sumNakitOdeBox"), el=$("sumNakitOde");
+    if(box) box.style.display = nakitVar ? "" : "none";
+    if(el) el.textContent = nakitVar ? fmt(Math.round(nakitTop)) : "—"; }
   if($("sumNakit")) $("sumNakit").textContent=fmt(finalNakit);
   if($("sumTaksit")) $("sumTaksit").textContent= (komis>0||bankaTaksitli||anyMT||manuelToplamTaksit!=null)? fmt(finalTaksit) : '—';
   if($("aylik")) $("aylik").textContent= ((komis>0||bankaTaksitli||manuelToplamTaksit!=null)&&tk)? fmt(finalTaksit/tk) : (tk?fmt(finalNakit/tk):'—');
