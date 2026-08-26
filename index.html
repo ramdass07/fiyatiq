@@ -630,11 +630,11 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 
     <div class="card" id="hizliKampCard" style="border:2px solid var(--acc)">
       <h2>⚡ Hızlı Kampanya <span class="badge">2-3 günlük özel fiyat</span></h2>
-      <p class="mut" style="font-size:13px;margin:4px 0 10px">Bir ürüne kısa süreli <b>özel satış fiyatı</b> tanımla. Ürün kodu + kampanya fiyatını yaz, tarihleri gir, <b>Ekle</b> de. Satış ekranında o ürün otomatik bu fiyattan gelir. <b>Nakit/havale</b> fiyatı da girersen satırda yeşil <b>💵 NAKİT</b> rozeti çıkar ve tek tuşla uygulanır. Marka: <b id="hkMarka">—</b></p>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Bir ürüne kısa süreli <b>özel satış fiyatı</b> tanımla. Yazdığın rakam <b>TAKSİTLİ</b> fiyattır — mağazalara ilan ettiğin fiyat (ör. <code>KD86NAID1N → 76.999</code>). Peşin karşılığı, seçilen bankanın komisyonu düşülerek otomatik bulunur. <b>Nakit/havale</b> fiyatı da girersen satırda yeşil <b>💵 NAKİT</b> rozeti çıkar ve tek tuşla uygulanır. Marka: <b id="hkMarka">—</b></p>
       <div class="row">
         <div class="fld"><label>Ürün kodu</label><input id="hkKod" placeholder="KD86NAID1N" style="width:180px"></div>
-        <div class="fld"><label>Kampanya fiyatı (peşin) ₺</label><input id="hkFiyat" type="text" inputmode="decimal" placeholder="76999" style="width:170px"></div>
-        <div class="fld"><label>Nakit / havale ₺ <span class="mut" style="font-size:10px">(opsiyonel)</span></label><input id="hkNakit" type="text" inputmode="decimal" placeholder="74999" style="width:170px"></div>
+        <div class="fld"><label>Kampanya fiyatı — <b>TAKSİTLİ</b> ₺</label><input id="hkFiyat" type="text" inputmode="decimal" placeholder="76999" style="width:170px"></div>
+        <div class="fld"><label><b>NAKİT</b> / havale ₺ <span class="mut" style="font-size:10px">(opsiyonel)</span></label><input id="hkNakit" type="text" inputmode="decimal" placeholder="74999" style="width:170px"></div>
         <div class="fld"><label>Başlangıç</label><input id="hkBas" type="date"></div>
         <div class="fld"><label>Bitiş</label><input id="hkBit" type="date"></div>
         <button onclick="hizliKampanya()">Ekle</button>
@@ -1226,7 +1226,7 @@ async function stokSorgula(){
   const ad=row&&row.urun_adi?row.urun_adi:q;
   const pm=primliMap[q];
   const pmTxt=(pm&&pm.fiyat)?`<span class="chip" style="background:var(--bad);color:#fff;border-color:var(--bad)">⭐ Primli Satış ${fmt(pm.fiyat)} ₺</span>`:"";
-  const kfHit=kampFiyatMap[(q||"").toUpperCase()]; const kfTxt=kfHit?`<span class="chip" style="background:var(--acc);color:#fff;border-color:var(--acc)">🎯 Kampanya ${fmt(kfHit.fiyat)} ₺</span>`:"";
+  const kfHit=kampFiyatMap[(q||"").toUpperCase()]; const kfTxt=kfHit?`<span class="chip" style="background:var(--acc);color:#fff;border-color:var(--acc)" title="Taksitli kampanya fiyatı">🎯 Kampanya ${fmt(kfHit.fiyat)} ₺ taksitli</span>`:"";
   const pTxt=(row&&row.nakit_fiyat)?`<span class="chip pesin">Peşin ${fmt(row.nakit_fiyat)} ₺</span>`:"";
   const tTxt=(row&&row.toptan_fiyat!=null)?`<span class="chip toptan">Toptan ${fmt(toptanGoster(row.toptan_fiyat,q))} ₺</span>`:"";
   const bTxt=(row&&row.bip_tutar)?`<span class="chip bip">BİP ${fmt(row.bip_tutar)} ₺</span>`:"";
@@ -1253,11 +1253,15 @@ function calcParts(r,kar,komis){
   const _nakitSec = r.nakitSecili ? nakitHedefi(r) : null;
   // İkili kampanyada girilen tutar TAKSİTLİ toplamdır → peşin karşılığı komisyon düşülerek bulunur.
   // Nakit seçiliyse nakit fiyat doğrudan peşin yerine geçer (nakitte taksit yok).
-  const _ikiTak = (!manuelP && !manuelT && !(_nakitSec>0) && (+r.ikiliTaksit>0)) ? (+r.ikiliTaksit) : null;
+  // TAKSİTLİ taban: ikili kampanya ve hızlı kampanya fiyatları TAKSİTLİ olarak girilir.
+  // Peşin karşılığı = taksitli × (1 − banka komisyonu). Nakit seçiliyse o doğrudan peşin yerine geçer.
+  const _takTaban = (!manuelP && !manuelT && !(_nakitSec>0))
+        ? ((+r.ikiliTaksit>0) ? (+r.ikiliTaksit) : ((+r.kampFiyat>0) ? (+r.kampFiyat) : null))
+        : null;
   const sabitPesin = manuelP ? (+r.manuelFiyat)
                    : ((_nakitSec>0) ? _nakitSec
-                   : ((_ikiTak!=null) ? _ikiTak*(1-(komis>0&&komis<100?komis/100:0))
-                   : ((+r.kampFiyat>0) ? (+r.kampFiyat) : ((+r.primliFiyat>0) ? (+r.primliFiyat) : null))));
+                   : ((_takTaban!=null) ? _takTaban*(1-(komis>0&&komis<100?komis/100:0))
+                   : ((+r.primliFiyat>0) ? (+r.primliFiyat) : null)));
   let unitNakit, unitTaksit;
   unitNakit = (sabitPesin!=null) ? sabitPesin : unitBipli*(1+kar/100);
   if(manuelT) unitTaksit = +r.manuelTaksit;
@@ -2628,12 +2632,12 @@ async function hizliKampanya(){
     const nakit=trSayi($("hkNakit").value)||0;
     const bas=$("hkBas").value||_bugun(), bit=$("hkBit").value||null;
     if(!kod){ adminMsgEl("hkMsg","Geçerli bir ürün kodu gir (örn: KD86NAID1N).","bad"); return; }
-    if(!(fiyat>0)){ adminMsgEl("hkMsg","Kampanya fiyatını gir (örn: 76999).","bad"); return; }
+    if(!(fiyat>0)){ adminMsgEl("hkMsg","Kampanya TAKSİTLİ fiyatını gir (örn: 76999).","bad"); return; }
     if(bit && bit<bas){ adminMsgEl("hkMsg","Bitiş tarihi başlangıçtan önce olamaz.","bad"); return; }
-    if(nakit>0 && nakit>fiyat){ adminMsgEl("hkMsg","Nakit fiyat peşin fiyattan yüksek olamaz — kontrol et.","bad"); return; }
+    if(nakit>0 && nakit>fiyat){ adminMsgEl("hkMsg","Nakit fiyat taksitli fiyattan yüksek olamaz — kontrol et.","bad"); return; }
     const rec={bayi_id:stokSahibi(), model_kodu:kod, marka:brand, kampanya_fiyat:fiyat, kampanya_nakit:(nakit>0?nakit:null), baslangic:bas, bitis:bit};
     const {error}=await sb.from("kampanya_fiyat").upsert(rec,{onConflict:"bayi_id,model_kodu,marka"}); if(error) throw new Error(error.message);
-    adminMsgEl("hkMsg",`✓ ${kod} → peşin ${fmt(fiyat)} ₺${nakit>0?" · nakit "+fmt(nakit)+" ₺":""} (${bas} → ${bit||"süresiz"}). Satış ekranında bu fiyattan gelecek.`,"ok");
+    adminMsgEl("hkMsg",`✓ ${kod} → taksitli ${fmt(fiyat)} ₺${nakit>0?" · nakit "+fmt(nakit)+" ₺":""} (${bas} → ${bit||"süresiz"}). Satış ekranında bu fiyattan gelecek.`,"ok");
     $("hkKod").value=""; $("hkFiyat").value=""; $("hkNakit").value="";
     await loadKampFiyat(); loadHizliKampList(); quoteRows.forEach(r=>{ if(r.kod) refetch(r); });
   }catch(e){ adminMsgEl("hkMsg","Hata: "+e.message,"bad"); }
@@ -2764,7 +2768,7 @@ async function loadHizliKampList(){
     const rows=(data||[]);
     if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Tanımlı kampanya fiyatı yok.</div>'; return; }
     box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">Kampanya fiyatları ('+markaAd(brand)+'):</div>'
-      +'<table><thead><tr><th>Ürün</th><th class="num">Kampanya fiyatı</th><th class="num">Nakit</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
+      +'<table><thead><tr><th>Ürün</th><th class="num">Taksitli</th><th class="num">Nakit</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
       +rows.map(k=>{ const bitti=k.bitis&&k.bitis<bugun; return `<tr style="${bitti?'opacity:.5':''}"><td>${k.model_kodu}${bitti?' <span class="badge" style="font-size:9px;color:var(--bad)">bitti</span>':''}</td><td class="num">${fmt(k.kampanya_fiyat)} ₺</td><td class="num">${(+k.kampanya_nakit>0)?fmt(k.kampanya_nakit)+" ₺":'<span class="mut">—</span>'}</td><td>${k.baslangic||"—"}</td><td>${k.bitis||"süresiz"}</td><td><button class="ghost sm" onclick="kampFiyatSil('${k.id}')">✕</button></td></tr>`;}).join("")
       +'</tbody></table>';
   }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi.</div>'; }
@@ -2783,7 +2787,7 @@ async function loadKampFiyat(){
 }
 function kampRozet(kod){ const k=kampFiyatMap[(kod||"").toUpperCase()]; if(!k) return "";
   const nk = (+k.nakit>0) ? ` <span class="prim-badge" style="background:#16a34a;box-shadow:0 0 8px rgba(22,163,74,.55)" title="Nakit / havale fiyatı ${fmt(k.nakit)} ₺ — bilgi amaçlı; uygulamak için satırdaki 💵 butonuna bas">💵 NAKİT ${fmt(k.nakit)}₺</span>` : "";
-  return ` <span class="prim-badge" style="background:var(--acc);box-shadow:0 0 8px rgba(59,130,246,.55)" title="Kampanya fiyatı ${fmt(k.fiyat)} ₺${k.bitis?' · bitiş '+k.bitis:''}">🎯 KAMPANYA ${fmt(k.fiyat)}₺</span>`+nk; }
+  return ` <span class="prim-badge" style="background:var(--acc);box-shadow:0 0 8px rgba(59,130,246,.55)" title="Kampanya TAKSİTLİ fiyatı ${fmt(k.fiyat)} ₺${k.nakit?' · NAKİT '+fmt(k.nakit)+' ₺':''}${k.bitis?' · bitiş '+k.bitis:''}. Peşin karşılığı komisyon düşülerek hesaplanır.">🎯 KAMPANYA ${fmt(k.fiyat)}₺ taksitli</span>`+nk; }
 
 // ===== İKİLİ KAMPANYA (iki ürün birlikte alınırsa TOPLAM fiyat) =====
 // ikiliList: bugün geçerli tanımlar. ikiliMap[kod] = eşleştiği tanımlar.
