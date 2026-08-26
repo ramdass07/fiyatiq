@@ -621,6 +621,13 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
     <p class="mut" style="font-size:13px;margin:4px 0 12px" id="merkeziAciklama">Normal aylık güncelleme için yukarıdaki <b>🚀 Aylık Veri Güncelleme</b> kutusu yeterlidir — toptan, perakende ve BİP'i tek dosyadan kendi ayıklar. Buradaki kutuları yalnızca tek bir listeyi ayrıca düzeltmen gerektiğinde kullan.</p>
     <div id="importers" style="display:none"></div>
 
+    <div class="card" id="aySonuCard" style="border:2px solid var(--warn)">
+      <h2>🩺 Ay Sonu / Geçiş Kontrolü <span class="badge" style="background:var(--warn);color:#1a1204">tek tuş</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Yeni ay fiyat listesi yüklendikten sonra <b>bu butona bas</b>. Sistem iki markayı birden tarar: dönem güncel mi, PH %3 doğru uygulanmış mı, <b>çift zam</b> var mı, bağımsız (ham) sütunda boş ürün kaldı mı, stok kaç günlük, primli liste yüklü mü, süresi geçmiş kampanya kalmış mı. Hiçbir şeyi değiştirmez — sadece bakar ve söyler.</p>
+      <div class="row"><button onclick="aySonuKontrol()">🩺 Kontrolü Çalıştır</button><span id="asoMsg" class="msg"></span></div>
+      <div id="asoSonuc" style="margin-top:12px"></div>
+    </div>
+
     <div class="card" id="hizliKampCard" style="border:2px solid var(--acc)">
       <h2>⚡ Hızlı Kampanya <span class="badge">2-3 günlük özel fiyat</span></h2>
       <p class="mut" style="font-size:13px;margin:4px 0 10px">Bir ürüne kısa süreli <b>özel satış fiyatı</b> tanımla. Ürün kodu + kampanya fiyatını yaz, tarihleri gir, <b>Ekle</b> de. Satış ekranında o ürün otomatik bu fiyattan gelir. <b>Nakit/havale</b> fiyatı da girersen satırda yeşil <b>💵 NAKİT</b> rozeti çıkar ve tek tuşla uygulanır. Marka: <b id="hkMarka">—</b></p>
@@ -2620,6 +2627,91 @@ async function hizliKampanya(){
     $("hkKod").value=""; $("hkFiyat").value=""; $("hkNakit").value="";
     await loadKampFiyat(); loadHizliKampList(); quoteRows.forEach(r=>{ if(r.kod) refetch(r); });
   }catch(e){ adminMsgEl("hkMsg","Hata: "+e.message,"bad"); }
+}
+// ===== AY SONU / GEÇİŞ KONTROLÜ =====
+// SALT OKUNUR. Her ay tekrarlanan hataları (çift zam, eksik ham sütun, eski stok, unutulmuş kampanya)
+// hafızaya güvenmeden yakalar. Kartta yazan kuralların makineye çevrilmiş hali.
+function _asoSatir(durum,baslik,detay){
+  const ikon = durum==='ok'?'✅' : (durum==='uyari'?'⚠️':'🔴');
+  const renk = durum==='ok'?'var(--ok)' : (durum==='uyari'?'var(--warn)':'var(--bad)');
+  return `<div class="row" style="justify-content:space-between;gap:14px;border-bottom:1px solid var(--line);padding:6px 0">
+    <div style="flex:1"><b style="color:${renk}">${ikon} ${baslik}</b><div class="mut" style="font-size:11.5px;margin-top:2px">${detay}</div></div></div>`;
+}
+async function aySonuKontrol(){
+  const box=$("asoSonuc"); adminMsgEl("asoMsg","Taranıyor...","");
+  const bugun=_bugun(); const buAy=bugun.slice(0,7)+"-01";
+  const gunFark=(d)=>{ if(!d) return null; return Math.round((new Date(bugun)-new Date(d))/86400000); };
+  let html=""; let kritik=0, uyari=0;
+  const ekle=(d,b,x)=>{ if(d==='kritik')kritik++; if(d==='uyari')uyari++; html+=_asoSatir(d,b,x); };
+  try{
+    for(const mk of ["siemens","bosch"]){
+      const ad=markaAd(mk);
+      html+=`<div style="font-weight:800;margin:12px 0 4px;font-size:13px;letter-spacing:.4px">${ad.toUpperCase()}</div>`;
+      // 1) Dönem
+      const dn=await sb.from("toptan_fiyatlar").select("donem").eq("marka",mk).order("donem",{ascending:false}).limit(1);
+      const donem=(dn.data&&dn.data[0])?dn.data[0].donem:null;
+      if(!donem) ekle('kritik','Toptan fiyat listesi YOK','Bu markada hiç toptan fiyat kaydı bulunamadı.');
+      else if(donem===buAy) ekle('ok','Dönem güncel',`Toptan liste dönemi ${donem} — bu ay.`);
+      else ekle('kritik','Dönem ESKİ',`Yüklü en yeni dönem <b>${donem}</b>, bu ay <b>${buAy}</b>. Yeni ay listesi yüklenmemiş — satışçı geçen ayın fiyatını görüyor.`);
+      // 2) PH oranı + çift zam + eksik ham
+      const rows=await sbTumu("toptan_fiyatlar","model_kodu,toptan_fiyat,toptan_fiyat_bagimsiz",q=>q.eq("marka",mk).eq("donem",donem||buAy));
+      const bosHam=[], ciftZam=[], tuhaf=[]; let n103=0,n100=0;
+      rows.forEach(r=>{ const t=+r.toptan_fiyat, h=+r.toptan_fiyat_bagimsiz;
+        if(!(t>0)) return;
+        if(!(h>0)){ bosHam.push(r.model_kodu); return; }
+        const o=t/h;
+        if(Math.abs(o-1.03)<0.0005) n103++;
+        else if(Math.abs(o-1)<0.0005) n100++;
+        else if(Math.abs(o-1.0609)<0.002) ciftZam.push(r.model_kodu);
+        else tuhaf.push(r.model_kodu+" ("+o.toFixed(4)+")"); });
+      ekle(rows.length?'ok':'kritik','Ürün sayısı',`${rows.length} ürün (dönem ${donem||buAy}).`);
+      if(ciftZam.length) ekle('kritik','ÇİFT ZAM ŞÜPHESİ',`${ciftZam.length} üründe oran ≈1,0609 (%3 iki kez binmiş): ${ciftZam.slice(0,8).join(", ")}${ciftZam.length>8?" …":""}`);
+      if(bosHam.length) ekle('kritik','Bağımsız (ham) fiyatı BOŞ',`${bosHam.length} üründe ham fiyat yok → dış bayi normal fiyata düşer, <b>%3 sızar</b>: ${bosHam.slice(0,8).join(", ")}${bosHam.length>8?" …":""}`);
+      if(tuhaf.length) ekle('uyari','Beklenmedik oran',`${tuhaf.length} üründe oran 1,00 da 1,03 de değil: ${tuhaf.slice(0,6).join(", ")}${tuhaf.length>6?" …":""}`);
+      if(!ciftZam.length && !bosHam.length && !tuhaf.length && rows.length)
+        ekle('ok','PH %3 tutarlı',`${n100} ürün ×1,0000 + ${n103} ürün ×1,0300 (PH). Başka oran yok, boş ham fiyat yok.`);
+      // 3) Perakende + BİP
+      const per=await sb.from("perakende_fiyatlar").select("model_kodu",{count:"exact",head:true}).eq("marka",mk).eq("donem",donem||buAy);
+      const bip=await sb.from("bip").select("model_kodu",{count:"exact",head:true}).eq("marka",mk).eq("donem",donem||buAy);
+      ekle((per.count||0)>0?'ok':'uyari','Perakende listesi',`${per.count||0} kayıt. ${((per.count||0)===0)?"Yoksa müşteri teklifinde 'İndiriminiz' sütunu hiç açılmaz.":""}`);
+      ekle((bip.count||0)>0?'ok':'uyari','BİP listesi',`${bip.count||0} kayıt. ${((bip.count||0)===0)?"BİP yoksa net maliyet ve kâr olduğundan düşük görünür.":""}`);
+      // 4) Stok tazeliği
+      const st=await sb.from("stok").select("stok_tarihi").eq("marka",mk).order("stok_tarihi",{ascending:false}).limit(1);
+      const sTar=(st.data&&st.data[0])?st.data[0].stok_tarihi:null; const yas=gunFark(sTar);
+      if(sTar==null) ekle('kritik','Stok YOK','Bu markada stok kaydı yok.');
+      else if(yas<=3) ekle('ok','Stok güncel',`En yeni stok tarihi ${fmtTarih(sTar)} (${yas} gün).`);
+      else if(yas<=10) ekle('uyari','Stok bayatlıyor',`En yeni stok tarihi ${fmtTarih(sTar)} — <b>${yas} gün</b> önce.`);
+      else ekle('kritik','Stok ESKİ',`En yeni stok tarihi ${fmtTarih(sTar)} — <b>${yas} gün</b> önce. Satışçı olmayan ürünü satabilir.`);
+      // 5) Primli liste
+      const pr=await sb.from("primli_urunler").select("model_kodu",{count:"exact",head:true}).eq("marka",mk).eq("donem",donem||buAy);
+      ekle((pr.count||0)>0?'ok':'uyari','Primli liste',`${pr.count||0} ürün (dönem ${donem||buAy}).`);
+      // 6) Kampanyalar
+      const kp=await sb.from("kampanyalar").select("id,ad,bitis_tarihi,aktif,match_type,kategoriler").or(`marka.eq.${mk},marka.is.null`);
+      const kl=(kp.data||[]).filter(k=>k.aktif!==false);
+      const gecmis=kl.filter(k=>k.bitis_tarihi && k.bitis_tarihi<bugun);
+      const suresiz=kl.filter(k=>!k.bitis_tarihi);
+      const yakin=kl.filter(k=>k.bitis_tarihi && k.bitis_tarihi>=bugun && gunFark(k.bitis_tarihi)>=-3);
+      const canli=kl.filter(k=>!k.bitis_tarihi || k.bitis_tarihi>=bugun);
+      ekle(canli.length?'ok':'uyari','Aktif kampanya',`${canli.length} kampanya yürürlükte.`);
+      if(suresiz.length) ekle('uyari','Bitiş tarihi YOK',`${suresiz.length} kampanya süresiz görünüyor, ay sonunda kendiliğinden kapanmaz: ${suresiz.map(k=>k.ad).slice(0,3).join(" · ")}`);
+      if(yakin.length) ekle('uyari','3 gün içinde bitiyor',`${yakin.map(k=>k.ad+" ("+fmtTarih(k.bitis_tarihi)+")").slice(0,4).join(" · ")}`);
+      if(gecmis.length) ekle('uyari','Süresi geçmiş ama aktif',`${gecmis.length} kampanyanın tarihi geçmiş; listede duruyor (satışta görünmez).`);
+      // 7) Ankastre set kampanyalarında match_type kontrolü (26 Ağu dersi)
+      const ankYanlis=canli.filter(k=>{ const kats=(k.kategoriler||[]).map(katNorm); const ank=new Set(['FIRIN','OCAK','DAVLUMBAZ','ANKASTRE']);
+        return kats.length>=2 && kats.every(c=>ank.has(c)) && k.match_type!=='all'; });
+      if(ankYanlis.length) ekle('kritik','Ankastre set kampanyası yanlış tipte',`${ankYanlis.map(k=>k.ad+" → "+k.match_type).join(" · ")}. Set kampanyaları <b>all</b> olmalı; <b>model_list</b> tek ürüne hakediş gösterir.`);
+    }
+    // 8) Süresi geçmiş hızlı/ikili kampanya (marka bağımsız, bilgi)
+    const hk=await sb.from("kampanya_fiyat").select("model_kodu,bitis").lt("bitis",bugun);
+    if((hk.data||[]).length) ekle('uyari','Süresi geçmiş hızlı kampanya',`${hk.data.length} kayıt listede duruyor (satışta uygulanmaz). Temizlemek istersen ⚡ Hızlı Kampanya kutusundan ✕ ile sil.`);
+    const ik=await sb.from("ikili_kampanya").select("kod_a,bitis").lt("bitis",bugun);
+    if((ik.data||[]).length) ekle('uyari','Süresi geçmiş ikili kampanya',`${ik.data.length} kayıt listede duruyor.`);
+  }catch(e){ adminMsgEl("asoMsg","Hata: "+e.message,"bad"); box.innerHTML=html; return; }
+  const ozet = kritik ? `<div class="msg bad" style="font-size:14px;font-weight:800">🔴 ${kritik} kritik bulgu — düzeltmeden aya girme.</div>`
+              : (uyari ? `<div class="msg" style="color:var(--warn);font-size:14px;font-weight:800">⚠️ ${uyari} uyarı — bakmakta fayda var.</div>`
+              : `<div class="msg ok" style="font-size:14px;font-weight:800">✅ Her şey yolunda.</div>`);
+  box.innerHTML=ozet+html;
+  adminMsgEl("asoMsg","Tarama bitti — "+fmtTarih(bugun),"ok");
 }
 async function ikiliTanimla(){
   try{
