@@ -1088,10 +1088,43 @@ async function loadBayiler(){
         ${mBtn('siemens','Siemens','rgba(34,211,238,.22)','#67e8f9')}
         ${mBtn('bosch','Bosch','rgba(244,63,94,.22)','#fda4af')}
         <button class="ghost sm" onclick="setBayiRol('${p.id}','${p.rol==='personel'?'bayi':'personel'}')">${p.rol==='personel'?'Bayi yap':'Personel yap'}</button>
+        <button class="ghost sm" title="Mağaza adını / kişi adını düzelt" onclick="bayiAdDuzelt('${p.id}')">✎ Ad</button>
         <button class="bad sm" onclick="silBayi('${p.id}','${(p.ad||'').replace(/'/g,'')}')">Sil</button>`}
-      </td></tr>`;
+      </td></tr>
+      <tr id="bed_${p.id}" style="display:none"><td colspan="5" style="text-align:left;background:var(--field)"></td></tr>`;
   }).join("");
   const msg=$("bayiMsg"); if(msg) { msg.className="mut"; msg.style.fontSize="11px"; msg.innerHTML="🏬 <b>Şubem</b> = şirketin ORTAK stok havuzunu görür ve <b>bizim toptan listemizi</b> görür. <b>Bağımsız</b> = kendi stoğunu kendi yükler, seninkileri göremez ve <b>\"BAĞIMSIZ BAYİ\" toptan listesini</b> görür. ⚠ Kendi mağazalarının hepsi 🏬 <b>Şubem</b> olmalı — Bağımsız kalan bir mağaza yanlış fiyat listesini görür. ✓ işaretli marka açıktır. Değişiklikler bayi sayfayı yenileyince yansır."; }
+}
+// Mağaza adı / kişi adı düzeltme (satır içi). Kayıt sırasında yanlış yazılan adlar buradan düzelir;
+// mağaza adı teklif kaydına ve Yönetim > Teklifler ekranına yazıldığı için önemlidir.
+function bayiAdDuzelt(id){
+  const tr=$("bed_"+id); const p=(window._bayiCache||{})[id]; if(!tr||!p) return;
+  if(tr.style.display===""){ tr.style.display="none"; return; }
+  tr.style.display="";
+  const esc=v=>String(v==null?"":v).replace(/"/g,"&quot;");
+  tr.firstElementChild.innerHTML=`
+    <div class="row" style="gap:12px;align-items:flex-end;padding:8px 2px">
+      <div class="fld"><label>Mağaza adı <span class="mut" style="font-size:10px">(teklifte görünür)</span></label>
+        <input id="be_mag_${id}" value="${esc(p.magaza)}" style="width:220px" maxlength="60"></div>
+      <div class="fld"><label>Ad Soyad <span class="mut" style="font-size:10px">(kişi)</span></label>
+        <input id="be_ad_${id}" value="${esc(p.ad)}" style="width:220px" maxlength="60"></div>
+      <button class="sm" onclick="bayiAdKaydet('${id}')">✓ Kaydet</button>
+      <button class="ghost sm" onclick="bayiAdDuzelt('${id}')">Vazgeç</button>
+      <span id="be_msg_${id}" class="msg"></span>
+    </div>`;
+}
+async function bayiAdKaydet(id){
+  const m=$("be_msg_"+id);
+  const magaza=($("be_mag_"+id).value||"").trim();
+  const ad=($("be_ad_"+id).value||"").trim();
+  if(!magaza && !ad){ m.className="msg bad"; m.textContent="En az birini doldur."; return; }
+  try{
+    const upd={}; if(magaza) upd.magaza=magaza; if(ad) upd.ad=ad;
+    const {error}=await sb.from("profiller").update(upd).eq("id",id); if(error) throw new Error(error.message);
+    m.className="msg ok"; m.textContent="✓ Kaydedildi.";
+    if(window._bayiCache&&window._bayiCache[id]) Object.assign(window._bayiCache[id],upd);
+    setTimeout(()=>{ loadBayiler(); },600);
+  }catch(e){ m.className="msg bad"; m.textContent="Hata: "+e.message; }
 }
 // Şube / Bağımsız geçişi: şube = bayi_sahibi ADMIN'e bağlanır → ortak stok/primli havuzu
 async function setBayiSube(id,yap){
