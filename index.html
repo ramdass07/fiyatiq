@@ -623,16 +623,33 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 
     <div class="card" id="hizliKampCard" style="border:2px solid var(--acc)">
       <h2>⚡ Hızlı Kampanya <span class="badge">2-3 günlük özel fiyat</span></h2>
-      <p class="mut" style="font-size:13px;margin:4px 0 10px">Bir ürüne kısa süreli <b>özel satış fiyatı</b> tanımla. Ürün kodu + kampanya fiyatını yaz, tarihleri gir, <b>Ekle</b> de. Satış ekranında o ürün otomatik bu fiyattan gelir. Marka: <b id="hkMarka">—</b></p>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Bir ürüne kısa süreli <b>özel satış fiyatı</b> tanımla. Ürün kodu + kampanya fiyatını yaz, tarihleri gir, <b>Ekle</b> de. Satış ekranında o ürün otomatik bu fiyattan gelir. <b>Nakit/havale</b> fiyatı da girersen satırda yeşil <b>💵 NAKİT</b> rozeti çıkar ve tek tuşla uygulanır. Marka: <b id="hkMarka">—</b></p>
       <div class="row">
         <div class="fld"><label>Ürün kodu</label><input id="hkKod" placeholder="KD86NAID1N" style="width:180px"></div>
         <div class="fld"><label>Kampanya fiyatı (peşin) ₺</label><input id="hkFiyat" type="text" inputmode="decimal" placeholder="76999" style="width:170px"></div>
+        <div class="fld"><label>Nakit / havale ₺ <span class="mut" style="font-size:10px">(opsiyonel)</span></label><input id="hkNakit" type="text" inputmode="decimal" placeholder="74999" style="width:170px"></div>
         <div class="fld"><label>Başlangıç</label><input id="hkBas" type="date"></div>
         <div class="fld"><label>Bitiş</label><input id="hkBit" type="date"></div>
         <button onclick="hizliKampanya()">Ekle</button>
       </div>
       <div id="hkMsg" class="msg"></div>
       <div id="hkList" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" id="ikiliCard" style="border:2px solid #a855f7">
+      <h2>🤝 İkili Kampanya <span class="badge" style="background:#a855f7;color:#fff">iki ürün birlikte</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">İki ürün <b>birlikte</b> alınırsa geçerli olacak <b>toplam</b> fiyatı tanımla (bundle/hakediş sistemine dokunmaz). Satış ekranında satışçı ürünlerden birini yazdığında <b style="color:#c084fc">🤝 İKİLİ</b> hatırlatması çıkar, tıklayınca diğer ürün sepete eklenir ve toplam fiyat iki satıra maliyet oranında dağıtılır. Tek başına alınırsa normal fiyat geçerlidir. Satışçı <b>Manuel</b> ile her zaman müdahale edebilir. Marka: <b id="ikMarka">—</b></p>
+      <div class="row">
+        <div class="fld"><label>1. ürün kodu</label><input id="ikA" placeholder="WGK244Z0TR" style="width:170px"></div>
+        <div class="fld"><label>2. ürün kodu</label><input id="ikB" placeholder="SMS4IKW62T" style="width:170px"></div>
+        <div class="fld"><label>İkisi birlikte (peşin) ₺</label><input id="ikPesin" type="text" inputmode="decimal" placeholder="62999" style="width:170px"></div>
+        <div class="fld"><label>İkisi birlikte nakit ₺ <span class="mut" style="font-size:10px">(ops.)</span></label><input id="ikNakit" type="text" inputmode="decimal" placeholder="60999" style="width:170px"></div>
+        <div class="fld"><label>Başlangıç</label><input id="ikBas" type="date"></div>
+        <div class="fld"><label>Bitiş</label><input id="ikBit" type="date"></div>
+        <button onclick="ikiliTanimla()">Ekle</button>
+      </div>
+      <div id="ikMsg" class="msg"></div>
+      <div id="ikList" style="margin-top:12px"></div>
     </div>
 
     <div class="card" id="kampSihirbazCard" style="border:2px solid var(--brand)">
@@ -807,6 +824,7 @@ async function showApp(session){
   await loadPrimli();
   await loadBagimsizToptan();
   await loadKampFiyat();
+  await loadIkili();
   await loadBanks();
   await loadAktifKampanyalar();
   if(typeof isEditor==="function" && isEditor() && typeof hkInit==="function") hkInit();
@@ -931,6 +949,7 @@ function setBrand(b){
   if(typeof topluTemizle==="function") topluTemizle(); // marka değişince eski yükleme sonucu ekranda kalmasın
   loadPrimli().then(()=>renderRows());
   loadKampFiyat().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
+  loadIkili().then(()=>{ loadIkiliList(); renderRows(); });
   loadBagimsizToptan().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   syncAdminBrand();
 }
@@ -1120,7 +1139,7 @@ async function bayiStokYukle(){
 
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
-function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}; }
+function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}; }
 function addRow(){ quoteRows.push(bosSatir()); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
@@ -1191,7 +1210,7 @@ function calcParts(r,kar,komis){
   const manuelP = r.isET && (+r.manuelFiyat>0);   // Manuel peşin
   const manuelT = r.isET && (+r.manuelTaksit>0);  // Manuel taksitli
   // Sabit peşin: önce manuel override, yoksa primli fiyat (varsa) — satışçı Manuel'le değiştirebilir
-  const sabitPesin = manuelP ? (+r.manuelFiyat) : ((+r.kampFiyat>0) ? (+r.kampFiyat) : ((+r.primliFiyat>0) ? (+r.primliFiyat) : null));
+  const sabitPesin = manuelP ? (+r.manuelFiyat) : ((+r.ikiliFiyat>0) ? (+r.ikiliFiyat) : ((+r.kampFiyat>0) ? (+r.kampFiyat) : ((+r.primliFiyat>0) ? (+r.primliFiyat) : null)));
   let unitNakit, unitTaksit;
   unitNakit = (sabitPesin!=null) ? sabitPesin : unitBipli*(1+kar/100);
   if(manuelT) unitTaksit = +r.manuelTaksit;
@@ -1206,6 +1225,7 @@ function calcParts(r,kar,komis){
 }
 function renderRows(){
   const tb=$("rows"); if(!tb) return;
+  ikiliUygula();   // ikili kampanya: sepetteki eşleşmeleri bul, payları dağıt, eksik eşi işaretle
   // Sepet TAMAMEN boşaldıysa alt panel sıfırlanır: eski hesap asılı kalmaz, yeni müşteriye temiz başlanır
   if(quoteRows.length===0) quoteRows.push(bosSatir());
   if(!quoteRows.some(r=>r.kod)){
@@ -1245,12 +1265,17 @@ function renderRows(){
       : fmt(taksitL);
     const satirTaksitVar = komis>0 || (r.isET && +r.manuelTaksit>0);
     const karCell = !valid ? '<span class="mut">—</span>' : ('P '+karBadge(p.karPesin) + (satirTaksitVar? '<br>T '+karBadge(p.karTaksit):''));
+    const _kf=kampFiyatMap[(r.kod||"").toUpperCase()];
+    const _nakitHedef = (+r.ikiliNakit>0) ? +r.ikiliNakit : ((_kf && +_kf.nakit>0) ? +_kf.nakit : null);
+    const nakitBtn = _nakitHedef!=null
+      ? `<button class="ghost sm" style="border-color:#16a34a;color:#22c55e" title="Nakit/havale fiyatını bu satıra uygula (${fmt(_nakitHedef)} ₺). Manuel kutusuna yazılır, geri alabilirsin." onclick="nakitUygula(${i})">💵 Nakit</button> `
+      : "";
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();setTimeout(()=>{const rr=quoteRows[${i}]; if(rr&&rr.kod)refetch(rr);},250)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
-      <td>${r.ad||""}${primliRozet(r.kod)}${kampRozet(r.kod)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+      <td>${r.ad||""}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -1260,7 +1285,7 @@ function renderRows(){
       <td class="num">${taksitCell}</td>
       <td class="num" style="font-size:12px;line-height:1.3">${karCell}</td>
       <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
-      <td style="white-space:nowrap"><button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
+      <td style="white-space:nowrap">${nakitBtn}<button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
   const ks=matchKampanyalar(); const matchIds=new Set(ks.map(k=>k.id));
@@ -1815,7 +1840,7 @@ function teklifSatirlar(items){
   const D=teklifDagilim(items);
   const rows=items.map(r=>{
     const line=(r.nakit||0)*(r.adet||1), lineT=(r.taksit||0)*(r.adet||1);
-    const sabit=((+r.kampFiyat>0)||(+r.primliFiyat>0))&&!(r.isET&&+r.manuelFiyat>0); // kampanya/primli fiyat aktifse bu satır değişmez
+    const sabit=((+r.ikiliFiyat>0)||(+r.kampFiyat>0)||(+r.primliFiyat>0))&&!(r.isET&&+r.manuelFiyat>0); // kampanya/primli fiyat aktifse bu satır değişmez
     return {r, line, lineT, sabit, indP:D.indP(r.kod), indT:D.indT(r.kod)};
   });
   const serbest=rows.filter(x=>!x.sabit);
@@ -2530,32 +2555,73 @@ function hkInit(){
   if(b&&e){ const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
     const t=new Date(); if(!b.value) b.value=iso(t); if(!e.value) e.value=iso(new Date(t.getTime()+3*86400000)); }
   loadHizliKampList();
+  // İkili kampanya kutusu da aynı anda hazırlansın
+  const ikm=$("ikMarka"); if(ikm) ikm.textContent=markaAd(brand);
+  const ib=$("ikBas"), ie=$("ikBit");
+  if(ib&&ie){ const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const t=new Date(); if(!ib.value) ib.value=iso(t); if(!ie.value) ie.value=iso(new Date(t.getTime()+3*86400000)); }
+  loadIkiliList();
 }
 async function hizliKampanya(){
   try{
     const kod=(parseModeller($("hkKod").value)[0])||"";
     const fiyat=trSayi($("hkFiyat").value)||0;
+    const nakit=trSayi($("hkNakit").value)||0;
     const bas=$("hkBas").value||_bugun(), bit=$("hkBit").value||null;
     if(!kod){ adminMsgEl("hkMsg","Geçerli bir ürün kodu gir (örn: KD86NAID1N).","bad"); return; }
     if(!(fiyat>0)){ adminMsgEl("hkMsg","Kampanya fiyatını gir (örn: 76999).","bad"); return; }
     if(bit && bit<bas){ adminMsgEl("hkMsg","Bitiş tarihi başlangıçtan önce olamaz.","bad"); return; }
-    const rec={bayi_id:stokSahibi(), model_kodu:kod, marka:brand, kampanya_fiyat:fiyat, baslangic:bas, bitis:bit};
+    if(nakit>0 && nakit>fiyat){ adminMsgEl("hkMsg","Nakit fiyat peşin fiyattan yüksek olamaz — kontrol et.","bad"); return; }
+    const rec={bayi_id:stokSahibi(), model_kodu:kod, marka:brand, kampanya_fiyat:fiyat, kampanya_nakit:(nakit>0?nakit:null), baslangic:bas, bitis:bit};
     const {error}=await sb.from("kampanya_fiyat").upsert(rec,{onConflict:"bayi_id,model_kodu,marka"}); if(error) throw new Error(error.message);
-    adminMsgEl("hkMsg",`✓ ${kod} → ${fmt(fiyat)} ₺ (${bas} → ${bit||"süresiz"}). Satış ekranında bu fiyattan gelecek.`,"ok");
-    $("hkKod").value=""; $("hkFiyat").value="";
+    adminMsgEl("hkMsg",`✓ ${kod} → peşin ${fmt(fiyat)} ₺${nakit>0?" · nakit "+fmt(nakit)+" ₺":""} (${bas} → ${bit||"süresiz"}). Satış ekranında bu fiyattan gelecek.`,"ok");
+    $("hkKod").value=""; $("hkFiyat").value=""; $("hkNakit").value="";
     await loadKampFiyat(); loadHizliKampList(); quoteRows.forEach(r=>{ if(r.kod) refetch(r); });
   }catch(e){ adminMsgEl("hkMsg","Hata: "+e.message,"bad"); }
 }
+async function ikiliTanimla(){
+  try{
+    const a=(parseModeller($("ikA").value)[0])||"", b=(parseModeller($("ikB").value)[0])||"";
+    const pesin=trSayi($("ikPesin").value)||0, nakit=trSayi($("ikNakit").value)||0;
+    const bas=$("ikBas").value||_bugun(), bit=$("ikBit").value||null;
+    if(!a||!b){ adminMsgEl("ikMsg","İki ürün kodunu da gir.","bad"); return; }
+    if(a===b){ adminMsgEl("ikMsg","İki kod aynı olamaz.","bad"); return; }
+    if(!(pesin>0)){ adminMsgEl("ikMsg","İkisi birlikte peşin fiyatı gir (örn: 62999).","bad"); return; }
+    if(nakit>0 && nakit>pesin){ adminMsgEl("ikMsg","Nakit fiyat peşin fiyattan yüksek olamaz — kontrol et.","bad"); return; }
+    if(bit && bit<bas){ adminMsgEl("ikMsg","Bitiş tarihi başlangıçtan önce olamaz.","bad"); return; }
+    const rec={bayi_id:stokSahibi(), marka:brand, kod_a:a, kod_b:b, ikili_pesin:pesin, ikili_nakit:(nakit>0?nakit:null), baslangic:bas, bitis:bit};
+    const {error}=await sb.from("ikili_kampanya").upsert(rec,{onConflict:"bayi_id,marka,kod_a,kod_b"}); if(error) throw new Error(error.message);
+    adminMsgEl("ikMsg",`✓ ${a} + ${b} → ikisi birlikte ${fmt(pesin)} ₺${nakit>0?" · nakit "+fmt(nakit)+" ₺":""} (${bas} → ${bit||"süresiz"}).`,"ok");
+    $("ikA").value=""; $("ikB").value=""; $("ikPesin").value=""; $("ikNakit").value="";
+    await loadIkili(); loadIkiliList(); renderRows();
+  }catch(e){ adminMsgEl("ikMsg","Hata: "+e.message+" (ikili_ve_nakit.sql çalıştırıldı mı?)","bad"); }
+}
+async function loadIkiliList(){
+  const box=$("ikList"); if(!box) return;
+  try{
+    const bugun=_bugun();
+    const {data,error}=await sb.from("ikili_kampanya").select("id,kod_a,kod_b,ikili_pesin,ikili_nakit,baslangic,bitis,created_at").eq("marka",brand).order("created_at",{ascending:false});
+    if(error) throw error;
+    const rows=(data||[]);
+    if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Tanımlı ikili kampanya yok.</div>'; return; }
+    box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">İkili kampanyalar ('+markaAd(brand)+'):</div>'
+      +'<table><thead><tr><th>1. ürün</th><th>2. ürün</th><th class="num">İkisi birlikte</th><th class="num">Nakit</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
+      +rows.map(k=>{ const bitti=k.bitis&&k.bitis<bugun;
+        return `<tr style="${bitti?'opacity:.5':''}"><td>${k.kod_a}${bitti?' <span class="badge" style="font-size:9px;color:var(--bad)">bitti</span>':''}</td><td>${k.kod_b}</td><td class="num">${fmt(k.ikili_pesin)} ₺</td><td class="num">${(+k.ikili_nakit>0)?fmt(k.ikili_nakit)+" ₺":'<span class="mut">—</span>'}</td><td>${k.baslangic||"—"}</td><td>${k.bitis||"süresiz"}</td><td><button class="ghost sm" onclick="ikiliSil('${k.id}')">✕</button></td></tr>`;}).join("")
+      +'</tbody></table>';
+  }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi ('+e.message+').</div>'; }
+}
+async function ikiliSil(id){ await sb.from("ikili_kampanya").delete().eq("id",id); await loadIkili(); loadIkiliList(); renderRows(); }
 async function loadHizliKampList(){
   const box=$("hkList"); if(!box) return;
   try{
     const bugun=_bugun();
-    const {data}=await sb.from("kampanya_fiyat").select("id,model_kodu,kampanya_fiyat,baslangic,bitis,created_at").eq("marka",brand).order("created_at",{ascending:false});
+    const {data}=await sb.from("kampanya_fiyat").select("id,model_kodu,kampanya_fiyat,kampanya_nakit,baslangic,bitis,created_at").eq("marka",brand).order("created_at",{ascending:false});
     const rows=(data||[]);
     if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Tanımlı kampanya fiyatı yok.</div>'; return; }
     box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">Kampanya fiyatları ('+markaAd(brand)+'):</div>'
-      +'<table><thead><tr><th>Ürün</th><th class="num">Kampanya fiyatı</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
-      +rows.map(k=>{ const bitti=k.bitis&&k.bitis<bugun; return `<tr style="${bitti?'opacity:.5':''}"><td>${k.model_kodu}${bitti?' <span class="badge" style="font-size:9px;color:var(--bad)">bitti</span>':''}</td><td class="num">${fmt(k.kampanya_fiyat)} ₺</td><td>${k.baslangic||"—"}</td><td>${k.bitis||"süresiz"}</td><td><button class="ghost sm" onclick="kampFiyatSil('${k.id}')">✕</button></td></tr>`;}).join("")
+      +'<table><thead><tr><th>Ürün</th><th class="num">Kampanya fiyatı</th><th class="num">Nakit</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
+      +rows.map(k=>{ const bitti=k.bitis&&k.bitis<bugun; return `<tr style="${bitti?'opacity:.5':''}"><td>${k.model_kodu}${bitti?' <span class="badge" style="font-size:9px;color:var(--bad)">bitti</span>':''}</td><td class="num">${fmt(k.kampanya_fiyat)} ₺</td><td class="num">${(+k.kampanya_nakit>0)?fmt(k.kampanya_nakit)+" ₺":'<span class="mut">—</span>'}</td><td>${k.baslangic||"—"}</td><td>${k.bitis||"süresiz"}</td><td><button class="ghost sm" onclick="kampFiyatSil('${k.id}')">✕</button></td></tr>`;}).join("")
       +'</tbody></table>';
   }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi.</div>'; }
 }
@@ -2566,13 +2632,89 @@ async function loadKampFiyat(){
   kampFiyatMap={};
   try{
     const bugun=_bugun();
-    const {data}=await sb.from("kampanya_fiyat").select("model_kodu,kampanya_fiyat,baslangic,bitis").eq("marka",brand);
+    const {data}=await sb.from("kampanya_fiyat").select("model_kodu,kampanya_fiyat,kampanya_nakit,baslangic,bitis").eq("marka",brand);
     (data||[]).forEach(x=>{ const gecerli=(!x.baslangic||x.baslangic<=bugun)&&(!x.bitis||x.bitis>=bugun);
-      if(gecerli && +x.kampanya_fiyat>0) kampFiyatMap[(x.model_kodu||"").toUpperCase()]={fiyat:+x.kampanya_fiyat,bitis:x.bitis}; });
+      if(gecerli && +x.kampanya_fiyat>0) kampFiyatMap[(x.model_kodu||"").toUpperCase()]={fiyat:+x.kampanya_fiyat,nakit:(+x.kampanya_nakit>0?+x.kampanya_nakit:null),bitis:x.bitis}; });
   }catch(e){ kampFiyatMap={}; }
 }
 function kampRozet(kod){ const k=kampFiyatMap[(kod||"").toUpperCase()]; if(!k) return "";
-  return ` <span class="prim-badge" style="background:var(--acc);box-shadow:0 0 8px rgba(59,130,246,.55)" title="Kampanya fiyatı ${fmt(k.fiyat)} ₺${k.bitis?' · bitiş '+k.bitis:''}">🎯 KAMPANYA ${fmt(k.fiyat)}₺</span>`; }
+  const nk = (+k.nakit>0) ? ` <span class="prim-badge" style="background:#16a34a;box-shadow:0 0 8px rgba(22,163,74,.55)" title="Nakit / havale fiyatı ${fmt(k.nakit)} ₺ — bilgi amaçlı; uygulamak için satırdaki 💵 butonuna bas">💵 NAKİT ${fmt(k.nakit)}₺</span>` : "";
+  return ` <span class="prim-badge" style="background:var(--acc);box-shadow:0 0 8px rgba(59,130,246,.55)" title="Kampanya fiyatı ${fmt(k.fiyat)} ₺${k.bitis?' · bitiş '+k.bitis:''}">🎯 KAMPANYA ${fmt(k.fiyat)}₺</span>`+nk; }
+
+// ===== İKİLİ KAMPANYA (iki ürün birlikte alınırsa TOPLAM fiyat) =====
+// ikiliList: bugün geçerli tanımlar. ikiliMap[kod] = eşleştiği tanımlar.
+let ikiliList=[], ikiliMap={};
+async function loadIkili(){
+  ikiliList=[]; ikiliMap={};
+  try{
+    const bugun=_bugun();
+    const {data}=await sb.from("ikili_kampanya").select("id,kod_a,kod_b,ikili_pesin,ikili_nakit,baslangic,bitis").eq("marka",brand);
+    (data||[]).forEach(x=>{
+      const gecerli=(!x.baslangic||x.baslangic<=bugun)&&(!x.bitis||x.bitis>=bugun);
+      if(!gecerli || !(+x.ikili_pesin>0)) return;
+      const rec={id:x.id,a:(x.kod_a||"").toUpperCase(),b:(x.kod_b||"").toUpperCase(),pesin:+x.ikili_pesin,nakit:(+x.ikili_nakit>0?+x.ikili_nakit:null),bitis:x.bitis};
+      ikiliList.push(rec);
+      (ikiliMap[rec.a]=ikiliMap[rec.a]||[]).push(rec);
+      (ikiliMap[rec.b]=ikiliMap[rec.b]||[]).push(rec);
+    });
+  }catch(e){ ikiliList=[]; ikiliMap={}; }
+}
+// Sepetteki satırlara ikili fiyatı dağıtır. Her satıra r.ikiliFiyat (BİRİM peşin) yazar.
+// Dağıtım net maliyete (toptan-BİP) oranlı; maliyet yoksa yarı yarıya. Kuruş farkı ilk satıra.
+function ikiliUygula(){
+  quoteRows.forEach(r=>{ r.ikiliFiyat=null; r.ikiliEksik=null; r.ikiliBilgi=null; r.ikiliNakit=null; });
+  if(!ikiliList.length) return;
+  const kodIdx={}; quoteRows.forEach((r,i)=>{ const k=(r.kod||"").toUpperCase(); if(k && kodIdx[k]===undefined) kodIdx[k]=i; });
+  const kullanildi={};
+  ikiliList.forEach(p=>{
+    const ia=kodIdx[p.a], ib=kodIdx[p.b];
+    if(ia===undefined && ib===undefined) return;
+    if(ia!==undefined && ib!==undefined){
+      if(kullanildi[ia]||kullanildi[ib]) return;   // bir satır tek ikiliye girsin
+      const ra=quoteRows[ia], rb=quoteRows[ib];
+      const bazA=Math.max(0,(ra.isET?(+ra.etToptan||0):(+ra.toptan||0))-(ra.isET?0:(+ra.bip||0)));
+      const bazB=Math.max(0,(rb.isET?(+rb.etToptan||0):(+rb.toptan||0))-(rb.isET?0:(+rb.bip||0)));
+      let payA;
+      if(bazA>0&&bazB>0) payA=Math.round(p.pesin*bazA/(bazA+bazB));
+      else payA=Math.round(p.pesin/2);
+      const payB=Math.round(p.pesin)-payA;
+      ra.ikiliFiyat=payA; rb.ikiliFiyat=payB;
+      if(p.nakit>0){ const nA=(bazA>0&&bazB>0)?Math.round(p.nakit*bazA/(bazA+bazB)):Math.round(p.nakit/2);
+        ra.ikiliNakit=nA; rb.ikiliNakit=Math.round(p.nakit)-nA; }
+      ra.ikiliBilgi=rb.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,es:null,bitis:p.bitis};
+      kullanildi[ia]=kullanildi[ib]=1;
+    }else{
+      // sadece biri sepette → hatırlat, fiyata dokunma
+      const i=(ia!==undefined)?ia:ib; const eksik=(ia!==undefined)?p.b:p.a;
+      const r=quoteRows[i]; if(!r.ikiliFiyat && !r.ikiliEksik) r.ikiliEksik={kod:eksik,toplam:p.pesin,bitis:p.bitis};
+    }
+  });
+}
+function ikiliRozet(i){
+  const r=quoteRows[i]; if(!r) return "";
+  if(r.ikiliFiyat!=null && r.ikiliBilgi)
+    return ` <span class="prim-badge" style="background:#a855f7;box-shadow:0 0 8px rgba(168,85,247,.55)" title="İkili kampanya: ikisi birlikte ${fmt(r.ikiliBilgi.toplam)} ₺${r.ikiliBilgi.nakit?' · nakit '+fmt(r.ikiliBilgi.nakit)+' ₺':''}. Bu satıra düşen pay ${fmt(r.ikiliFiyat)} ₺.">🤝 İKİLİ ${fmt(r.ikiliFiyat)}₺</span>`;
+  if(r.ikiliEksik)
+    return ` <span class="prim-badge" style="background:var(--warn);color:#1a1204;box-shadow:0 0 8px rgba(245,158,11,.5);cursor:pointer" title="${r.ikiliEksik.kod} ile birlikte alınırsa ikisi ${fmt(r.ikiliEksik.toplam)} ₺. Eklemek için tıkla." onclick="ikiliEkle('${r.ikiliEksik.kod}')">🤝 İKİLİ: ${r.ikiliEksik.kod} ekle → ${fmt(r.ikiliEksik.toplam)}₺</span>`;
+  return "";
+}
+async function ikiliEkle(kod){
+  let i=quoteRows.findIndex(r=>!r.kod);
+  if(i<0){ quoteRows.push(bosSatir()); i=quoteRows.length-1; }
+  quoteRows[i].kod=(kod||"").toUpperCase();
+  await refetch(quoteRows[i]);
+  renderRows();
+}
+// Kampanya nakit fiyatını o satıra uygular (Manuel modunu açıp peşin kutusuna yazar) — satışçı geri alabilir
+function nakitUygula(i){
+  const r=quoteRows[i]; if(!r) return;
+  const k=kampFiyatMap[(r.kod||"").toUpperCase()];
+  const hedef = (+r.ikiliNakit>0) ? +r.ikiliNakit : ((k && +k.nakit>0) ? +k.nakit : null);
+  if(hedef==null) return;
+  if(!r.isET){ r.isET=true; if((r.etToptan==null||r.etToptan==="") && (+r.toptan>0)) r.etToptan=r.toptan; }
+  r.manuelFiyat=hedef; r.manuelTaksit=null;
+  renderRows();
+}
 
 // ===== KAMPANYA SİHİRBAZI (Opus ile otomatik ayıklama) =====
 async function ksMetinCikar(file){
