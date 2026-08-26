@@ -1139,7 +1139,7 @@ async function bayiStokYukle(){
 
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
-function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}; }
+function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,ikiliEsIdx:null,nakitSecili:false,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}; }
 function addRow(){ quoteRows.push(bosSatir()); renderRows(); }
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
@@ -1210,7 +1210,8 @@ function calcParts(r,kar,komis){
   const manuelP = r.isET && (+r.manuelFiyat>0);   // Manuel peşin
   const manuelT = r.isET && (+r.manuelTaksit>0);  // Manuel taksitli
   // Sabit peşin: önce manuel override, yoksa primli fiyat (varsa) — satışçı Manuel'le değiştirebilir
-  const sabitPesin = manuelP ? (+r.manuelFiyat) : ((+r.ikiliFiyat>0) ? (+r.ikiliFiyat) : ((+r.kampFiyat>0) ? (+r.kampFiyat) : ((+r.primliFiyat>0) ? (+r.primliFiyat) : null)));
+  const _nakitSec = r.nakitSecili ? nakitHedefi(r) : null;
+  const sabitPesin = manuelP ? (+r.manuelFiyat) : ((_nakitSec>0) ? _nakitSec : ((+r.ikiliFiyat>0) ? (+r.ikiliFiyat) : ((+r.kampFiyat>0) ? (+r.kampFiyat) : ((+r.primliFiyat>0) ? (+r.primliFiyat) : null))));
   let unitNakit, unitTaksit;
   unitNakit = (sabitPesin!=null) ? sabitPesin : unitBipli*(1+kar/100);
   if(manuelT) unitTaksit = +r.manuelTaksit;
@@ -1265,10 +1266,10 @@ function renderRows(){
       : fmt(taksitL);
     const satirTaksitVar = komis>0 || (r.isET && +r.manuelTaksit>0);
     const karCell = !valid ? '<span class="mut">—</span>' : ('P '+karBadge(p.karPesin) + (satirTaksitVar? '<br>T '+karBadge(p.karTaksit):''));
-    const _kf=kampFiyatMap[(r.kod||"").toUpperCase()];
-    const _nakitHedef = (+r.ikiliNakit>0) ? +r.ikiliNakit : ((_kf && +_kf.nakit>0) ? +_kf.nakit : null);
+    const _nakitHedef = nakitHedefi(r);
+    const _nSec = !!r.nakitSecili;
     const nakitBtn = _nakitHedef!=null
-      ? `<button class="ghost sm" style="border-color:#16a34a;color:#22c55e" title="Nakit/havale fiyatını bu satıra uygula (${fmt(_nakitHedef)} ₺). Manuel kutusuna yazılır, geri alabilirsin." onclick="nakitUygula(${i})">💵 Nakit</button> `
+      ? `<button class="ghost sm" style="${_nSec?'background:#16a34a;border-color:#16a34a;color:#fff;font-weight:800':'border-color:#16a34a;color:#22c55e'}" title="${_nSec?'Nakit fiyatı UYGULANDI ('+fmt(_nakitHedef)+' ₺). Geri almak için tekrar bas.':'Nakit/havale fiyatını uygula ('+fmt(_nakitHedef)+' ₺)'}${r.ikiliEsIdx!=null?' — ikili kampanyada iki satıra birlikte uygulanır':''}" onclick="nakitUygula(${i})">💵 Nakit${_nSec?' ✓':''}</button> `
       : "";
     const tr=document.createElement("tr");
     tr.innerHTML=`
@@ -1545,8 +1546,16 @@ function hesaplaHakedis(applied, rows){
       const a=cats[0].arr.pop(), b=cats[1].arr.pop(); a.used=b.used=true; toplamHak+=hak; toplamInd+=ind;
       dagEkle(a.kod,hak/2); dagEkle(b.kod,hak/2);
       dokum.push({ikon:'🔗',aciklama:`2'li: ${a.kod} (${a.kat}) + ${b.kod} (${b.kat})`,hak,ind}); } });
-  // 4) diğer (tekil / tümü / all+any) — düz bir kez uygulanır
-  digerK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0; if(hak||ind){ toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'🎁',aciklama:k.ad||'kampanya',hak,ind}); } });
+  // 4) diğer (tekil / tümü / all+any) — bir kez uygulanır AMA sepette gerçekten uyan ürün olmalı.
+  //    ⚠️ Eski sürümde bu kontrol YOKTU: sepette alakasız tek bir ürün varken bile (hatta boş sepette)
+  //    kampanya "Bu sepette X ₺" gösteriyordu. Artık model/kategori/hariç listesine göre eşleşme aranır.
+  digerK.forEach(k=>{ const hak=+k.hakedis||0, ind=+k.musteri_indirimi||0; if(!(hak||ind)) return;
+    const mods=(k.secili_modeller||[]).map(m=>(m||"").toUpperCase());
+    const haric=new Set((k.haric_modeller||[]).map(m=>String(m||"").toUpperCase()));
+    const kats=(k.kategoriler||[]).map(katNorm).filter(Boolean);
+    const uyan=units.filter(u=>!haric.has(u.kod) && (mods.length ? mods.includes(u.kod) : (kats.length ? kats.includes(u.kat) : true)));
+    if(!uyan.length) return;   // sepette bu kampanyaya uyan ürün yok → hakediş YOK
+    toplamHak+=hak; toplamInd+=ind; dokum.push({ikon:'🎁',aciklama:k.ad||'kampanya',hak,ind}); });
   // eşleşmeyen bundle-adayı birimler (bilgi amaçlı — sadece bundle seçiliyse)
   let bosta=[];
   if(hasBundle){ const aday=new Set(['BUZDOLABI','DERINDONDURUCU','CAMASIR','KURUTMA','BULASIK','FIRIN','OCAK','DAVLUMBAZ']);
@@ -1840,7 +1849,7 @@ function teklifSatirlar(items){
   const D=teklifDagilim(items);
   const rows=items.map(r=>{
     const line=(r.nakit||0)*(r.adet||1), lineT=(r.taksit||0)*(r.adet||1);
-    const sabit=((+r.ikiliFiyat>0)||(+r.kampFiyat>0)||(+r.primliFiyat>0))&&!(r.isET&&+r.manuelFiyat>0); // kampanya/primli fiyat aktifse bu satır değişmez
+    const sabit=(r.nakitSecili||(+r.ikiliFiyat>0)||(+r.kampFiyat>0)||(+r.primliFiyat>0))&&!(r.isET&&+r.manuelFiyat>0); // kampanya/primli fiyat aktifse bu satır değişmez
     return {r, line, lineT, sabit, indP:D.indP(r.kod), indT:D.indT(r.kod)};
   });
   const serbest=rows.filter(x=>!x.sabit);
@@ -2662,7 +2671,7 @@ async function loadIkili(){
 // Sepetteki satırlara ikili fiyatı dağıtır. Her satıra r.ikiliFiyat (BİRİM peşin) yazar.
 // Dağıtım net maliyete (toptan-BİP) oranlı; maliyet yoksa yarı yarıya. Kuruş farkı ilk satıra.
 function ikiliUygula(){
-  quoteRows.forEach(r=>{ r.ikiliFiyat=null; r.ikiliEksik=null; r.ikiliBilgi=null; r.ikiliNakit=null; });
+  quoteRows.forEach(r=>{ r.ikiliFiyat=null; r.ikiliEksik=null; r.ikiliBilgi=null; r.ikiliNakit=null; r.ikiliEsIdx=null; });
   if(!ikiliList.length) return;
   const kodIdx={}; quoteRows.forEach((r,i)=>{ const k=(r.kod||"").toUpperCase(); if(k && kodIdx[k]===undefined) kodIdx[k]=i; });
   const kullanildi={};
@@ -2672,8 +2681,10 @@ function ikiliUygula(){
     if(ia!==undefined && ib!==undefined){
       if(kullanildi[ia]||kullanildi[ib]) return;   // bir satır tek ikiliye girsin
       const ra=quoteRows[ia], rb=quoteRows[ib];
-      const bazA=Math.max(0,(ra.isET?(+ra.etToptan||0):(+ra.toptan||0))-(ra.isET?0:(+ra.bip||0)));
-      const bazB=Math.max(0,(rb.isET?(+rb.etToptan||0):(+rb.toptan||0))-(rb.isET?0:(+rb.bip||0)));
+      // Baz her zaman HAM net maliyet (toptan − BİP). Manuel modu açılınca pay kaymasın diye
+      // isET/etToptan'a bakılmaz; toptan yoksa etToptan'a düşülür.
+      const _baz=r=>Math.max(0,((+r.toptan>0)?(+r.toptan):(+r.etToptan||0))-(+r.bip||0));
+      const bazA=_baz(ra), bazB=_baz(rb);
       let payA;
       if(bazA>0&&bazB>0) payA=Math.round(p.pesin*bazA/(bazA+bazB));
       else payA=Math.round(p.pesin/2);
@@ -2681,7 +2692,8 @@ function ikiliUygula(){
       ra.ikiliFiyat=payA; rb.ikiliFiyat=payB;
       if(p.nakit>0){ const nA=(bazA>0&&bazB>0)?Math.round(p.nakit*bazA/(bazA+bazB)):Math.round(p.nakit/2);
         ra.ikiliNakit=nA; rb.ikiliNakit=Math.round(p.nakit)-nA; }
-      ra.ikiliBilgi=rb.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,es:null,bitis:p.bitis};
+      ra.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,bitis:p.bitis}; rb.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,bitis:p.bitis};
+      ra.ikiliEsIdx=ib; rb.ikiliEsIdx=ia;
       kullanildi[ia]=kullanildi[ib]=1;
     }else{
       // sadece biri sepette → hatırlat, fiyata dokunma
@@ -2706,13 +2718,19 @@ async function ikiliEkle(kod){
   renderRows();
 }
 // Kampanya nakit fiyatını o satıra uygular (Manuel modunu açıp peşin kutusuna yazar) — satışçı geri alabilir
-function nakitUygula(i){
-  const r=quoteRows[i]; if(!r) return;
+function nakitHedefi(r){
+  if(!r) return null;
+  if(+r.ikiliNakit>0) return +r.ikiliNakit;
   const k=kampFiyatMap[(r.kod||"").toUpperCase()];
-  const hedef = (+r.ikiliNakit>0) ? +r.ikiliNakit : ((k && +k.nakit>0) ? +k.nakit : null);
-  if(hedef==null) return;
-  if(!r.isET){ r.isET=true; if((r.etToptan==null||r.etToptan==="") && (+r.toptan>0)) r.etToptan=r.toptan; }
-  r.manuelFiyat=hedef; r.manuelTaksit=null;
+  return (k && +k.nakit>0) ? +k.nakit : null;
+}
+// Nakit fiyatı aç/kapa. Manuel moduna DOKUNMAZ → BİP ve kâr hesabı bozulmaz.
+// İkili kampanyada tek satır nakde geçerse toplam tutmaz; bu yüzden eş satır da birlikte açılır/kapanır.
+function nakitUygula(i){
+  const r=quoteRows[i]; if(!r || nakitHedefi(r)==null) return;
+  const yeni=!r.nakitSecili;
+  r.nakitSecili=yeni;
+  if(r.ikiliEsIdx!=null && quoteRows[r.ikiliEsIdx]) quoteRows[r.ikiliEsIdx].nakitSecili=yeni;
   renderRows();
 }
 
