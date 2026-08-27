@@ -646,7 +646,7 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 
     <div class="card" id="ikiliCard" style="border:2px solid #a855f7">
       <h2>🤝 İkili Kampanya <span class="badge" style="background:#a855f7;color:#fff">iki ürün birlikte</span></h2>
-      <p class="mut" style="font-size:13px;margin:4px 0 10px">İki ürün <b>birlikte</b> alınırsa geçerli olacak <b>toplam</b> fiyatı tanımla (bundle/hakediş sistemine dokunmaz). <b>Taksitli</b> = müşterinin karta bölerek ödeyeceği toplam (ilan ettiğin fiyat); peşin karşılığı bankanın komisyonu düşülerek otomatik bulunur. <b>Nakit</b> = elden/havale fiyatı, satırdaki 💵 butonuyla uygulanır. Satış ekranında satışçı ürünlerden birini yazdığında <b style="color:#c084fc">🤝 İKİLİ</b> hatırlatması çıkar, tıklayınca diğer ürün sepete eklenir ve toplam fiyat iki satıra maliyet oranında dağıtılır. Tek başına alınırsa normal fiyat geçerlidir. Satışçı <b>Manuel</b> ile her zaman müdahale edebilir. Marka: <b id="ikMarka">—</b></p>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">İki ürün <b>birlikte</b> alınırsa geçerli olacak <b>toplam</b> fiyatı tanımla (bundle/hakediş sistemine dokunmaz). <b>Taksitli</b> = müşterinin karta bölerek ödeyeceği toplam (ilan ettiğin fiyat); peşin karşılığı bankanın komisyonu düşülerek otomatik bulunur. <b>Nakit</b> = elden/havale fiyatı, satırdaki 💵 butonuyla uygulanır. <b>Bundle tiki:</b> fiyatı hesaplarken bundle desteğini zaten düştüysen işaretli bırak — o satışta bundle kampanyaları kapanır, indirim ikinci kez inmez. Düşmediysen tiki kaldır, bundle normal çalışsın. Satış ekranında satışçı ürünlerden birini yazdığında <b style="color:#c084fc">🤝 İKİLİ</b> hatırlatması çıkar, tıklayınca diğer ürün sepete eklenir ve toplam fiyat iki satıra maliyet oranında dağıtılır. Tek başına alınırsa normal fiyat geçerlidir. Satışçı <b>Manuel</b> ile her zaman müdahale edebilir. Marka: <b id="ikMarka">—</b></p>
       <div class="row">
         <div class="fld"><label>1. ürün kodu</label><input id="ikA" placeholder="WGK244Z0TR" style="width:170px"></div>
         <div class="fld"><label>2. ürün kodu</label><input id="ikB" placeholder="SMS4IKW62T" style="width:170px"></div>
@@ -654,6 +654,10 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
         <div class="fld"><label>İkisi birlikte <b>NAKİT</b> ₺ <span class="mut" style="font-size:10px">(ops.)</span></label><input id="ikNakit" type="text" inputmode="decimal" placeholder="74999" style="width:170px"></div>
         <div class="fld"><label>Başlangıç</label><input id="ikBas" type="date"></div>
         <div class="fld"><label>Bitiş</label><input id="ikBit" type="date"></div>
+        <div class="fld" style="min-width:230px"><label>&nbsp;</label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;background:var(--field);border:1px solid #a855f7;border-radius:8px;padding:8px 10px">
+            <input id="ikBundle" type="checkbox" checked style="width:16px;height:16px;accent-color:#a855f7">
+            <span>Bu fiyata <b>bundle desteğini düştüm</b></span></label></div>
         <button onclick="ikiliTanimla()">Ekle</button>
       </div>
       <div id="ikMsg" class="msg"></div>
@@ -1490,6 +1494,7 @@ async function loadAktifKampanyalar(){
   }catch(e){ aktifKampanyalar=[]; }
 }
 function matchKampanyalar(){
+  if(ikiliAktifMi()) return [];   // ikili kampanya varken bundle aranmaz
   const items=quoteRows.filter(r=>r.kod && r.ad!=="— bulunamadı —");
   if(!items.length) return [];
   const modelSet=new Set(items.map(r=>(r.kod||"").toUpperCase()));
@@ -1521,6 +1526,17 @@ function matchKampanyalar(){
 function renderKampanyaPanel(){
   const panel=$("kampPanel"), list=$("kampList"); if(!panel||!list) return;
   panel.style.display="";
+  if(ikiliAktifMi()){
+    if(secilenKampanya.size) secilenKampanya.clear();   // eski seçim asılı kalmasın
+    const kc=$("kampCount"); if(kc) kc.textContent="ikili kampanya aktif";
+    const ar=$("kampArrow"); if(ar) ar.textContent=kampAcik?"▼":"▶"; list.style.display=kampAcik?"":"none";
+    list.innerHTML=`<div class="diva-uyari" style="background:rgba(168,85,247,.15);border-color:#a855f7;color:#c084fc">
+      🤝 <b>Bu sepette ikili kampanya var — bundle kampanyaları uygulanmaz.</b><br>
+      <span style="font-weight:400;font-size:12px">İkili fiyat, bundle desteği zaten düşülerek belirlendi.
+      Ayrıca bundle uygulanırsa indirim ikinci kez iner ve satış zarara geçer.
+      Bundle kullanmak istiyorsan ikili ürünlerden birini sepetten çıkar.</span></div>`;
+    return;
+  }
   const matched=matchKampanyalar(); const matchIds=new Set(matched.map(k=>k.id));
   const all=aktifKampanyalar.slice().sort((a,b)=>(matchIds.has(b.id)?1:0)-(matchIds.has(a.id)?1:0));
   const applied=all.filter(k=>secilenKampanya.has(k.id));
@@ -1563,6 +1579,10 @@ function renderKampanyaPanel(){
       </div>`;
   setHeader();
 }
+// 🤝 İkili kampanya fiyatı BUNDLE DESTEĞİ DÜŞÜLEREK belirlenir. Aynı sepette bundle/hakediş
+// kampanyası da uygulanırsa indirim İKİ KEZ iner → zarar. Bu yüzden sepette ikili eşleşmesi
+// varsa o teklifte bundle kampanyaları tümüyle devre dışı kalır (Burak'ın kararı, 26 Ağu).
+function ikiliAktifMi(){ try{ return quoteRows.some(r=>+r.ikiliFiyat>0 && r.ikiliBundle); }catch(e){ return false; } }
 function isBundleKamp(k){ return ['all','all+any','any2','xl','xxl','xl+xxl'].includes(k&&k.match_type); }
 // Kampanyanın bundle türü: xl (tek tek dolap), ankastre (fırın+ocak+davlumbaz seti), ikili (2 farklı beyaz eşya), diger
 function bundleTuru(k){
@@ -1577,6 +1597,8 @@ function bundleTuru(k){
 // Sıra: XL/XXL (tek tek, en yüksek) → ankastre set (1+1+1) → 2'li (farklı kategori çiftleri). Bir ürün yalnız bir yerde sayılır.
 function hesaplaHakedis(applied, rows){
   const dokum=[]; let toplamHak=0, toplamInd=0;
+  // ikili kampanyalı sepette bundle yok — indirim ikinci kez inmesin
+  if(ikiliAktifMi()) return {toplamHak:0,toplamInd:0,dokum:[],bosta:[],dagilim:{}};
   // dagilim: kod → o ürüne düşen hakediş TL (teklif/sipariş formunda İNDİRİM ilgili ürüne yazılır)
   const dagilim={}; const dagEkle=(kod,tl)=>{ dagilim[kod]=(dagilim[kod]||0)+tl; };
   // birim listesi (adet kadar çoğalt) — her birim tek bir kampanyada kullanılır
@@ -2748,9 +2770,10 @@ async function ikiliTanimla(){
     if(!(pesin>0)){ adminMsgEl("ikMsg","İkisi birlikte TAKSİTLİ fiyatı gir (örn: 79999).","bad"); return; }
     if(nakit>0 && nakit>pesin){ adminMsgEl("ikMsg","Nakit fiyat taksitli fiyattan yüksek olamaz — kontrol et.","bad"); return; }
     if(bit && bit<bas){ adminMsgEl("ikMsg","Bitiş tarihi başlangıçtan önce olamaz.","bad"); return; }
-    const rec={bayi_id:stokSahibi(), marka:brand, kod_a:a, kod_b:b, ikili_taksitli:pesin, ikili_nakit:(nakit>0?nakit:null), baslangic:bas, bitis:bit};
+    const bd=!!(($("ikBundle")||{}).checked);
+    const rec={bayi_id:stokSahibi(), marka:brand, kod_a:a, kod_b:b, ikili_taksitli:pesin, ikili_nakit:(nakit>0?nakit:null), bundle_dahil:bd, baslangic:bas, bitis:bit};
     const {error}=await sb.from("ikili_kampanya").upsert(rec,{onConflict:"bayi_id,marka,kod_a,kod_b"}); if(error) throw new Error(error.message);
-    adminMsgEl("ikMsg",`✓ ${a} + ${b} → taksitli ${fmt(pesin)} ₺${nakit>0?" · nakit "+fmt(nakit)+" ₺":""} (${bas} → ${bit||"süresiz"}).`,"ok");
+    adminMsgEl("ikMsg",`✓ ${a} + ${b} → taksitli ${fmt(pesin)} ₺${nakit>0?" · nakit "+fmt(nakit)+" ₺":""} · ${bd?"bundle DÜŞÜLDÜ (satışta bundle kapalı)":"bundle düşülmedi (bundle açık)"} (${bas} → ${bit||"süresiz"}).`,"ok");
     $("ikA").value=""; $("ikB").value=""; $("ikPesin").value=""; $("ikNakit").value="";
     await loadIkili(); loadIkiliList(); renderRows();
   }catch(e){ adminMsgEl("ikMsg","Hata: "+e.message+" (ikili_ve_nakit.sql çalıştırıldı mı?)","bad"); }
@@ -2759,14 +2782,14 @@ async function loadIkiliList(){
   const box=$("ikList"); if(!box) return;
   try{
     const bugun=_bugun();
-    const {data,error}=await sb.from("ikili_kampanya").select("id,kod_a,kod_b,ikili_taksitli,ikili_nakit,baslangic,bitis,created_at").eq("marka",brand).order("created_at",{ascending:false});
+    const {data,error}=await sb.from("ikili_kampanya").select("id,kod_a,kod_b,ikili_taksitli,ikili_nakit,bundle_dahil,baslangic,bitis,created_at").eq("marka",brand).order("created_at",{ascending:false});
     if(error) throw error;
     const rows=(data||[]);
     if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Tanımlı ikili kampanya yok.</div>'; return; }
     box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">İkili kampanyalar ('+markaAd(brand)+'):</div>'
-      +'<table><thead><tr><th>1. ürün</th><th>2. ürün</th><th class="num">Taksitli</th><th class="num">Nakit</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
+      +'<table><thead><tr><th>1. ürün</th><th>2. ürün</th><th class="num">Taksitli</th><th class="num">Nakit</th><th>Bundle</th><th>Başlangıç</th><th>Bitiş</th><th></th></tr></thead><tbody>'
       +rows.map(k=>{ const bitti=k.bitis&&k.bitis<bugun;
-        return `<tr style="${bitti?'opacity:.5':''}"><td>${k.kod_a}${bitti?' <span class="badge" style="font-size:9px;color:var(--bad)">bitti</span>':''}</td><td>${k.kod_b}</td><td class="num">${fmt(k.ikili_taksitli)} ₺</td><td class="num">${(+k.ikili_nakit>0)?fmt(k.ikili_nakit)+" ₺":'<span class="mut">—</span>'}</td><td>${k.baslangic||"—"}</td><td>${k.bitis||"süresiz"}</td><td><button class="ghost sm" onclick="ikiliSil('${k.id}')">✕</button></td></tr>`;}).join("")
+        return `<tr style="${bitti?'opacity:.5':''}"><td>${k.kod_a}${bitti?' <span class="badge" style="font-size:9px;color:var(--bad)">bitti</span>':''}</td><td>${k.kod_b}</td><td class="num">${fmt(k.ikili_taksitli)} ₺</td><td class="num">${(+k.ikili_nakit>0)?fmt(k.ikili_nakit)+" ₺":'<span class="mut">—</span>'}</td><td>${(k.bundle_dahil!==false)?'<span class="badge" style="background:#a855f7;color:#fff;font-size:9px" title="Fiyata bundle düşüldü — satışta bundle kampanyası uygulanmaz">✓ düşüldü</span>':'<span class="mut" style="font-size:11px">düşülmedi</span>'}</td><td>${k.baslangic||"—"}</td><td>${k.bitis||"süresiz"}</td><td><button class="ghost sm" onclick="ikiliSil('${k.id}')">✕</button></td></tr>`;}).join("")
       +'</tbody></table>';
   }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi ('+e.message+').</div>'; }
 }
@@ -2807,11 +2830,11 @@ async function loadIkili(){
   ikiliList=[]; ikiliMap={};
   try{
     const bugun=_bugun();
-    const {data}=await sb.from("ikili_kampanya").select("id,kod_a,kod_b,ikili_taksitli,ikili_nakit,baslangic,bitis").eq("marka",brand);
+    const {data}=await sb.from("ikili_kampanya").select("id,kod_a,kod_b,ikili_taksitli,ikili_nakit,bundle_dahil,baslangic,bitis").eq("marka",brand);
     (data||[]).forEach(x=>{
       const gecerli=(!x.baslangic||x.baslangic<=bugun)&&(!x.bitis||x.bitis>=bugun);
       if(!gecerli || !(+x.ikili_taksitli>0)) return;
-      const rec={id:x.id,a:(x.kod_a||"").toUpperCase(),b:(x.kod_b||"").toUpperCase(),pesin:+x.ikili_taksitli,nakit:(+x.ikili_nakit>0?+x.ikili_nakit:null),bitis:x.bitis};
+      const rec={id:x.id,a:(x.kod_a||"").toUpperCase(),b:(x.kod_b||"").toUpperCase(),pesin:+x.ikili_taksitli,nakit:(+x.ikili_nakit>0?+x.ikili_nakit:null),bundleDahil:(x.bundle_dahil!==false),bitis:x.bitis};
       ikiliList.push(rec);
       (ikiliMap[rec.a]=ikiliMap[rec.a]||[]).push(rec);
       (ikiliMap[rec.b]=ikiliMap[rec.b]||[]).push(rec);
@@ -2821,7 +2844,7 @@ async function loadIkili(){
 // Sepetteki satırlara ikili fiyatı dağıtır. Her satıra r.ikiliFiyat (BİRİM peşin) yazar.
 // Dağıtım net maliyete (toptan-BİP) oranlı; maliyet yoksa yarı yarıya. Kuruş farkı ilk satıra.
 function ikiliUygula(){
-  quoteRows.forEach(r=>{ r.ikiliFiyat=null; r.ikiliTaksit=null; r.ikiliEksik=null; r.ikiliBilgi=null; r.ikiliNakit=null; r.ikiliEsIdx=null; });
+  quoteRows.forEach(r=>{ r.ikiliFiyat=null; r.ikiliTaksit=null; r.ikiliEksik=null; r.ikiliBilgi=null; r.ikiliNakit=null; r.ikiliEsIdx=null; r.ikiliBundle=false; });
   if(!ikiliList.length) return;
   const kodIdx={}; quoteRows.forEach((r,i)=>{ const k=(r.kod||"").toUpperCase(); if(k && kodIdx[k]===undefined) kodIdx[k]=i; });
   const kullanildi={};
@@ -2843,7 +2866,8 @@ function ikiliUygula(){
       ra.ikiliFiyat=payA; rb.ikiliFiyat=payB;
       if(p.nakit>0){ const nA=(bazA>0&&bazB>0)?Math.round(p.nakit*bazA/(bazA+bazB)):Math.round(p.nakit/2);
         ra.ikiliNakit=nA; rb.ikiliNakit=Math.round(p.nakit)-nA; }
-      ra.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,bitis:p.bitis}; rb.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,bitis:p.bitis};
+      ra.ikiliBundle=rb.ikiliBundle=!!p.bundleDahil;   // bu fiyata bundle düşüldü mü
+      ra.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,bitis:p.bitis,bundleDahil:!!p.bundleDahil}; rb.ikiliBilgi={toplam:p.pesin,nakit:p.nakit,bitis:p.bitis,bundleDahil:!!p.bundleDahil};
       ra.ikiliEsIdx=ib; rb.ikiliEsIdx=ia;
       kullanildi[ia]=kullanildi[ib]=1;
     }else{
