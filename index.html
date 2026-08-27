@@ -2869,6 +2869,16 @@ let hasarliMap={};
 const HS_ETIKET={hasarli:"HASARLI",iade:"İADE GELDİ",rezerve:"REZERVE",belirsiz:"DURUMU BELİRSİZ",acik:"AÇIK ÜRÜN",kutusuz:"KUTUSUZ"};
 // 🔴 kırmızı = satma, önce sor · 🟠 turuncu = satılır ama müşteriye SÖYLE
 const HS_SARI=new Set(["acik","kutusuz"]);
+// Kaydı giren kim? E-posta ASLA yazılmaz — mağaza adı, yoksa role göre etiket.
+function hsKimYaz(){
+  const raw=((profil&&(profil.magaza||profil.ad))||"").trim();
+  if(raw && raw.indexOf("@")<0) return raw;
+  if(profil&&profil.rol==="admin") return "Merkez (yönetim)";
+  if(profil&&profil.rol==="personel") return "Merkez";
+  return raw ? "Mağaza" : "Mağaza";
+}
+// Eski kayıtlarda e-posta durabilir; ekranda gösterme.
+function hsKimGoster(kim){ kim=(kim||"").trim(); if(!kim) return ""; return (kim.indexOf("@")>=0) ? "Merkez (yönetim)" : kim; }
 function hsDepoAd(d){ if(!d) return ""; if(d==="mars") return "MARS"; if(d==="horoz") return "HOROZ"; if(d==="magaza") return "MAĞAZADA"; if(d==="kadikoy") return (typeof depoAdi==="function"?depoAdi().toUpperCase():"KENDİ DEPO"); return String(d).toUpperCase(); }
 function hsSari(sebep){ return HS_SARI.has(sebep||""); }
 function hsRenk(sebep){ return hsSari(sebep)?"var(--warn)":"var(--bad)"; }
@@ -2888,7 +2898,7 @@ function hasarliRozet(kod){
   const dp=hsDepoAd(h.depo);
   const t=(HS_ETIKET[h.sebep]||"SORUNLU")+(h.adet>1?" ×"+h.adet:"")+(dp?" · "+dp:"");
   const sari=hsSari(h.sebep);
-  const ip=`${t}${h.aciklama?" — "+h.aciklama:""}${h.kim?" · giren: "+h.kim:""}${h.tarih?" · "+fmtTarih(h.tarih):""}. ${hsUyariMetni(h.sebep).toUpperCase()}`;
+  const ip=`${t}${h.aciklama?" — "+h.aciklama:""}${hsKimGoster(h.kim)?" · giren: "+hsKimGoster(h.kim):""}${h.tarih?" · "+fmtTarih(h.tarih):""}. ${hsUyariMetni(h.sebep).toUpperCase()}`;
   return ` <span class="prim-badge hs-badge" style="background:${hsRenk(h.sebep)};box-shadow:0 0 10px rgba(${hsRgba(h.sebep)},.75)${sari?";color:#1a1300!important":""}" title="${ip.replace(/"/g,"&quot;")}">${sari?"📦":"🚫"} ${t}</span>`;
 }
 function hasarliUyariKutu(kod){
@@ -2898,7 +2908,7 @@ function hasarliUyariKutu(kod){
   const sari=hsSari(h.sebep);
   return `<div style="margin-top:8px;background:${hsRenk(h.sebep)};color:${sari?"#1a1300":"#fff"};border-radius:10px;padding:11px 13px;font-weight:800;font-size:14px;line-height:1.5;box-shadow:0 0 14px rgba(${hsRgba(h.sebep)},.5)">
     ${sari?"📦":"🚫"} DİKKAT — BU ÜRÜN ${t}<br>
-    <span style="font-weight:600;font-size:13px">${h.aciklama?h.aciklama+"<br>":""}${hsUyariMetni(h.sebep)}${h.kim?" (kaydı giren: "+h.kim+")":""}${h.tarih?" · "+fmtTarih(h.tarih):""}</span></div>`;
+    <span style="font-weight:600;font-size:13px">${h.aciklama?h.aciklama+"<br>":""}${hsUyariMetni(h.sebep)}${hsKimGoster(h.kim)?" (kaydı giren: "+hsKimGoster(h.kim)+")":""}${h.tarih?" · "+fmtTarih(h.tarih):""}</span></div>`;
 }
 function hsInit(){ const m=$("hsMarka"); if(m) m.textContent=markaAd(brand);
   const dk=$("hsDepoKendi"); if(dk && typeof depoAdi==="function") dk.textContent=depoAdi();
@@ -2910,7 +2920,7 @@ async function hasarliEkle(){
     const adet=Math.max(1, parseInt(($("hsAdet").value||"1").replace(/[^0-9]/g,""),10)||1);
     const sebep=($("hsSebep")||{}).value||"hasarli";
     const acik=($("hsAciklama").value||"").trim()||null;
-    const kim=((profil&&(profil.magaza||profil.ad))||"").trim()||null;
+    const kim=hsKimYaz();
     const depo=(($("hsDepo")||{}).value)||null;
     const rec={bayi_id:stokSahibi(), marka:brand, model_kodu:kod, adet, sebep, depo, aciklama:acik, ekleyen_ad:kim, aktif:true};
     const {error}=await sb.from("hasarli_urunler").upsert(rec,{onConflict:"bayi_id,marka,model_kodu"}); if(error) throw new Error(error.message);
@@ -2928,7 +2938,7 @@ async function loadHasarliList(){
     if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Sorunlu ürün kaydı yok — temiz.</div>'; return; }
     box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">Sorunlu ürünler ('+markaAd(brand)+') — satışta kırmızı uyarı veriyor:</div>'
       +'<table><thead><tr><th>Ürün</th><th class="num">Adet</th><th>Sebep</th><th>Nerede</th><th>Açıklama</th><th>Giren</th><th>Tarih</th><th></th></tr></thead><tbody>'
-      +rows.map(k=>`<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:${hsRenk(k.sebep)};color:${hsSari(k.sebep)?"#1a1300":"#fff"};font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${hsDepoAd(k.depo)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${(k.aciklama||"").replace(/</g,"&lt;")||'<span class="mut">—</span>'}</td><td style="font-size:12px">${k.ekleyen_ad||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`).join("")
+      +rows.map(k=>`<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:${hsRenk(k.sebep)};color:${hsSari(k.sebep)?"#1a1300":"#fff"};font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${hsDepoAd(k.depo)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${(k.aciklama||"").replace(/</g,"&lt;")||'<span class="mut">—</span>'}</td><td style="font-size:12px">${hsKimGoster(k.ekleyen_ad)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`).join("")
       +'</tbody></table>';
   }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi ('+e.message+') — hasarli_urun.sql çalıştırıldı mı?</div>'; }
 }
