@@ -853,7 +853,7 @@ async function showApp(session){
   await loadProfil(session.user.id);
   if(profil.rol!=="admin" && profil.abonelik_durumu==="pasif"){ show("pendingView"); return; }
   show("appView"); appReady=true;
-  $("who").textContent = session.user.email;
+  $("who").textContent = benKimim();   // e-posta DEĞİL — müşteri ekranı görebiliyor
   applyBrandAccess();
   $("adminBtn").style.display = ""; // herkes girer; içerideki kartlar role göre görünür
   applyAdminAccess();
@@ -943,6 +943,18 @@ function disBayiMi(){ return !!(profil && profil.rol==="bayi" && ("bayi_sahibi" 
 // onların stok sahibi, bağlı oldukları merkezdir. Bağımsız bayide sahip kendisidir.
 // Bu fonksiyon HEM okuma HEM yazma HEM silme sorgularında kullanılır —
 // güvenlik yalnızca RLS'e bırakılmaz, kodda da açıkça filtrelenir.
+// ===== E-POSTA EKRANA BASILMAZ =====
+// Ekranda kişi/mağaza adı gösterilecek her yerde bundan geçilir.
+// Değer e-posta ise role göre etiketle değiştirilir.
+function adGoster(v, rol){
+  v=(v||"").toString().trim();
+  if(v && v.indexOf("@")<0) return v;
+  const r=rol||(profil&&profil.rol)||"";
+  if(r==="admin") return "Merkez (yönetim)";
+  if(r==="personel") return "Merkez";
+  return v ? "Mağaza" : "";
+}
+function benKimim(){ return adGoster((profil&&(profil.magaza||profil.ad))||"") || "Merkez (yönetim)"; }
 function stokSahibi(){ return (profil && profil.bayi_sahibi) ? profil.bayi_sahibi : authUid; }
 let bagimsizToptan={};   // MODEL KODU -> ham toptan fiyat (sadece dış bayide dolar)
 async function loadBagimsizToptan(){
@@ -1797,12 +1809,12 @@ async function loadTeklifler(){
   const tb=$("tekliflerList"); if(!tb) return;
   const {data,error}=await sb.from("teklifler").select("*").order("created_at",{ascending:false}).limit(1000);
   if(error){ if($("tekliflerMsg")) $("tekliflerMsg").textContent="Hata: "+error.message; return; }
-  let pmap={}; try{ const ps=await sb.from("profiller").select("id,magaza,ad"); (ps.data||[]).forEach(p=>pmap[p.id]={magaza:p.magaza,ad:p.ad}); }catch(e){}
+  let pmap={}; try{ const ps=await sb.from("profiller").select("id,magaza,ad,rol"); (ps.data||[]).forEach(p=>pmap[p.id]={magaza:p.magaza,ad:adGoster(p.ad,p.rol)}); }catch(e){}
   tfCache=(data||[]).map(t=>{
     const s=t.satirlar||{}; const arr=Array.isArray(s);
     const items=arr?s:(s.items||[]);
     return { id:t.id, no:arr?"—":(s.no||"—"), personel:arr?"—":(s.personel||"—"),
-      magaza:(!arr&&s.magaza)||(pmap[t.bayi_id]&&(pmap[t.bayi_id].magaza||pmap[t.bayi_id].ad))||"—",
+      magaza:adGoster((!arr&&s.magaza)||(pmap[t.bayi_id]&&(pmap[t.bayi_id].magaza||pmap[t.bayi_id].ad))||"")||"—",
       tarih:t.created_at||null, musteri:t.musteri_ad||"", tel:t.musteri_tel||"", marka:t.marka||"",
       toplam:+t.toplam||0, durum:t.durum||(!arr&&s.durum)||durumYerelOku(t.id)||"teklif", satirlarObj:(!arr?s:null), urunler:items.map(x=>x.model).filter(Boolean).join(", ") };
   });
@@ -2870,15 +2882,9 @@ const HS_ETIKET={hasarli:"HASARLI",iade:"İADE GELDİ",rezerve:"REZERVE",belirsi
 // 🔴 kırmızı = satma, önce sor · 🟠 turuncu = satılır ama müşteriye SÖYLE
 const HS_SARI=new Set(["acik","kutusuz"]);
 // Kaydı giren kim? E-posta ASLA yazılmaz — mağaza adı, yoksa role göre etiket.
-function hsKimYaz(){
-  const raw=((profil&&(profil.magaza||profil.ad))||"").trim();
-  if(raw && raw.indexOf("@")<0) return raw;
-  if(profil&&profil.rol==="admin") return "Merkez (yönetim)";
-  if(profil&&profil.rol==="personel") return "Merkez";
-  return raw ? "Mağaza" : "Mağaza";
-}
+function hsKimYaz(){ return benKimim(); }
 // Eski kayıtlarda e-posta durabilir; ekranda gösterme.
-function hsKimGoster(kim){ kim=(kim||"").trim(); if(!kim) return ""; return (kim.indexOf("@")>=0) ? "Merkez (yönetim)" : kim; }
+function hsKimGoster(kim){ kim=(kim||"").trim(); if(!kim) return ""; return (kim.indexOf("@")>=0) ? "Merkez (yönetim)" : kim; }  // eski kayıtlar
 function hsDepoAd(d){ if(!d) return ""; if(d==="mars") return "MARS"; if(d==="horoz") return "HOROZ"; if(d==="magaza") return "MAĞAZADA"; if(d==="kadikoy") return (typeof depoAdi==="function"?depoAdi().toUpperCase():"KENDİ DEPO"); return String(d).toUpperCase(); }
 function hsSari(sebep){ return HS_SARI.has(sebep||""); }
 function hsRenk(sebep){ return hsSari(sebep)?"var(--warn)":"var(--bad)"; }
