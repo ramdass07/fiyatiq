@@ -1253,8 +1253,17 @@ async function stokOner(v){
   clearTimeout(stokOnerT);
   stokOnerT=setTimeout(async()=>{
     try{ const {data}=await sb.from("urunler").select("model_kodu,urun_adi").eq("marka",brand).or(`model_kodu.ilike.%${q}%,urun_adi.ilike.%${q}%`).limit(10);
-      if(!data||!data.length){ box.style.display="none"; return; }
-      box.innerHTML=data.map(o=>'<div onmousedown="stokSec(\''+o.model_kodu+'\')" style="padding:8px 11px;cursor:pointer;border-bottom:1px solid #ffffff10;font-size:13px" onmouseover="this.style.background=\'#ffffff14\'" onmouseout="this.style.background=\'\'"><b>'+o.model_kodu+'</b> <span class="mut">'+(o.urun_adi||"")+'</span></div>').join("");
+      const rows=(data||[]).map(o=>({kod:o.model_kodu, ad:o.urun_adi||"", hs:hasarliBilgi(o.model_kodu)}));
+      // FL dışı ürün (urunler'de yok) hasarlı listesindeyse yine önerilsin — SMS44DW01T dersi:
+      // satışçı "SMS44" yazınca öneri çıkmıyordu, uyarıyı ancak TAM kodla görüyordu.
+      const qU=q.toUpperCase(), varOlan=new Set(rows.map(r=>r.kod.toUpperCase()));
+      Object.keys(hasarliMap).forEach(k=>{ if(k.includes(qU) && !varOlan.has(k)) rows.unshift({kod:k, ad:"", hs:hasarliMap[k]}); });
+      if(!rows.length){ box.style.display="none"; return; }
+      box.innerHTML=rows.slice(0,10).map(o=>{
+        const sari=o.hs&&hsSari(o.hs.sebep);
+        const roz=o.hs?(' <span style="background:'+(sari?"var(--warn)":"var(--bad)")+';color:'+(sari?"#1a1300":"#fff")+';border-radius:6px;padding:1px 6px;font-size:10px;font-weight:800">'+(sari?"📦 ":"🚫 ")+(HS_ETIKET[o.hs.sebep]||"SORUNLU")+'</span>'):'';
+        return '<div onmousedown="stokSec(\''+o.kod+'\')" style="padding:8px 11px;cursor:pointer;border-bottom:1px solid #ffffff10;font-size:13px" onmouseover="this.style.background=\'#ffffff14\'" onmouseout="this.style.background=\'\'"><b>'+o.kod+'</b>'+roz+' <span class="mut">'+o.ad+'</span></div>';
+      }).join("");
       box.style.display="block";
     }catch(e){ box.style.display="none"; }
   },180);
