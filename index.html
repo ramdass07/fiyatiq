@@ -76,7 +76,7 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:var(--field);border:1px solid var(--line);margin-left:6px}
   @keyframes fqblink{0%,100%{opacity:1}50%{opacity:.2}}
   .blink{animation:fqblink .85s steps(1,end) infinite;color:var(--bad);font-weight:800}
-.hs-badge{animation:fqpulse 1.1s ease-in-out infinite;color:#fff!important}
+.hs-badge{animation:fqpulse 1.1s ease-in-out infinite;color:#fff}
 @keyframes fqpulse{0%,100%{opacity:1}50%{opacity:.45}}
   @keyframes uyariPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.45);border-color:var(--bad)}50%{box-shadow:0 0 20px 5px rgba(239,68,68,.55);border-color:#fca5a5}}
   .uyari-kritik{background:rgba(239,68,68,.12);border:2.5px solid var(--bad);color:#fecaca;border-radius:12px;padding:13px 18px;margin-bottom:10px;font-weight:800;font-size:15px;display:flex;align-items:center;gap:10px;animation:uyariPulse 1.05s ease-in-out infinite}
@@ -648,15 +648,21 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 
     <div class="card" id="hasarliCard" style="border:2px solid var(--bad)">
       <h2>🚫 Hasarlı / Sorunlu Ürün <span class="badge" style="background:var(--bad);color:#fff">satışta kırmızı uyarı</span></h2>
-      <p class="mut" style="font-size:13px;margin:4px 0 10px">Lojistikte son adet kalmış, mağaza satmış, ürün <b>hasarlı</b> diye müşteriye gitmemiş ve iade alınmışsa — kodunu buraya gir. O andan sonra <b>hangi mağaza o kodu yazarsa</b> (ürün satırında ve 🔎 Hızlı Stok Sorgu'da) <b style="color:var(--bad)">kırmızı uyarı</b> görür, aynı ürünü ikinci kez satmaz. <b>Fiyata, kâra, kampanyaya dokunmaz</b> — sadece uyarıdır. Sorun çözülünce ✕ ile kaldır. Marka: <b id="hsMarka">—</b></p>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Lojistikte son adet kalmış, mağaza satmış, ürün <b>hasarlı</b> diye müşteriye gitmemiş ve iade alınmışsa — kodunu buraya gir. O andan sonra <b>hangi mağaza o kodu yazarsa</b> (ürün satırında ve 🔎 Hızlı Stok Sorgu'da) <b style="color:var(--bad)">kırmızı uyarı</b> görür, aynı ürünü ikinci kez satmaz. <b>Fiyata, kâra, kampanyaya dokunmaz</b> — sadece uyarıdır. <b>Açık ürün / teşhir</b> ve <b>kutusuz</b> ürünler turuncu uyarı verir — satılır, ama satışçı müşteriye söylemek zorundadır. Sorun çözülünce ✕ ile kaldır. Marka: <b id="hsMarka">—</b></p>
       <div class="row">
         <div class="fld"><label>Ürün kodu</label><input id="hsKod" placeholder="KGN55CIE0N" style="width:180px" onkeydown="if(event.key==='Enter')hasarliEkle()"></div>
         <div class="fld"><label>Adet</label><input id="hsAdet" type="text" inputmode="numeric" value="1" style="width:70px"></div>
-        <div class="fld"><label>Sebep</label><select id="hsSebep" style="width:170px">
-          <option value="hasarli">Hasarlı</option>
-          <option value="iade">İade geldi</option>
-          <option value="rezerve">Rezerve / bekliyor</option>
-          <option value="belirsiz">Durumu belirsiz</option></select></div>
+        <div class="fld"><label>Sebep</label><select id="hsSebep" style="width:190px">
+          <optgroup label="🔴 SATMA — önce sor">
+            <option value="hasarli">Hasarlı</option>
+            <option value="iade">İade geldi</option>
+            <option value="rezerve">Rezerve / bekliyor</option>
+            <option value="belirsiz">Durumu belirsiz</option>
+          </optgroup>
+          <optgroup label="🟠 SATILIR — müşteriye söyle">
+            <option value="acik">Açık ürün / teşhir</option>
+            <option value="kutusuz">Kutusuz</option>
+          </optgroup></select></div>
         <div class="fld" style="flex:1;min-width:240px"><label>Açıklama <span class="mut" style="font-size:10px">(opsiyonel)</span></label><input id="hsAciklama" placeholder="Ataşehir sattı, hasarlı döndü — lojistiğe sor" style="width:100%"></div>
         <button onclick="hasarliEkle()">Ekle</button>
       </div>
@@ -2777,8 +2783,8 @@ async function aySonuKontrol(){
     if((hk.data||[]).length) ekle('uyari','Süresi geçmiş hızlı kampanya',`${hk.data.length} kayıt listede duruyor (satışta uygulanmaz). Temizlemek istersen ⚡ Hızlı Kampanya kutusundan ✕ ile sil.`);
     const ik=await sb.from("ikili_kampanya").select("kod_a,bitis").lt("bitis",bugun);
     if((ik.data||[]).length) ekle('uyari','Süresi geçmiş ikili kampanya',`${ik.data.length} kayıt listede duruyor.`);
-    try{ const hs=await sb.from("hasarli_urunler").select("model_kodu,created_at").eq("aktif",true);
-      const hl=(hs.data||[]); if(hl.length) ekle('uyari','Açık sorunlu ürün uyarısı',`${hl.length} üründe kırmızı uyarı açık: ${hl.map(x=>x.model_kodu).slice(0,8).join(", ")}${hl.length>8?" …":""}. Çözülenleri 🚫 Hasarlı / Sorunlu Ürün kutusundan ✕ ile kaldır.`);
+    try{ const hs=await sb.from("hasarli_urunler").select("model_kodu,sebep,created_at").eq("aktif",true);
+      const hl=(hs.data||[]); if(hl.length) ekle('uyari','Açık sorunlu ürün uyarısı',`${hl.length} üründe uyarı açık: ${hl.map(x=>x.model_kodu+" ("+(HS_ETIKET[x.sebep]||x.sebep)+")").slice(0,8).join(", ")}${hl.length>8?" …":""}. Çözülenleri 🚫 Hasarlı / Sorunlu Ürün kutusundan ✕ ile kaldır.`);
       else ekle('ok','Sorunlu ürün yok','Açık hasarlı/iade uyarısı bulunmuyor.'); }catch(e){}
   }catch(e){ adminMsgEl("asoMsg","Hata: "+e.message,"bad"); box.innerHTML=html; return; }
   const ozet = kritik ? `<div class="msg bad" style="font-size:14px;font-weight:800">🔴 ${kritik} kritik bulgu — düzeltmeden aya girme.</div>`
@@ -2854,7 +2860,13 @@ function kampRozet(kod){ const k=kampFiyatMap[(kod||"").toUpperCase()]; if(!k) r
 // Ortak bir "kara liste": bayi havuzundaki her mağaza görür. Fiyata/kâra/kampanyaya
 // DOKUNMAZ — sadece satış ekranında ve stok sorgusunda kırmızı uyarı basar.
 let hasarliMap={};
-const HS_ETIKET={hasarli:"HASARLI",iade:"İADE GELDİ",rezerve:"REZERVE",belirsiz:"DURUMU BELİRSİZ"};
+const HS_ETIKET={hasarli:"HASARLI",iade:"İADE GELDİ",rezerve:"REZERVE",belirsiz:"DURUMU BELİRSİZ",acik:"AÇIK ÜRÜN",kutusuz:"KUTUSUZ"};
+// 🔴 kırmızı = satma, önce sor · 🟠 turuncu = satılır ama müşteriye SÖYLE
+const HS_SARI=new Set(["acik","kutusuz"]);
+function hsSari(sebep){ return HS_SARI.has(sebep||""); }
+function hsRenk(sebep){ return hsSari(sebep)?"var(--warn)":"var(--bad)"; }
+function hsRgba(sebep){ return hsSari(sebep)?"245,158,11":"220,38,38"; }
+function hsUyariMetni(sebep){ return hsSari(sebep)?"Müşteriye MUTLAKA söyle — açık/kutusuz teslim edilecek.":"Satmadan önce lojistiğe / merkeze sor."; }
 async function loadHasarli(){
   const _m={};
   try{
@@ -2867,15 +2879,17 @@ function hasarliBilgi(kod){ return hasarliMap[(kod||"").toUpperCase()]||null; }
 function hasarliRozet(kod){
   const h=hasarliBilgi(kod); if(!h) return "";
   const t=(HS_ETIKET[h.sebep]||"SORUNLU")+(h.adet>1?" ×"+h.adet:"");
-  const ip=`${t}${h.aciklama?" — "+h.aciklama:""}${h.kim?" · giren: "+h.kim:""}${h.tarih?" · "+fmtTarih(h.tarih):""}. SATMADAN ÖNCE LOJİSTİĞE SOR.`;
-  return ` <span class="prim-badge hs-badge" style="background:var(--bad);box-shadow:0 0 10px rgba(220,38,38,.75)" title="${ip.replace(/"/g,"&quot;")}">🚫 ${t}</span>`;
+  const sari=hsSari(h.sebep);
+  const ip=`${t}${h.aciklama?" — "+h.aciklama:""}${h.kim?" · giren: "+h.kim:""}${h.tarih?" · "+fmtTarih(h.tarih):""}. ${hsUyariMetni(h.sebep).toUpperCase()}`;
+  return ` <span class="prim-badge hs-badge" style="background:${hsRenk(h.sebep)};box-shadow:0 0 10px rgba(${hsRgba(h.sebep)},.75)${sari?";color:#1a1300!important":""}" title="${ip.replace(/"/g,"&quot;")}">${sari?"📦":"🚫"} ${t}</span>`;
 }
 function hasarliUyariKutu(kod){
   const h=hasarliBilgi(kod); if(!h) return "";
   const t=(HS_ETIKET[h.sebep]||"SORUNLU")+(h.adet>1?" ×"+h.adet+" adet":"");
-  return `<div style="margin-top:8px;background:var(--bad);color:#fff;border-radius:10px;padding:11px 13px;font-weight:800;font-size:14px;line-height:1.5;box-shadow:0 0 14px rgba(220,38,38,.5)">
-    🚫 DİKKAT — BU ÜRÜN ${t}<br>
-    <span style="font-weight:600;font-size:13px">${h.aciklama?h.aciklama+"<br>":""}Satmadan önce lojistiğe / merkeze sor.${h.kim?" (kaydı giren: "+h.kim+")":""}${h.tarih?" · "+fmtTarih(h.tarih):""}</span></div>`;
+  const sari=hsSari(h.sebep);
+  return `<div style="margin-top:8px;background:${hsRenk(h.sebep)};color:${sari?"#1a1300":"#fff"};border-radius:10px;padding:11px 13px;font-weight:800;font-size:14px;line-height:1.5;box-shadow:0 0 14px rgba(${hsRgba(h.sebep)},.5)">
+    ${sari?"📦":"🚫"} DİKKAT — BU ÜRÜN ${t}<br>
+    <span style="font-weight:600;font-size:13px">${h.aciklama?h.aciklama+"<br>":""}${hsUyariMetni(h.sebep)}${h.kim?" (kaydı giren: "+h.kim+")":""}${h.tarih?" · "+fmtTarih(h.tarih):""}</span></div>`;
 }
 function hsInit(){ const m=$("hsMarka"); if(m) m.textContent=markaAd(brand); loadHasarliList(); }
 async function hasarliEkle(){
@@ -2888,7 +2902,7 @@ async function hasarliEkle(){
     const kim=((profil&&(profil.magaza||profil.ad))||"").trim()||null;
     const rec={bayi_id:stokSahibi(), marka:brand, model_kodu:kod, adet, sebep, aciklama:acik, ekleyen_ad:kim, aktif:true};
     const {error}=await sb.from("hasarli_urunler").upsert(rec,{onConflict:"bayi_id,marka,model_kodu"}); if(error) throw new Error(error.message);
-    adminMsgEl("hsMsg",`✓ ${kod} → ${HS_ETIKET[sebep]||sebep}${adet>1?" ×"+adet:""}. Artık bu kodu yazan herkes kırmızı uyarı görecek.`,"ok");
+    adminMsgEl("hsMsg",`✓ ${kod} → ${HS_ETIKET[sebep]||sebep}${adet>1?" ×"+adet:""}. Artık bu kodu yazan herkes ${hsSari(sebep)?"turuncu":"kırmızı"} uyarı görecek.`,"ok");
     $("hsKod").value=""; $("hsAciklama").value=""; $("hsAdet").value="1";
     await loadHasarli(); loadHasarliList(); renderRows();
   }catch(e){ adminMsgEl("hsMsg","Hata: "+e.message+" (hasarli_urun.sql çalıştırıldı mı?)","bad"); }
@@ -2902,7 +2916,7 @@ async function loadHasarliList(){
     if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Sorunlu ürün kaydı yok — temiz.</div>'; return; }
     box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">Sorunlu ürünler ('+markaAd(brand)+') — satışta kırmızı uyarı veriyor:</div>'
       +'<table><thead><tr><th>Ürün</th><th class="num">Adet</th><th>Sebep</th><th>Açıklama</th><th>Giren</th><th>Tarih</th><th></th></tr></thead><tbody>'
-      +rows.map(k=>`<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:var(--bad);color:#fff;font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${(k.aciklama||"").replace(/</g,"&lt;")||'<span class="mut">—</span>'}</td><td style="font-size:12px">${k.ekleyen_ad||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`).join("")
+      +rows.map(k=>`<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:${hsRenk(k.sebep)};color:${hsSari(k.sebep)?"#1a1300":"#fff"};font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${(k.aciklama||"").replace(/</g,"&lt;")||'<span class="mut">—</span>'}</td><td style="font-size:12px">${k.ekleyen_ad||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`).join("")
       +'</tbody></table>';
   }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi ('+e.message+') — hasarli_urun.sql çalıştırıldı mı?</div>'; }
 }
