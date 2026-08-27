@@ -855,7 +855,7 @@ async function showApp(session){
   show("appView"); appReady=true;
   $("who").textContent = benKimim();   // e-posta DEĞİL — müşteri ekranı görebiliyor
   applyBrandAccess();
-  $("adminBtn").style.display = ""; // herkes girer; içerideki kartlar role göre görünür
+  $("adminBtn").style.display = subeMagaza() ? "none" : ""; // Yönetim: şube mağazalarım giremez; dış bayi girer.
   applyAdminAccess();
   const bsc=$("bayiStokCard"); if(bsc) bsc.style.display = "none";
   $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent=depoAdi(); $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H";
@@ -975,6 +975,10 @@ function toptanGoster(v,kod){
   return v;
 }
 function isEditor(){ return profil.rol==="admin"||profil.rol==="personel"; }
+// 🏬 ŞUBE MAĞAZA = benim mağazam (bayi_sahibi dolu). Yönetim ekranına giremez.
+// ⚠️ BAĞIMSIZ (dış) bayi bunun DIŞINDA — kendi stoğunu, primlisini, ayarlarını
+//    kendi yükler, Yönetim'e girmesi ŞART.
+function subeMagaza(){ return !isEditor() && profil && profil.bayi_sahibi!=null; }
 async function depoAdiKaydet(){
   const v=(($("depoAdiInp")||{}).value||"").trim(); const m=$("depoAdiMsg");
   if(!v){ m.className="msg bad"; m.textContent="Depo adı boş olamaz."; return; }
@@ -1020,6 +1024,7 @@ function syncAdminBrand(){
   const av=$("adminView"); if(av && av.style.display!=="none"){ loadKampanyalar(); }
 }
 function toggleAdmin(){
+  if(subeMagaza()){ const a0=$("adminView"); if(a0) a0.style.display="none"; const b0=$("bayiView"); if(b0) b0.style.display="block"; return; } // şube mağaza yönetime giremez
   const a=$("adminView"), b=$("bayiView");
   const showAdmin = a.style.display==="none";
   a.style.display = showAdmin?"block":"none"; b.style.display = showAdmin?"none":"block";
@@ -1032,7 +1037,7 @@ function toggleAdmin(){
 // FL/kampanya/banka MERKEZDEN (admin/personel) yüklenir — ortak veridir.
 function applyAdminAccess(){
   const ed=isEditor();
-  ["hizliKampCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  ["hizliKampCard","ikiliCard","aySonuCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
   // "Elle Yükleme" kutuları kapalı başlar — başlığa tıklayınca açılır (bkz. merkeziAc)
   const imp=$("importers"); if(imp) imp.style.display="none";
   const mo=$("merkeziOk"); if(mo) mo.textContent="▶";
@@ -3342,6 +3347,42 @@ async function kampEkle(i){
   $("ka_msg"+i).className="msg "+(error?"bad":"ok");
   if(!error){ kampEklenen++; updateKampOzet(); loadKampanyalar(); }
 }
+
+// ===== YENİ SÜRÜM UYARISI =====
+// Mağaza ekranı günlerce açık kalabiliyor; yeni index yüklendiğinde eski sürümü
+// kullanmaya devam ediyorlar. Sunucudaki dosyanın parmak izini (ETag / Last-Modified)
+// periyodik kontrol eder, değişmişse ekranın altında "Yenile" şeridi çıkarır.
+// OTOMATİK YENİLEMEZ — satışçı teklif ortasında olabilir, kararı o verir.
+let _fqParmak=null, _fqUyariAcik=false;
+async function _fqParmakAl(){
+  try{
+    const r=await fetch(location.pathname+"?_v="+new Date().getTime(), {method:"HEAD", cache:"no-store"});
+    if(!r.ok) return null;
+    return r.headers.get("etag") || r.headers.get("last-modified") || null;
+  }catch(e){ return null; }
+}
+function _fqYeniSurumSerit(){
+  if(_fqUyariAcik) return; _fqUyariAcik=true;
+  const d=document.createElement("div");
+  d.id="fqYeniSurum";
+  d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:9999;background:var(--brand);color:var(--brandink);"+
+    "padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;"+
+    "font-weight:800;font-size:15px;box-shadow:0 -4px 18px rgba(0,0,0,.45)";
+  d.innerHTML='<span>🔄 FiyatIQ güncellendi — ekranındaki sürüm eski. Teklifin bitince yenile.</span>'+
+    '<button style="padding:7px 16px;font-weight:800" onclick="location.reload(true)">Şimdi Yenile</button>'+
+    '<button class="ghost sm" style="padding:6px 12px" onclick="this.parentNode.remove()" title="Şerit kapanır, 30 dakika sonra tekrar hatırlatır">Sonra</button>';
+  document.body.appendChild(d);
+  setTimeout(()=>{ const el=document.getElementById("fqYeniSurum"); if(!el){ _fqUyariAcik=false; } }, 1800000);
+}
+async function _fqSurumKontrol(){
+  const p=await _fqParmakAl(); if(!p) return;
+  if(_fqParmak==null){ _fqParmak=p; return; }
+  if(p!==_fqParmak) _fqYeniSurumSerit();
+}
+_fqSurumKontrol();
+setInterval(_fqSurumKontrol, 5*60*1000);                 // 5 dakikada bir
+window.addEventListener("focus", ()=>{ _fqSurumKontrol(); });   // sekmeye dönünce
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSurumKontrol(); });
 </script>
 </body>
 </html>
