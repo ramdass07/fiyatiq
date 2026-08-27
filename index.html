@@ -663,6 +663,12 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
             <option value="acik">Açık ürün / teşhir</option>
             <option value="kutusuz">Kutusuz</option>
           </optgroup></select></div>
+        <div class="fld"><label>Nerede?</label><select id="hsDepo" style="width:160px">
+          <option value="">— belirtilmedi —</option>
+          <option value="mars">Mars</option>
+          <option value="horoz">Horoz</option>
+          <option value="kadikoy" id="hsDepoKendi">Kadıköy</option>
+          <option value="magaza">Mağazada</option></select></div>
         <div class="fld" style="flex:1;min-width:240px"><label>Açıklama <span class="mut" style="font-size:10px">(opsiyonel)</span></label><input id="hsAciklama" placeholder="Ataşehir sattı, hasarlı döndü — lojistiğe sor" style="width:100%"></div>
         <button onclick="hasarliEkle()">Ekle</button>
       </div>
@@ -2863,6 +2869,7 @@ let hasarliMap={};
 const HS_ETIKET={hasarli:"HASARLI",iade:"İADE GELDİ",rezerve:"REZERVE",belirsiz:"DURUMU BELİRSİZ",acik:"AÇIK ÜRÜN",kutusuz:"KUTUSUZ"};
 // 🔴 kırmızı = satma, önce sor · 🟠 turuncu = satılır ama müşteriye SÖYLE
 const HS_SARI=new Set(["acik","kutusuz"]);
+function hsDepoAd(d){ if(!d) return ""; if(d==="mars") return "MARS"; if(d==="horoz") return "HOROZ"; if(d==="magaza") return "MAĞAZADA"; if(d==="kadikoy") return (typeof depoAdi==="function"?depoAdi().toUpperCase():"KENDİ DEPO"); return String(d).toUpperCase(); }
 function hsSari(sebep){ return HS_SARI.has(sebep||""); }
 function hsRenk(sebep){ return hsSari(sebep)?"var(--warn)":"var(--bad)"; }
 function hsRgba(sebep){ return hsSari(sebep)?"245,158,11":"220,38,38"; }
@@ -2870,28 +2877,32 @@ function hsUyariMetni(sebep){ return hsSari(sebep)?"Müşteriye MUTLAKA söyle �
 async function loadHasarli(){
   const _m={};
   try{
-    const {data}=await sb.from("hasarli_urunler").select("model_kodu,adet,sebep,aciklama,ekleyen_ad,created_at").eq("marka",brand).eq("aktif",true);
-    (data||[]).forEach(x=>{ _m[(x.model_kodu||"").toUpperCase()]={adet:+x.adet||1,sebep:x.sebep||"hasarli",aciklama:x.aciklama||"",kim:x.ekleyen_ad||"",tarih:(x.created_at||"").slice(0,10)}; });
+    const {data}=await sb.from("hasarli_urunler").select("model_kodu,adet,sebep,depo,aciklama,ekleyen_ad,created_at").eq("marka",brand).eq("aktif",true);
+    (data||[]).forEach(x=>{ _m[(x.model_kodu||"").toUpperCase()]={adet:+x.adet||1,sebep:x.sebep||"hasarli",depo:x.depo||"",aciklama:x.aciklama||"",kim:x.ekleyen_ad||"",tarih:(x.created_at||"").slice(0,10)}; });
     hasarliMap=_m;
   }catch(e){ hasarliMap={}; }
 }
 function hasarliBilgi(kod){ return hasarliMap[(kod||"").toUpperCase()]||null; }
 function hasarliRozet(kod){
   const h=hasarliBilgi(kod); if(!h) return "";
-  const t=(HS_ETIKET[h.sebep]||"SORUNLU")+(h.adet>1?" ×"+h.adet:"");
+  const dp=hsDepoAd(h.depo);
+  const t=(HS_ETIKET[h.sebep]||"SORUNLU")+(h.adet>1?" ×"+h.adet:"")+(dp?" · "+dp:"");
   const sari=hsSari(h.sebep);
   const ip=`${t}${h.aciklama?" — "+h.aciklama:""}${h.kim?" · giren: "+h.kim:""}${h.tarih?" · "+fmtTarih(h.tarih):""}. ${hsUyariMetni(h.sebep).toUpperCase()}`;
   return ` <span class="prim-badge hs-badge" style="background:${hsRenk(h.sebep)};box-shadow:0 0 10px rgba(${hsRgba(h.sebep)},.75)${sari?";color:#1a1300!important":""}" title="${ip.replace(/"/g,"&quot;")}">${sari?"📦":"🚫"} ${t}</span>`;
 }
 function hasarliUyariKutu(kod){
   const h=hasarliBilgi(kod); if(!h) return "";
-  const t=(HS_ETIKET[h.sebep]||"SORUNLU")+(h.adet>1?" ×"+h.adet+" adet":"");
+  const dp=hsDepoAd(h.depo);
+  const t=(HS_ETIKET[h.sebep]||"SORUNLU")+(h.adet>1?" ×"+h.adet+" adet":"")+(dp?" · "+dp:"");
   const sari=hsSari(h.sebep);
   return `<div style="margin-top:8px;background:${hsRenk(h.sebep)};color:${sari?"#1a1300":"#fff"};border-radius:10px;padding:11px 13px;font-weight:800;font-size:14px;line-height:1.5;box-shadow:0 0 14px rgba(${hsRgba(h.sebep)},.5)">
     ${sari?"📦":"🚫"} DİKKAT — BU ÜRÜN ${t}<br>
     <span style="font-weight:600;font-size:13px">${h.aciklama?h.aciklama+"<br>":""}${hsUyariMetni(h.sebep)}${h.kim?" (kaydı giren: "+h.kim+")":""}${h.tarih?" · "+fmtTarih(h.tarih):""}</span></div>`;
 }
-function hsInit(){ const m=$("hsMarka"); if(m) m.textContent=markaAd(brand); loadHasarliList(); }
+function hsInit(){ const m=$("hsMarka"); if(m) m.textContent=markaAd(brand);
+  const dk=$("hsDepoKendi"); if(dk && typeof depoAdi==="function") dk.textContent=depoAdi();
+  loadHasarliList(); }
 async function hasarliEkle(){
   try{
     const kod=(parseModeller($("hsKod").value)[0])||"";
@@ -2900,23 +2911,24 @@ async function hasarliEkle(){
     const sebep=($("hsSebep")||{}).value||"hasarli";
     const acik=($("hsAciklama").value||"").trim()||null;
     const kim=((profil&&(profil.magaza||profil.ad))||"").trim()||null;
-    const rec={bayi_id:stokSahibi(), marka:brand, model_kodu:kod, adet, sebep, aciklama:acik, ekleyen_ad:kim, aktif:true};
+    const depo=(($("hsDepo")||{}).value)||null;
+    const rec={bayi_id:stokSahibi(), marka:brand, model_kodu:kod, adet, sebep, depo, aciklama:acik, ekleyen_ad:kim, aktif:true};
     const {error}=await sb.from("hasarli_urunler").upsert(rec,{onConflict:"bayi_id,marka,model_kodu"}); if(error) throw new Error(error.message);
-    adminMsgEl("hsMsg",`✓ ${kod} → ${HS_ETIKET[sebep]||sebep}${adet>1?" ×"+adet:""}. Artık bu kodu yazan herkes ${hsSari(sebep)?"turuncu":"kırmızı"} uyarı görecek.`,"ok");
-    $("hsKod").value=""; $("hsAciklama").value=""; $("hsAdet").value="1";
+    adminMsgEl("hsMsg",`✓ ${kod} → ${HS_ETIKET[sebep]||sebep}${adet>1?" ×"+adet:""}${depo?" · "+hsDepoAd(depo):""}. Artık bu kodu yazan herkes ${hsSari(sebep)?"turuncu":"kırmızı"} uyarı görecek.`,"ok");
+    $("hsKod").value=""; $("hsAciklama").value=""; $("hsAdet").value="1"; if($("hsDepo")) $("hsDepo").value="";
     await loadHasarli(); loadHasarliList(); renderRows();
   }catch(e){ adminMsgEl("hsMsg","Hata: "+e.message+" (hasarli_urun.sql çalıştırıldı mı?)","bad"); }
 }
 async function loadHasarliList(){
   const box=$("hsList"); if(!box) return;
   try{
-    const {data,error}=await sb.from("hasarli_urunler").select("id,model_kodu,adet,sebep,aciklama,ekleyen_ad,aktif,created_at").eq("marka",brand).order("created_at",{ascending:false});
+    const {data,error}=await sb.from("hasarli_urunler").select("id,model_kodu,adet,sebep,depo,aciklama,ekleyen_ad,aktif,created_at").eq("marka",brand).order("created_at",{ascending:false});
     if(error) throw error;
     const rows=(data||[]).filter(x=>x.aktif!==false);
     if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Sorunlu ürün kaydı yok — temiz.</div>'; return; }
     box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">Sorunlu ürünler ('+markaAd(brand)+') — satışta kırmızı uyarı veriyor:</div>'
-      +'<table><thead><tr><th>Ürün</th><th class="num">Adet</th><th>Sebep</th><th>Açıklama</th><th>Giren</th><th>Tarih</th><th></th></tr></thead><tbody>'
-      +rows.map(k=>`<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:${hsRenk(k.sebep)};color:${hsSari(k.sebep)?"#1a1300":"#fff"};font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${(k.aciklama||"").replace(/</g,"&lt;")||'<span class="mut">—</span>'}</td><td style="font-size:12px">${k.ekleyen_ad||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`).join("")
+      +'<table><thead><tr><th>Ürün</th><th class="num">Adet</th><th>Sebep</th><th>Nerede</th><th>Açıklama</th><th>Giren</th><th>Tarih</th><th></th></tr></thead><tbody>'
+      +rows.map(k=>`<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:${hsRenk(k.sebep)};color:${hsSari(k.sebep)?"#1a1300":"#fff"};font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${hsDepoAd(k.depo)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${(k.aciklama||"").replace(/</g,"&lt;")||'<span class="mut">—</span>'}</td><td style="font-size:12px">${k.ekleyen_ad||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`).join("")
       +'</tbody></table>';
   }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi ('+e.message+') — hasarli_urun.sql çalıştırıldı mı?</div>'; }
 }
