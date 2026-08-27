@@ -2827,7 +2827,9 @@ function kampRozet(kod){ const k=kampFiyatMap[(kod||"").toUpperCase()]; if(!k) r
 // ikiliList: bugün geçerli tanımlar. ikiliMap[kod] = eşleştiği tanımlar.
 let ikiliList=[], ikiliMap={};
 async function loadIkili(){
-  ikiliList=[]; ikiliMap={};
+  // ⚠️ Yerel dizide topla, en sonda ata. Doğrudan ikiliList'e push edilirse iki eşzamanlı çağrı
+  // (boot + setBrand) aynı kaydı iki kez ekliyordu — listede duplike görünüyordu.
+  const _list=[], _map={};
   try{
     const bugun=_bugun();
     const {data}=await sb.from("ikili_kampanya").select("id,kod_a,kod_b,ikili_taksitli,ikili_nakit,bundle_dahil,baslangic,bitis").eq("marka",brand);
@@ -2835,10 +2837,11 @@ async function loadIkili(){
       const gecerli=(!x.baslangic||x.baslangic<=bugun)&&(!x.bitis||x.bitis>=bugun);
       if(!gecerli || !(+x.ikili_taksitli>0)) return;
       const rec={id:x.id,a:(x.kod_a||"").toUpperCase(),b:(x.kod_b||"").toUpperCase(),pesin:+x.ikili_taksitli,nakit:(+x.ikili_nakit>0?+x.ikili_nakit:null),bundleDahil:(x.bundle_dahil!==false),bitis:x.bitis};
-      ikiliList.push(rec);
-      (ikiliMap[rec.a]=ikiliMap[rec.a]||[]).push(rec);
-      (ikiliMap[rec.b]=ikiliMap[rec.b]||[]).push(rec);
+      _list.push(rec);
+      (_map[rec.a]=_map[rec.a]||[]).push(rec);
+      (_map[rec.b]=_map[rec.b]||[]).push(rec);
     });
+    ikiliList=_list; ikiliMap=_map;
   }catch(e){ ikiliList=[]; ikiliMap={}; }
 }
 // Sepetteki satırlara ikili fiyatı dağıtır. Her satıra r.ikiliFiyat (BİRİM peşin) yazar.
