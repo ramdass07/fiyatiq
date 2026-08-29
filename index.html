@@ -142,6 +142,22 @@
   #yardimBody .gold{background:var(--field);border:1px solid color-mix(in srgb,var(--brand) 30%,var(--line));border-radius:12px;padding:12px 16px;margin-top:18px}
   #yardimBody .gold h4{margin:0 0 6px;font-size:14px;color:var(--brand)}
   /* Yardım penceresi açıkken yazdırılırsa sadece kılavuz basılsın */
+  /* ===== MOBİL (27 Ağu): üst bar taşıyordu, marka seçilemiyordu ===== */
+  @media (max-width:760px){
+    header{flex-wrap:wrap;gap:8px 10px;padding:10px 12px}
+    header .brand{font-size:19px}
+    header .grow{display:none}
+    #who{order:5;font-size:11px;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #yardimBtn{font-size:0;padding:6px 9px}
+    #yardimBtn::before{content:"❓";font-size:14px}
+    #adminBtn{padding:6px 10px}
+    .seg button{padding:7px 13px;font-size:13px}
+    main{padding:10px}
+    .card{padding:12px 10px}
+    .row{gap:8px}
+    table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+    input,select{max-width:100%}
+  }
   @media print{
     body.yardim-print{background:#fff;color:#000}
     body.yardim-print>*{display:none!important}
