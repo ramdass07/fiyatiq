@@ -2239,6 +2239,39 @@ function detectBrandWb(wb){
 }
 function markaAd(b){ return b==="bosch"?"Bosch": b==="siemens"?"Siemens": "?"; }
 // Ham BSH FL (çok sayfalı) veya temiz dosyadan toptan + perakende + BİP çıkarır
+
+// ===== HAM BİP DOSYASI ("Fiyat Farkları") — 31 Ağu =====
+// BSH'ın ham BİP dosyasında "BİP" başlıklı sütun YOKTUR. Yapı şu:
+//   satırda ürün kodu → ondan SONRAKİ ilk pozitif sayı = birim tutar (KDV HARİÇ)
+//   sonraki sayılardan biri ≈ hariç × 1,20 ise o KDV DAHİL değerdir.
+// ⚠️ KDV KRİTİK: REFERANS'ta BİP her zaman KDV DAHİL'dir. Atlanırsa bütün BİP'ler %20 sapar.
+// (Aynı kural fl-referans-uret skill'inde de var, doğrulanmıştır.)
+const BIP_KDV=1.20;
+function parseBipFarkWb(wb, marka, donem){
+  const bip={};
+  wb.SheetNames.forEach(sn=>{
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+    aoa.forEach(row=>{
+      if(!row||!row.length) return;
+      for(let i=0;i<row.length;i++){
+        const c=row[i];
+        if(!isCode(c)) continue;
+        const kod=(""+c).trim().toUpperCase();
+        const sayilar=[];
+        for(let j=i+1;j<row.length;j++){ const v=row[j]; if(isNum(v)&&+v>0) sayilar.push(+v); }
+        if(!sayilar.length) break;
+        const haric=sayilar[0];
+        const tol=Math.max(1, haric*0.01);
+        let dahil=null;
+        for(let k=1;k<sayilar.length;k++){ if(Math.abs(sayilar[k]-haric*BIP_KDV)<tol){ dahil=sayilar[k]; break; } }
+        const deger = dahil!=null ? dahil : Math.round(haric*BIP_KDV*100)/100;
+        if(!(kod in bip)) bip[kod]=deger;
+        break;
+      }
+    });
+  });
+  return Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}));
+}
 function parsePriceWb(wb, marka, donem){
   const top={}, per={}, bip={};
   wb.SheetNames.forEach(sn=>{
@@ -2270,10 +2303,17 @@ function parsePriceWb(wb, marka, donem){
         if(!isCode(kod)) continue; const v=row[bc]; if(isNum(v)){ const b=Math.round(+v*100)/100; if(b>0||!(kod in bip)) bip[kod]=b; } }
     }
   });
+  let bipRows = Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}));
+  let bipHam = false;
+  // "BİP" başlıklı sütun yoksa dosya ham "Fiyat Farkları" olabilir → KDV dahil hesapla
+  if(!bipRows.length){
+    const r = parseBipFarkWb(wb, marka, donem);
+    if(r.length){ bipRows = r; bipHam = true; }
+  }
   return {
     topRows: Object.keys(top).map(k=>({model_kodu:k,marka,donem,toptan_fiyat:top[k]})),
     perRows: Object.keys(per).map(k=>({model_kodu:k,marka,donem,nakit_fiyat:per[k]})),
-    bipRows: Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}))
+    bipRows, bipHam
   };
 }
 function topluTemizle(){ // yükleme kutusunu sıfırla — eski tarama sonucu ekranda kalmasın
@@ -2309,7 +2349,7 @@ async function topluTara(files){
       else { // fiyat listesi (ham FL veya temiz)
         const r=parsePriceWb(wb,c.brand,donem); res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
         res.ok=(r.topRows.length+r.perRows.length+r.bipRows.length)>0;
-        const parts=[]; if(r.topRows.length)parts.push(r.topRows.length+" toptan"); if(r.perRows.length)parts.push(r.perRows.length+" perakende"); if(r.bipRows.length)parts.push(r.bipRows.length+" BİP");
+        const parts=[]; if(r.topRows.length)parts.push(r.topRows.length+" toptan"); if(r.perRows.length)parts.push(r.perRows.length+" perakende"); if(r.bipRows.length)parts.push(r.bipRows.length+" BİP"+(r.bipHam?" (ham Fiyat Farkı · KDV dahil)":""));
         res.detay= res.ok? parts.join(" + ") : "fiyat sütunu bulunamadı"; }
     }catch(e){ res.detay="okunamadı: "+e.message; }
     window.topluItems.push(res);
@@ -2957,7 +2997,7 @@ async function bpTara(files){
       res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
       const n=(r.topRows||[]).length+(r.perRows||[]).length+(r.bipRows||[]).length;
       res.ok=n>0;
-      res.detay = n ? `${(r.topRows||[]).length} toptan · ${(r.perRows||[]).length} perakende · ${(r.bipRows||[]).length} BİP · dönem ${donem}`
+      res.detay = n ? `${(r.topRows||[]).length} toptan · ${(r.perRows||[]).length} perakende · ${(r.bipRows||[]).length} BİP${r.bipHam?" (ham Fiyat Farkı · KDV dahil hesaplandı)":""} · dönem ${donem}`
                     : "⚠ Fiyat sütunu bulunamadı — dosya yapısını kontrol et.";
     }catch(e){ res.detay="okunamadı: "+e.message; }
     window.bpItems.push(res);
