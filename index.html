@@ -2247,6 +2247,10 @@ function markaAd(b){ return b==="bosch"?"Bosch": b==="siemens"?"Siemens": "?"; }
 // ⚠️ KDV KRİTİK: REFERANS'ta BİP her zaman KDV DAHİL'dir. Atlanırsa bütün BİP'ler %20 sapar.
 // (Aynı kural fl-referans-uret skill'inde de var, doğrulanmıştır.)
 const BIP_KDV=1.20;
+// ⚠️ Genel isCode() harf ZORUNLU tutmuyor → "41700" gibi salt sayı hücreler ürün kodu sanılıyordu
+// ve fiyat sütunu BİP olarak yazılıyordu (31 Ağu Bosch olayı). Burada harf de şart.
+const BIP_KOD_RE=/^(?=.*\d)(?=.*[A-Z])[A-Z0-9]{5,}$/;
+function bipKodMu(v){ return BIP_KOD_RE.test((""+(v==null?"":v)).trim().toUpperCase()); }
 function parseBipFarkWb(wb, marka, donem){
   const bip={};
   wb.SheetNames.forEach(sn=>{
@@ -2255,7 +2259,7 @@ function parseBipFarkWb(wb, marka, donem){
       if(!row||!row.length) return;
       for(let i=0;i<row.length;i++){
         const c=row[i];
-        if(!isCode(c)) continue;
+        if(!bipKodMu(c)) continue;
         const kod=(""+c).trim().toUpperCase();
         const sayilar=[];
         for(let j=i+1;j<row.length;j++){ const v=row[j]; if(isNum(v)&&+v>0) sayilar.push(+v); }
@@ -2305,8 +2309,12 @@ function parsePriceWb(wb, marka, donem){
   });
   let bipRows = Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}));
   let bipHam = false;
-  // "BİP" başlıklı sütun yoksa dosya ham "Fiyat Farkları" olabilir → KDV dahil hesapla
-  if(!bipRows.length){
+  // Ham "Fiyat Farkları" dosyası mı? SADECE o zaman KDV'li hesaplama yapılır.
+  // ⚠️ 31 Ağu dersi: bu geri düşüş kapısızken Bosch TOPTAN/PERAKENDE dosyası da buraya giriyor,
+  //    fiyat sütununu BİP diye yazıyordu (gerçeğin ~13,5 katı). Kapı: dosyada toptan/perakende
+  //    satırı ÜRETİLMEMİŞ olacak — gerçek fark dosyası sadece fark içerir.
+  const topPer = Object.keys(top).length + Object.keys(per).length;
+  if(!bipRows.length && topPer===0){
     const r = parseBipFarkWb(wb, marka, donem);
     if(r.length){ bipRows = r; bipHam = true; }
   }
