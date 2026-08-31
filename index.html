@@ -905,7 +905,7 @@ async function showApp(session){
   await loadIkili();
   await loadBanks();
   await loadAktifKampanyalar();
-  if(typeof isEditor==="function" && isEditor() && typeof hkInit==="function") hkInit();
+  if(typeof hkInit==="function" && (isEditor() || disBayiMi())) hkInit();
   if(typeof hsInit==="function") hsInit();
   if(quoteRows.length===0) addRow();
 }
@@ -1045,7 +1045,7 @@ function setBrand(b){
   if(typeof setManuelToplam==='function') setManuelToplam('sifirla'); // marka değişince elle fiyat sıfırlanır
   quoteRows.forEach(r=>refetch(r)); loadBanks();
   loadAktifKampanyalar().then(()=>renderRows());
-  if(typeof isEditor==="function" && isEditor() && typeof hkInit==="function") hkInit();
+  if(typeof hkInit==="function" && (isEditor() || disBayiMi())) hkInit();
   if(typeof topluTemizle==="function") topluTemizle(); // marka değişince eski yükleme sonucu ekranda kalmasın
   loadPrimli().then(()=>renderRows());
   loadKampFiyat().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
@@ -1076,7 +1076,11 @@ function toggleAdmin(){
 // FL/kampanya/banka MERKEZDEN (admin/personel) yüklenir — ortak veridir.
 function applyAdminAccess(){
   const ed=isEditor();
-  ["hizliKampCard","ikiliCard","aySonuCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  ["aySonuCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  // ⚡🤝 Hızlı + İkili kampanya: merkez personeli VE dış bayi girebilir (dış bayi kendi havuzuna).
+  // Şube mağazalarım zaten Yönetim'e giremiyor, onlara ulaşmıyor.
+  { const kampYetki = ed || (typeof disBayiMi==="function" && disBayiMi());
+    ["hizliKampCard","ikiliCard"].forEach(id=>{ const el=$(id); if(el) el.style.display=kampYetki?"":"none"; }); }
   // "Elle Yükleme" kutuları kapalı başlar — başlığa tıklayınca açılır (bkz. merkeziAc)
   const imp=$("importers"); if(imp) imp.style.display="none";
   const mo=$("merkeziOk"); if(mo) mo.textContent="▶";
@@ -1320,14 +1324,30 @@ async function stokSorgula(){
   let stokHtml="";
   {
     const {data:st}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",q).eq("marka",brand).eq("bayi_id",stokSahibi());
-    const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}}; let kadikoyTarih=null;
-    (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); if(x.depo==='kadikoy'&&x.stok_tarihi) kadikoyTarih=x.stok_tarihi; });
-    const net=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
+    const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
+    const tar={mars:null,horoz:null,kadikoy:null};   // 📅 her deponun SAYIM tarihi
+    (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return;
+      if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0);
+      if(x.stok_tarihi && (!tar[x.depo] || x.stok_tarihi>tar[x.depo])) tar[x.depo]=x.stok_tarihi; });
+    const kadikoyTarih=tar.kadikoy;
+    const netHam=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
+    const dus=hasarliDusum(q,null);                     // 🚫 sorunlu adet
+    const net=netHam-dus;
+    // 📅 Sayım tarihi rozeti — eskiyince renk değişir. Kendi depo haftada bir sayılabildiği için
+    //    ona 7 gün, Mars/Horoz otomatik geldiği için 3 gün tolerans (31 Ağu, Burak isteği).
+    const tarRozet=(d,esik)=>{ if(!d) return ' <span class="mut" style="font-size:10px">(sayım tarihi yok)</span>';
+      const g=gunFark(d); const eski=g>esik;
+      const renk = g>esik*2 ? 'var(--bad)' : (eski ? 'var(--warn)' : '');
+      return ` <span style="font-size:10px;${renk?`color:${renk};font-weight:800`:'opacity:.65'}" title="Son sayım ${fmtTarih(d)} · ${g} gün önce">${eski?'⚠ ':''}sayım ${fmtTarih(d)}${eski?` · ${g} gün`:''}</span>`; };
+    const kdEski = tar.kadikoy ? gunFark(tar.kadikoy) : null;
     stokHtml=`<table style="margin-top:6px;width:auto"><thead><tr><th>Depo</th><th class="num">Mevcut</th><th class="num">Ayrılan</th></tr></thead><tbody>
-      <tr><td>Mars</td><td class="num">${stokCell(acc.mars.m)}</td><td class="num">${ayrCell(acc.mars.a)}</td></tr>
-      <tr><td>Horoz</td><td class="num">${stokCell(acc.horoz.m)}</td><td class="num">${ayrCell(acc.horoz.a)}</td></tr>
-      <tr><td>${depoAdi()} ${acc.kadikoy.m>0?'<span class="kd">KD</span>':''}${kadikoyTarih?` <span class="mut" style="font-size:10px">(sayım ${fmtTarih(kadikoyTarih)})</span>`:''}</td><td class="num">${stokCell(acc.kadikoy.m)}</td><td class="num">${ayrCell(acc.kadikoy.a)}</td></tr>
+      <tr><td>Mars${tarRozet(tar.mars,3)}</td><td class="num">${stokCell(acc.mars.m)}</td><td class="num">${ayrCell(acc.mars.a)}</td></tr>
+      <tr><td>Horoz${tarRozet(tar.horoz,3)}</td><td class="num">${stokCell(acc.horoz.m)}</td><td class="num">${ayrCell(acc.horoz.a)}</td></tr>
+      <tr><td>${depoAdi()} ${acc.kadikoy.m>0?'<span class="kd">KD</span>':''}${tarRozet(tar.kadikoy,7)}</td><td class="num">${stokCell(acc.kadikoy.m)}</td><td class="num">${ayrCell(acc.kadikoy.a)}</td></tr>
       </tbody><tfoot><tr><th>NET satılabilir</th><th class="num ${net<=0?'bad':net<=3?'warn':'ok'}" colspan="2">${net}</th></tr></tfoot></table>
+      ${dus>0?`<div class="mut" style="margin-top:4px;font-size:12px">Görünen ${netHam} · <span style="color:var(--bad);font-weight:700">sorunlu ${dus}</span> → NET ${net}</div>`:''}
+      ${(kdEski!=null&&kdEski>7)?`<div style="margin-top:5px;background:${kdEski>14?'var(--bad)':'var(--warn)'};color:${kdEski>14?'#fff':'#1a1300'};border-radius:8px;padding:7px 10px;font-weight:800;font-size:12.5px">📅 ${depoAdi()} deposu ${kdEski} gündür sayılmamış (son sayım ${fmtTarih(tar.kadikoy)}) — bu rakama güvenme, depoyu say.</div>`:''}
+      ${(kdEski==null&&acc.kadikoy.m>0)?`<div class="mut" style="margin-top:5px;font-size:12px">📅 ${depoAdi()} deposunda sayım tarihi yok.</div>`:''}
       ${net<=0?'<div class="nostock" style="margin-top:4px">⚠ BU ÜRÜNDE STOK YOK</div>':''}`;
   }
   const ad=row&&row.urun_adi?row.urun_adi:q;
@@ -1808,7 +1828,9 @@ async function refetch(r){
     r.marsMevcut=acc.mars.m; r.horozMevcut=acc.horoz.m; r.kadikoyMevcut=acc.kadikoy.m;
     r.marsAyrilan=acc.mars.a; r.horozAyrilan=acc.horoz.a;
     r.sKadikoy=acc.kadikoy.m-acc.kadikoy.a;
-    r.netStok=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
+    r.netStokHam=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
+    r.hasarliDus=hasarliDusum(r.kod,null);              // 🚫 sorunlu adet düşülür
+    r.netStok=r.netStokHam-r.hasarliDus;
   }
   renderRows();
 }
@@ -2350,7 +2372,7 @@ async function topluTara(files){
         res.stokRows=rows; res.ok=rows.length>0;
         // ⚠️ Buradaki ilk sayı ÜRÜN ÇEŞİDİ (kaç farklı kod), ikincisi TOPLAM ADET.
         // Eskiden sadece "N stok" yazıyordu ve adet sanılıyordu (30 Ağu, Burak fark etti).
-        res.detay=rows.length+" ürün · "+fmt(toplamAdet)+" adet · "+c.depo+"/"+c.tip
+        res.detay=rows.length+" ürün · "+fmt(toplamAdet)+" adet · "+c.depo+"/"+c.tip+" · 📅 sayım "+fmtTarih(bugun)
                  +(atlanan?` · <span style="color:var(--warn)">${atlanan} ürün atlandı (bloke ≥ satılabilir)</span>`:""); }
       else if(!isEditor()){ // bayi rolü: fiyat/kampanya dosyası yükleyemez — merkezden gelir
         res.detay="Bu bir fiyat listesi görünüyor — fiyatlar MERKEZDEN yüklenir. Sen sadece STOK dosyası yükleyebilirsin (dosya adında Mars, Horoz ya da '"+depoAdi()+"' geçsin)."; }
@@ -3059,6 +3081,19 @@ async function loadHasarli(){
   }catch(e){ hasarliMap={}; }
 }
 function hasarliBilgi(kod){ return hasarliMap[(kod||"").toUpperCase()]||null; }
+// 🚫 SORUNLU ADET → NET STOKTAN DÜŞ (31 Ağu, Burak onayı)
+// Depo hasarlı ürünü stoktan düşmediği sürece sayı "1" göstermeye devam ediyordu;
+// uyarı "yok" derken sayı "var" diyordu. Artık sayı da gerçeği söylüyor.
+// SADECE görünen adedi düzeltir — fiyata / kâra / bundle'a DOKUNMAZ.
+// 📦 açık ürün / kutusuz SATILABİLİR olduğu için DÜŞÜLMEZ; yalnız 🔴 grubu düşülür.
+function hasarliDusum(kod, depo){
+  const h=hasarliBilgi(kod); if(!h) return 0;
+  if(hsSari(h.sebep)) return 0;                       // açık/kutusuz → satılabilir, düşme
+  const a=+h.adet||0; if(a<=0) return 0;
+  if(!depo) return a;                                  // toplam NET'ten düş
+  if(!h.depo) return 0;                                // kayıtta depo yoksa depo bazında düşme
+  return (h.depo===depo) ? a : 0;
+}
 function hasarliRozet(kod){
   const h=hasarliBilgi(kod); if(!h) return "";
   const dp=hsDepoAd(h.depo);
@@ -3156,9 +3191,31 @@ async function loadHasarliList(){
     if(error) throw error;
     const rows=(data||[]).filter(x=>x.aktif!==false);
     if(!rows.length){ box.innerHTML='<div class="mut" style="font-size:12px">Sorunlu ürün kaydı yok — temiz.</div>'; return; }
+    // 📋 TAKİP KOLAYLIĞI (Burak: "takibi zor olacak"): her kayıt için CANLI stoğa bak.
+    // Depo ürünü sonunda stoktan düştüyse kayıt gereksizdir → "kaldırılabilir" der.
+    const stokDurum={};
+    try{
+      const kod=rows.map(x=>x.model_kodu);
+      const st=await sb.from("stok").select("model_kodu,depo,tip,adet").in("model_kodu",kod).eq("marka",brand).eq("bayi_id",stokSahibi());
+      (st.data||[]).forEach(x=>{ const k=(x.model_kodu||"").toUpperCase();
+        if(!stokDurum[k]) stokDurum[k]={toplam:0,depolar:{}};
+        const d=(x.adet||0)*(x.tip==="ayrilmis"?-1:1);
+        stokDurum[k].toplam+=d;
+        stokDurum[k].depolar[x.depo]=(stokDurum[k].depolar[x.depo]||0)+d; });
+    }catch(e){}
     box.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:4px">Sorunlu ürünler ('+markaAd(brand)+') — satışta kırmızı uyarı veriyor:</div>'
-      +'<table><thead><tr><th>Ürün</th><th class="num">Adet</th><th>Sebep</th><th>Nerede</th><th>Açıklama</th><th>Giren</th><th>Tarih</th><th></th></tr></thead><tbody>'
-      +rows.map(k=>`<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:${hsRenk(k.sebep)};color:${hsSari(k.sebep)?"#1a1300":"#fff"};font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${hsDepoAd(k.depo)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${esc(k.aciklama)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${esc(hsKimGoster(k.ekleyen_ad))||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`).join("")
+      +'<table><thead><tr><th>Ürün</th><th class="num">Adet</th><th>Sebep</th><th>Nerede</th><th>Durum</th><th>Açıklama</th><th>Giren</th><th>Tarih</th><th></th></tr></thead><tbody>'
+      +rows.map(k=>{
+        const kk=(k.model_kodu||"").toUpperCase(); const sd=stokDurum[kk];
+        const gun=gunFark(( k.created_at||"").slice(0,10)); const gunT=(gun>=0?gun:0);
+        const kalan = sd ? (k.depo && sd.depolar[k.depo]!=null ? sd.depolar[k.depo] : sd.toplam) : null;
+        let durum;
+        if(kalan==null)      durum='<span class="mut">stok kaydı yok</span>';
+        else if(kalan<=0)    durum='<span style="color:var(--ok);font-weight:800" title="Depo ürünü stoktan düşmüş — bu uyarı artık gereksiz, ✕ ile kaldırabilirsin">✔ stok 0 · kaldırılabilir</span>';
+        else                 durum=`<span style="color:var(--warn)">stokta ${kalan} görünüyor</span>`;
+        durum += ` <span class="mut" style="font-size:11px">· ${gunT} gün</span>`;
+        if(gunT>=14 && !(kalan<=0)) durum += ' <span class="badge" style="background:var(--warn);color:#1a1300;font-size:9px">ESKİ</span>';
+        return `<tr><td><b>${k.model_kodu}</b></td><td class="num">${k.adet||1}</td><td><span class="badge" style="background:${hsRenk(k.sebep)};color:${hsSari(k.sebep)?"#1a1300":"#fff"};font-size:9px">${HS_ETIKET[k.sebep]||k.sebep}</span></td><td style="font-size:12px">${hsDepoAd(k.depo)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${durum}</td><td style="font-size:12px">${esc(k.aciklama)||'<span class="mut">—</span>'}</td><td style="font-size:12px">${esc(hsKimGoster(k.ekleyen_ad))||'<span class="mut">—</span>'}</td><td style="font-size:12px">${fmtTarih((k.created_at||"").slice(0,10))}</td><td><button class="ghost sm" title="Sorun çözüldü — uyarıyı kaldır" onclick="hasarliSil('${k.id}')">✕</button></td></tr>`;}).join("")
       +'</tbody></table>';
   }catch(e){ box.innerHTML='<div class="mut" style="font-size:12px">Liste yüklenemedi ('+e.message+') — hasarli_urun.sql çalıştırıldı mı?</div>'; }
 }
