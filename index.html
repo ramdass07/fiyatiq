@@ -2270,10 +2270,15 @@ async function topluTara(files){
       if(!c.brand){ c.brand = detectBrandWb(wb) || brand; res.brand=c.brand; }
       if(!c.kind){ c.kind="fiyat"; res.kind="fiyat"; }
       if(!c.brand){ res.detay="marka tanınamadı"; }
-      else if(c.kind==="stok"){ let rows=[]; const seen={};
+      else if(c.kind==="stok"){ let rows=[]; const seen={}; let toplamAdet=0, atlanan=0;
         wb.SheetNames.forEach(sn=>{ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
-          parseStockRows(aoa).forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; rows.push({bayi_id:stokSahibi(),model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
-        res.stokRows=rows; res.ok=rows.length>0; res.detay=rows.length+" stok · "+c.depo+"/"+c.tip; }
+          const par=parseStockRows(aoa); atlanan+=(par.atlanan||0);
+          par.forEach(o=>{ if(seen[o.model_kodu])return; seen[o.model_kodu]=1; toplamAdet+=(+o.adet||0); rows.push({bayi_id:stokSahibi(),model_kodu:o.model_kodu,marka:c.brand,depo:c.depo,tip:c.tip,adet:o.adet,stok_tarihi:bugun}); }); });
+        res.stokRows=rows; res.ok=rows.length>0;
+        // ⚠️ Buradaki ilk sayı ÜRÜN ÇEŞİDİ (kaç farklı kod), ikincisi TOPLAM ADET.
+        // Eskiden sadece "N stok" yazıyordu ve adet sanılıyordu (30 Ağu, Burak fark etti).
+        res.detay=rows.length+" ürün · "+fmt(toplamAdet)+" adet · "+c.depo+"/"+c.tip
+                 +(atlanan?` · <span style="color:var(--warn)">${atlanan} ürün atlandı (bloke ≥ satılabilir)</span>`:""); }
       else if(!isEditor()){ // bayi rolü: fiyat/kampanya dosyası yükleyemez — merkezden gelir
         res.detay="Bu bir fiyat listesi görünüyor — fiyatlar MERKEZDEN yüklenir. Sen sadece STOK dosyası yükleyebilirsin (dosya adında Mars, Horoz ya da '"+depoAdi()+"' geçsin)."; }
       else { // fiyat listesi (ham FL veya temiz)
@@ -2517,6 +2522,7 @@ function parseStockRows(aoa){
       if(cBirim>=0&&cToplam>=0){ const b=+r[cBirim],t=+r[cToplam]; if(isNum(b)&&isNum(t)&&b) adet=Math.round(t/b); }
       else if(cSat>=0){ const s=isNum(r[cSat])?+r[cSat]:0; const bl=(cBloke>=0&&isNum(r[cBloke]))?+r[cBloke]:0; adet=Math.round(s-bl); }
       if(adet!=null&&adet>0){ seen.add(kod); out.push({model_kodu:kod,adet}); }
+      else if(adet!=null&&adet<=0){ out.atlanan=(out.atlanan||0)+1; }   // bloke ≥ satılabilir → satılabilir stok yok
     }
   } else {
     for(const r of aoa){ if(!isCode((r||[])[0])) continue; const kod=(""+r[0]).trim().toUpperCase(); if(seen.has(kod)) continue; const a=isNum(r[1])?Math.round(+r[1]):null; if(a!=null){ seen.add(kod); out.push({model_kodu:kod,adet:a}); } }
