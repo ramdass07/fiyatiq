@@ -586,6 +586,23 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <div class="row" style="margin-top:10px"><button id="topluYaz" onclick="topluYaz()" disabled>✓ Onayla ve Yükle</button><span id="topluMsg" class="msg"></span></div>
     </div>
 
+    <div class="card" id="bayiPanelCard" style="border:2px solid #14b8a6">
+      <h2>🏪 Bayi Paneli · Dış Bayi Fiyat Listeleri <span class="badge" style="background:#14b8a6;color:#04231f">ayrı dünya</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">
+        <b>Buraya BSH'tan geldiği gibi HAM listeleri bırak</b> — toptan, perakende ve BİP.
+        Bunlar <b>yalnızca dış bayilerin</b> (deneme2 gibi, kendi havuzu olan bağımsız bayiler) gördüğü fiyatlardır.
+        Kendi mağazaların için <b>yukarıdaki 🚀 Aylık Veri Güncelleme</b> kutusunu kullan (PH'de %3 zamlı liste oraya).
+        İki dünya birbirine hiç karışmaz. <b>Stok buraya yüklenmez</b> — dış bayi kendi stoğunu kendi yükler.
+        Marka dosya adından tanınır. Şu an: <b id="bpMarka">—</b></p>
+      <label id="bpDrop" ondragover="event.preventDefault();this.style.background='#14b8a622'" ondragleave="this.style.background='var(--field)'" ondrop="event.preventDefault();this.style.background='var(--field)';bpTara(event.dataTransfer.files)" style="display:block;border:2px dashed #14b8a6;border-radius:12px;padding:22px;text-align:center;cursor:pointer;background:var(--field)">
+        <input id="bpFile" type="file" accept=".xlsx,.xls,.csv" multiple style="display:none" onchange="bpTara(this.files)">
+        <div style="font-size:15px;font-weight:700">🏪 Dış bayi fiyat listelerini buraya bırak</div>
+        <div class="mut" style="font-size:12px;margin-top:4px">Örn: BOSCH EYLUL TOPTAN.xlsx · SIEMENS EYLUL PERAKENDE.xlsx</div>
+      </label>
+      <div id="bpSonuc" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:10px"><button id="bpYaz" onclick="bpYaz()" disabled style="background:#14b8a6;color:#04231f">✓ Bayi Paneline Yükle</button><span id="bpMsg" class="msg"></span></div>
+    </div>
+
     <div class="card" id="primliCard" style="border:2px solid var(--bad)">
       <h2>⭐ Primli Ürün Listesi <span class="badge">kırmızı uyarı</span></h2>
       <p class="mut" style="font-size:13px;margin:4px 0 10px">BSH'ın aylık <b>primli listesini</b> (Ürün Kodu · Primli Fiyat · Prim sütunlu Excel) buraya bırak. Üstten <b>doğru markayı</b> seç. Yüklenince o ürünler teklif/sorguda <b style="color:var(--bad)">kırmızı ⭐ PRİMLİ</b> rozetiyle uyarır.</p>
@@ -894,6 +911,9 @@ async function showApp(session){
 }
 // Yüklü en güncel dönemi bul; sorgular sadece bu döneme bakar (eski ay verisi sızmaz, marka karışmaz)
 async function loadAktifDonem(){
+  // 🔒 MÜHÜR: dış bayi toptan_fiyatlar'ı doğrudan okuyamaz → dönemi RPC'den al.
+  try{ const {data,error}=await sb.rpc("fl_aktif_donem");
+       if(!error && data){ aktifDonem=data; return; } }catch(e){}
   try{ const {data}=await sb.from("toptan_fiyatlar").select("donem").order("donem",{ascending:false}).limit(1);
        aktifDonem = (data&&data[0]&&data[0].donem) ? data[0].donem : _donem(); }
   catch(e){ aktifDonem=_donem(); }
@@ -977,6 +997,8 @@ async function loadBagimsizToptan(){
   bagimsizToptan={};
   if(!disBayiMi()) return;
   try{
+    // 🔒 31 Ağu: dış bayi fiyatı artık BAYİ PANELİ tablolarından, urun_fiyat() içinde seçiliyor.
+    // Bu eski yol (toptan_fiyat_bagimsiz sütunu) sadece geri uyumluluk için duruyor; dış bayide boş döner.
     const rows=await sbTumu("toptan_fiyatlar","model_kodu,toptan_fiyat_bagimsiz",
       q=>q.eq("marka",brand).eq("donem",aktifDonem||_donem()).not("toptan_fiyat_bagimsiz","is",null));
     (rows||[]).forEach(r=>{ const k=(r.model_kodu||"").toUpperCase();
@@ -1029,6 +1051,7 @@ function setBrand(b){
   loadKampFiyat().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   loadIkili().then(()=>{ loadIkiliList(); renderRows(); });
   loadHasarli().then(()=>{ if(typeof hsInit==="function") hsInit(); renderRows(); });
+  { const bm=$("bpMarka"); if(bm) bm.textContent=markaAd(brand); }
   loadBagimsizToptan().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   syncAdminBrand();
 }
@@ -1058,6 +1081,8 @@ function applyAdminAccess(){
   const imp=$("importers"); if(imp) imp.style.display="none";
   const mo=$("merkeziOk"); if(mo) mo.textContent="▶";
   const bc=$("bayilerCard"); if(bc) bc.style.display=profil.rol==="admin"?"":"none";
+  const bp=$("bayiPanelCard"); if(bp) bp.style.display=profil.rol==="admin"?"":"none";  // 🏪 dış bayi fiyatları: yalnız admin
+  { const bm=$("bpMarka"); if(bm) bm.textContent=markaAd(brand); }
   // Satış Asistanı: yalnızca admin. Mağaza/personel hesaplarında ne kart ne panel açılır.
   const ac=$("asistanCard"); if(ac) ac.style.display=profil.rol==="admin"?"":"none";
   if(profil.rol!=="admin") asKapat();
@@ -2910,6 +2935,55 @@ function kampRozet(kod){ const k=kampFiyatMap[(kod||"").toUpperCase()]; if(!k) r
   const nk = (+k.nakit>0) ? ` <span class="prim-badge" style="background:#16a34a;box-shadow:0 0 8px rgba(22,163,74,.55)" title="Nakit / havale fiyatı ${fmt(k.nakit)} ₺ — bilgi amaçlı; uygulamak için satırdaki 💵 butonuna bas">💵 NAKİT ${fmt(k.nakit)}₺</span>` : "";
   return ` <span class="prim-badge" style="background:var(--acc);box-shadow:0 0 8px rgba(59,130,246,.55)" title="Kampanya TAKSİTLİ fiyatı ${fmt(k.fiyat)} ₺${k.nakit?' · NAKİT '+fmt(k.nakit)+' ₺':''}${k.bitis?' · bitiş '+k.bitis:''}. Peşin karşılığı komisyon düşülerek hesaplanır.">🎯 KAMPANYA ${fmt(k.fiyat)}₺ taksitli</span>`+nk; }
 
+// ===== 🏪 BAYİ PANELİ — DIŞ BAYİ FİYAT LİSTELERİ (31 Ağu) =====
+// Merkez yüklemesiyle AYNI ayrıştırıcıyı kullanır ama bayi_* tablolarına yazar.
+// Stok dosyası kabul etmez: dış bayi kendi stoğunu kendi yükler.
+window.bpItems=[];
+function bpTemizle(){ window.bpItems=[]; const b=$("bpSonuc"); if(b) b.innerHTML="";
+  const y=$("bpYaz"); if(y){ y.disabled=true; y.textContent="✓ Bayi Paneline Yükle"; }
+  const m=$("bpMsg"); if(m){ m.textContent=""; m.className="msg"; } }
+async function bpTara(files){
+  const box=$("bpSonuc"); if(!files||!files.length) return;
+  box.innerHTML="<span class='mut'>Taranıyor...</span>"; window.bpItems=[];
+  const donem=_donem();
+  for(const f of files){
+    const c=tclassify(f.name);
+    const res={name:f.name, brand:c.brand||brand, ok:false, detay:""};
+    try{
+      const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
+      if(!c.brand){ c.brand = detectBrandWb(wb) || brand; res.brand=c.brand; }
+      if(c.kind==="stok"){ res.detay="⚠ Bu bir STOK dosyası — bayi paneline stok yüklenmez. Dış bayi kendi stoğunu kendi yükler."; window.bpItems.push(res); continue; }
+      const r=parsePriceWb(wb,c.brand,donem);
+      res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
+      const n=(r.topRows||[]).length+(r.perRows||[]).length+(r.bipRows||[]).length;
+      res.ok=n>0;
+      res.detay = n ? `${(r.topRows||[]).length} toptan · ${(r.perRows||[]).length} perakende · ${(r.bipRows||[]).length} BİP · dönem ${donem}`
+                    : "⚠ Fiyat sütunu bulunamadı — dosya yapısını kontrol et.";
+    }catch(e){ res.detay="okunamadı: "+e.message; }
+    window.bpItems.push(res);
+  }
+  box.innerHTML=window.bpItems.map(r=>`<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${esc(r.name)}</b><br><span class="mut" style="font-size:12px">${markaAd(r.brand)} · ${esc(r.detay)}</span></div>`).join("");
+  const y=$("bpYaz"); if(y) y.disabled = !window.bpItems.some(r=>r.ok);
+}
+async function bpYaz(){
+  const items=(window.bpItems||[]).filter(r=>r.ok); const msg=$("bpMsg"), btn=$("bpYaz");
+  if(!items.length) return; btn.disabled=true; msg.className="msg"; msg.textContent="Yükleniyor, bekle...";
+  try{
+    let t=0,p=0,b=0;
+    for(const r of items){
+      if(r.topRows&&r.topRows.length){ await upsert("bayi_toptan_fiyatlar",r.topRows,"model_kodu,marka,donem"); t+=r.topRows.length; }
+      if(r.perRows&&r.perRows.length){ await upsert("bayi_perakende_fiyatlar",r.perRows,"model_kodu,marka,donem"); p+=r.perRows.length; }
+      if(r.bipRows&&r.bipRows.length){ await upsert("bayi_bip",r.bipRows,"model_kodu,marka,donem"); b+=r.bipRows.length; }
+      // Katalog ortak: dış bayi de ürün adını/önerisini görsün
+      const kodlar={}; [...(r.topRows||[]),...(r.perRows||[])].forEach(x=>{ kodlar[x.model_kodu]=1; });
+      const urunRows=Object.keys(kodlar).map(k=>({model_kodu:k,marka:r.brand}));
+      if(urunRows.length) await upsert("urunler",urunRows,"model_kodu,marka");
+    }
+    msg.className="msg ok"; msg.textContent=`✓ Bayi paneline yüklendi — ${t} toptan · ${p} perakende · ${b} BİP. Bunları SADECE dış bayiler görür.`;
+    setTimeout(bpTemizle, 5000);
+  }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message+" (bayi_paneli.sql çalıştırıldı mı?)"; btn.disabled=false; }
+}
+
 // ===== HASARLI / SORUNLU ÜRÜN UYARISI =====
 // Ortak bir "kara liste": bayi havuzundaki her mağaza görür. Fiyata/kâra/kampanyaya
 // DOKUNMAZ — sadece satış ekranında ve stok sorgusunda kırmızı uyarı basar.
@@ -2960,12 +3034,14 @@ function hasarliUyariKutu(kod){
 async function kodMarkalari(kod){
   const set=new Set();
   try{
-    const [u,t]=await Promise.all([
+    const [u,t,rp]=await Promise.all([
       sb.from("urunler").select("marka").eq("model_kodu",kod),
-      sb.from("toptan_fiyatlar").select("marka").eq("model_kodu",kod)
+      sb.from("toptan_fiyatlar").select("marka").eq("model_kodu",kod),
+      sb.rpc("fl_kod_markalari",{p_kod:kod})            // 🔒 tablo kapalıysa buradan gelir
     ]);
     (u.data||[]).forEach(x=>{ if(x.marka) set.add(x.marka); });
     (t.data||[]).forEach(x=>{ if(x.marka) set.add(x.marka); });
+    if(!rp.error) (rp.data||[]).forEach(x=>{ if(x.marka) set.add(x.marka); });
   }catch(e){}
   return set;
 }
