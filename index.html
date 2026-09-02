@@ -500,7 +500,8 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
     </div>
     <div class="card totalsCard" id="altPanelCard" style="display:none"><div class="row">
       <div class="fld"><label>Kâr Oranı %</label><input id="karOrani" type="number" step="0.5" value="4" style="width:100px" oninput="recalc()"></div>
-      <div class="fld"><label>Banka</label><select id="banka" onchange="onBankChange()"></select></div>
+      <div class="fld"><label>Banka</label><select id="banka" onchange="onBankChange()"></select>
+        <div id="ticariUyari" style="display:none;margin-top:4px;padding:4px 8px;border-radius:6px;background:#fef2f2;border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;max-width:230px">⚠ Bu, TİCARİ kart oranıdır — müşterinin kartı bireyselse bireysel satırı seçin.</div></div>
       <div class="fld"><label>Taksit</label><select id="taksit" onchange="onTaksitChange()"></select></div>
       <div class="fld" id="elleKomFld" style="display:none"><label style="color:#f59e0b">✏️ Banka adı &amp; Komisyon %</label>
         <span style="display:flex;gap:6px">
@@ -1840,7 +1841,7 @@ async function loadBanks(){
   // Koç grubu (BEKO ...) oranları bize özel — bağımsız/dış bayilere gösterilmez.
   if(disBayiMi()) uniq=uniq.filter(b=>!/^BEKO\b/i.test((b||"").trim()));
   $("banka").innerHTML='<option value="">— peşin —</option>'+uniq.map(b=>`<option>${b}</option>`).join("")
-    +'<option value="__elle__">✏️ Elle gireceğim…</option>'; await loadTaksit();
+    +'<option value="__elle__">✏️ Elle gireceğim…</option>'; ticariKontrol(); await loadTaksit();
 }
 // Satış anında banka listede yoksa / oran değiştiyse: "✏️ Elle gireceğim" seçilir,
 // satışçı banka adını ve komisyon oranını kendi yazar. Kaydedilen orana dokunmaz.
@@ -1874,7 +1875,14 @@ async function setKomis(){
   const {data}=await sb.from("banka_komisyonlari").select("oran").eq("banka",bk).eq("taksit_sayisi",tk).maybeSingle();
   komisOran = data? +data.oran : 0; renderRows();
 }
-function onBankChange(){ loadTaksit(); }
+// Ticari kart oranı uyarısı: seçilen banka adında "ticari" geçiyorsa (YKB-World (Ticari),
+// GARANTİ-Bonus (Ticari) vb.) satışçıya kırmızı uyarı gösterilir. Hesaba DOKUNMAZ, sadece görsel.
+function ticariKontrol(){
+  const u=document.getElementById("ticariUyari"); if(!u) return;
+  const bk=($("banka")||{}).value||"";
+  u.style.display = /ticari/i.test(bk) ? "" : "none";
+}
+function onBankChange(){ ticariKontrol(); loadTaksit(); }
 function onTaksitChange(){ setKomis(); }
 function calcBank(){ renderRows(); }
 // Durum (Teklif/Satıldı/Kaybedildi) kaydı: veritabanında 'durum' sütunu varsa oraya,
