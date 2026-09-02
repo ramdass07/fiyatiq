@@ -903,6 +903,7 @@ async function showApp(session){
   await loadBagimsizToptan();
   await loadKampFiyat();
   await loadHasarli();
+  await loadPhaseOut();
   await loadIkili();
   await loadBanks();
   await loadAktifKampanyalar();
@@ -1052,6 +1053,7 @@ function setBrand(b){
   loadKampFiyat().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   loadIkili().then(()=>{ loadIkiliList(); renderRows(); });
   loadHasarli().then(()=>{ if(typeof hsInit==="function") hsInit(); renderRows(); });
+  loadPhaseOut().then(()=>renderRows());
   { const bm=$("bpMarka"); if(bm) bm.textContent=markaAd(brand); }
   loadBagimsizToptan().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   syncAdminBrand();
@@ -1454,7 +1456,7 @@ function renderRows(){
       <td><input value="${r.kod}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();setTimeout(()=>{const rr=quoteRows[${i}]; if(rr&&rr.kod)refetch(rr);},250)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
-      <td>${r.ad||""}${hasarliRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+      <td>${r.ad||""}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -3108,6 +3110,21 @@ async function loadHasarli(){
   }catch(e){ hasarliMap={}; }
 }
 function hasarliBilgi(kod){ return hasarliMap[(kod||"").toUpperCase()]||null; }
+// ⛔ PHASE OUT ROZETİ (2 Eyl, Burak istedi): phase_out tablosundaki ürünler ürün adının yanında
+// mor rozetle işaretlenir. Tablo yoksa/boşsa sessizce devre dışı — hesaba DOKUNMAZ, sadece görsel.
+// Liste şimdilik SQL ile yükleniyor; ileride Yönetim'e yükleme ekranı eklenecek.
+let phaseOutSet=new Set();
+async function loadPhaseOut(){
+  try{
+    const {data,error}=await sb.from("phase_out").select("model_kodu").eq("marka",brand);
+    phaseOutSet = error ? new Set() : new Set((data||[]).map(x=>(x.model_kodu||"").toUpperCase()));
+  }catch(e){ phaseOutSet=new Set(); }
+}
+function phaseOutRozet(kod){
+  return phaseOutSet.has((kod||"").toUpperCase())
+    ? ' <span class="prim-badge" style="background:#7c3aed;box-shadow:0 0 8px rgba(124,58,237,.6)" title="PHASE OUT — üretimden kalkan ürün; stok bitince yenisi GELMEZ.">⛔ PHASE OUT</span>'
+    : "";
+}
 // 🚫 SORUNLU ADET → NET STOKTAN DÜŞ (31 Ağu, Burak onayı)
 // Depo hasarlı ürünü stoktan düşmediği sürece sayı "1" göstermeye devam ediyordu;
 // uyarı "yok" derken sayı "var" diyordu. Artık sayı da gerçeği söylüyor.
