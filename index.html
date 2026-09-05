@@ -462,6 +462,7 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
     </div>
     <button id="adminBtn" class="ghost sm" style="display:none" onclick="toggleAdmin()">⚙ Yönetim</button>
     <button id="yardimBtn" class="ghost sm" onclick="yardimAc()" title="Nasıl kullanılır">❓ Nasıl kullanılır</button>
+    <span class="mut" id="fqSurum" title="Yüklü sürüm — eski sürümde çalışıyorsan altta 🔄 yenile şeridi çıkar" style="font-size:10px;align-self:center"></span>
     <div class="grow"></div>
     <span id="who" class="mut"></span>
     <button class="ghost sm" onclick="signOut()">Çıkış</button>
@@ -914,8 +915,13 @@ async function showApp(session){
 // Yüklü en güncel dönemi bul; sorgular sadece bu döneme bakar (eski ay verisi sızmaz, marka karışmaz)
 async function loadAktifDonem(){
   // 🔒 MÜHÜR: dış bayi toptan_fiyatlar'ı doğrudan okuyamaz → dönemi RPC'den al.
-  try{ const {data,error}=await sb.rpc("fl_aktif_donem");
-       if(!error && data){ aktifDonem=data; return; } }catch(e){}
+  // 5 Eyl: RPC artık MARKA BAZLI (ay ortasında tek marka gelince diğeri fiyatsız kalmasın —
+  //        "hızlı stok sorgu çalışmıyor" olayı). ay_gecisi_kalici.sql henüz çalıştırılmadıysa
+  //        eski parametresiz RPC'ye geri düşer.
+  try{ const {data,error}=await sb.rpc("fl_aktif_donem",{p_marka:brand});
+       if(!error && data){ aktifDonem=data; return; }
+       if(error){ const r2=await sb.rpc("fl_aktif_donem");
+                  if(!r2.error && r2.data){ aktifDonem=r2.data; return; } } }catch(e){}
   try{ const {data}=await sb.from("toptan_fiyatlar").select("donem").order("donem",{ascending:false}).limit(1);
        aktifDonem = (data&&data[0]&&data[0].donem) ? data[0].donem : _donem(); }
   catch(e){ aktifDonem=_donem(); }
@@ -1045,11 +1051,12 @@ function setBrand(b){
   const am=$("aktifMarka"); if(am) am.textContent="Aktif: "+(b==="bosch"?"Bosch":"Siemens");
   if(typeof secilenKampanya!=='undefined') secilenKampanya.clear(); // marka değişince diğer markanın seçimleri kalkar
   if(typeof setManuelToplam==='function') setManuelToplam('sifirla'); // marka değişince elle fiyat sıfırlanır
-  quoteRows.forEach(r=>refetch(r)); loadBanks();
+  // 5 Eyl: dönem artık marka bazlı — önce bu markanın aktif dönemi çekilir, fiyatlar ondan sonra tazelenir
+  loadAktifDonem().then(()=>{ quoteRows.forEach(r=>refetch(r)); loadPrimli().then(()=>renderRows()); });
+  loadBanks();
   loadAktifKampanyalar().then(()=>renderRows());
   if(typeof hkInit==="function" && (isEditor() || disBayiMi())) hkInit();
   if(typeof topluTemizle==="function") topluTemizle(); // marka değişince eski yükleme sonucu ekranda kalmasın
-  loadPrimli().then(()=>renderRows());
   loadKampFiyat().then(()=>{ quoteRows.forEach(r=>refetch(r)); });
   loadIkili().then(()=>{ loadIkiliList(); renderRows(); });
   loadHasarli().then(()=>{ if(typeof hsInit==="function") hsInit(); renderRows(); });
@@ -1682,8 +1689,10 @@ function renderKampanyaPanel(){
       let uyari="";
       if(uygun) uyari=` <span class="badge" style="font-size:9px;background:rgba(34,197,94,.22);color:var(--ok);border-color:var(--ok)">✓ sepete uygun</span>`;
       else if(on) uyari=`<div style="color:var(--bad);font-size:11px;font-weight:700;margin-top:2px">⚠ Bu kampanya sepete UYGUN OLMAYABİLİR — Diva kontrolü tavsiye edilir</div>`;
+      // 5 Eyl: "Bu sepette X ₺" iki kampanyada da görününce toplamı İKİ KEZ verilmiş sanıldı
+      // (Burak'ın 4 ürünlü Siemens testi). Etiket artık bunun TEK BAŞINA senaryosu olduğunu söylüyor.
       const sepetBox = pv.toplamHak>0
-        ? `<div><b style="color:var(--acc);font-size:16px">Bu sepette ${fmt(pv.toplamHak)} ₺</b> <span class="mut" style="font-size:11px">(${cnt} ${birimAdi(k)})</span></div>`
+        ? `<div title="Bu tutar SADECE bu kampanya tek başına uygulanırsa geçerlidir. Birden çok kampanya uygulanırsa her ürün tek kampanyada sayılır — geçerli toplam en alttaki 'Uygulanan hakediş' satırıdır."><b style="color:var(--acc);font-size:16px">Tek başına: ${fmt(pv.toplamHak)} ₺</b> <span class="mut" style="font-size:11px">(${cnt} ${birimAdi(k)})</span><div class="mut" style="font-size:10px">birlikte uygulanınca geçerli toplam alttadır</div></div>`
         : `<div class="mut" style="font-size:11px">bu sepette uygun ürün yok</div>`;
       return `<div class="row" style="justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:7px 0;${uygun?'':'opacity:.78'}">
       <div style="flex:1">
@@ -1729,9 +1738,13 @@ function hesaplaHakedis(applied, rows){
   // birim listesi (adet kadar çoğalt) — her birim tek bir kampanyada kullanılır
   const units=[];
   rows.forEach(r=>{ const kod=(r.kod||"").toUpperCase(); const kat=(kategoriOf(kod)||[])[0]||null; const adet=+r.adet||1; for(let n=0;n<adet;n++) units.push({kod,kat,used:false}); });
-  const xlK=applied.filter(k=>bundleTuru(k)==='xl');
-  const ankK=applied.filter(k=>bundleTuru(k)==='ankastre');
-  const ikiK=applied.filter(k=>bundleTuru(k)==='ikili');
+  // ⚠️ 5 Eyl düzeltmesi: aynı türden birden çok kampanya uygulanırsa ürünleri EN YÜKSEK
+  // hakedişli kampanya önce kapmalı (örn. Çamaşır+Kurutma 8.000 hak, 2'li LDA 4.000 hak —
+  // çift önce 8.000'e sayılır). Eskiden liste sırasına göreydi, düşük olan kapabiliyordu.
+  const byHak=(a,b)=>(+b.hakedis||0)-(+a.hakedis||0);
+  const xlK=applied.filter(k=>bundleTuru(k)==='xl').sort(byHak);
+  const ankK=applied.filter(k=>bundleTuru(k)==='ankastre').sort(byHak);
+  const ikiK=applied.filter(k=>bundleTuru(k)==='ikili').sort(byHak);
   const digerK=applied.filter(k=>bundleTuru(k)==='diger');
   const hasBundle=xlK.length||ankK.length||ikiK.length;
   // kategori bazlı gate: kampanyanın secili_modeller listesinde O kategoriden model VARSA, sadece o modeller geçerli
@@ -2254,6 +2267,9 @@ function tclassify(name){
   const da=tkey(depoAdi()); // bayinin kendi depo adı da dosya adından tanınır (Kadıköy, Maltepe...)
   const depo = n.includes("mars")?"mars": n.includes("horoz")?"horoz": (n.includes("kadikoy")||n.includes("kadkoy")||(da&&da.length>=3&&n.includes(da)))?"kadikoy": null;
   if(depo) return {brand, kind:"stok", depo, tip};
+  // ⛔ 5 Eyl: Phase-out listesi dosya adından tanınır. Tanınmazsa "fiyat" sanılıp
+  //    ham BİP ayrıştırıcısına düşüyor ve fiyat sütunu BİP diye yazılıyordu (tehlike).
+  if(n.includes("phase")) return {brand, kind:"phaseout"};
   // stok değilse fiyat listesi kabul et (toptan/perakende sayfalarını içeriden bulur)
   return {brand, kind: brand? "fiyat": null};
 }
@@ -2375,6 +2391,17 @@ function parsePriceWb(wb, marka, donem){
     bipRows, bipHam, bipSayfa, bipAtlanan
   };
 }
+// ⛔ PHASE-OUT LİSTESİ AYRIŞTIRICI (5 Eyl): dosyadaki TÜM ürün kodlarını toplar.
+// Sayfa elemesi yok — dosya zaten yalnız phase-out listesi. Kod kuralı BİP'tekiyle aynı
+// (harf + rakam zorunlu, ≥5) — "41700" gibi salt sayılar kod sanılmaz.
+function parsePhaseOutWb(wb, marka, donem){
+  const s=new Set();
+  wb.SheetNames.forEach(sn=>{
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+    aoa.forEach(row=>{ (row||[]).forEach(c=>{ if(bipKodMu(c)) s.add((""+c).trim().toUpperCase()); }); });
+  });
+  return [...s].map(k=>({model_kodu:k,marka,donem}));
+}
 function topluTemizle(){ // yükleme kutusunu sıfırla — eski tarama sonucu ekranda kalmasın
   window.topluItems=[]; const box=$("topluSonuc"); if(box) box.innerHTML="";
   const inp=$("topluFile"); if(inp) inp.value="";
@@ -2405,6 +2432,12 @@ async function topluTara(files){
                  +(atlanan?` · <span style="color:var(--warn)">${atlanan} ürün atlandı (bloke ≥ satılabilir)</span>`:""); }
       else if(!isEditor()){ // bayi rolü: fiyat/kampanya dosyası yükleyemez — merkezden gelir
         res.detay="Bu bir fiyat listesi görünüyor — fiyatlar MERKEZDEN yüklenir. Sen sadece STOK dosyası yükleyebilirsin (dosya adında Mars, Horoz ya da '"+depoAdi()+"' geçsin)."; }
+      else if(c.kind==="phaseout"){ // ⛔ 5 Eyl: phase-out dosyası — kodlar phase_out tablosuna yazılır
+        const rows=parsePhaseOutWb(wb,c.brand,donem);
+        res.phRows=rows; res.ok=rows.length>0;
+        res.detay = rows.length
+          ? `⛔ PHASE-OUT listesi — <b>${rows.length} kod</b>: ${rows.map(x=>x.model_kodu).join(", ")}<br><span style="color:var(--warn)">Yüklenince ${markaAd(c.brand)} phase-out listesi BU listeyle DEĞİŞTİRİLİR.</span> Toptan yüklemede bu kodlara %3 işlenir, satış ekranında ⛔ rozet çıkar.`
+          : "dosyada ürün kodu bulunamadı"; }
       else { // fiyat listesi (ham FL veya temiz)
         const r=parsePriceWb(wb,c.brand,donem); res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
         res.ok=(r.topRows.length+r.perRows.length+r.bipRows.length)>0;
@@ -2419,9 +2452,9 @@ async function topluTara(files){
 function topluRender(){
   const box=$("topluSonuc"); if(!box) return;
   box.innerHTML=window.topluItems.map((r,i)=>{
-    const aiBtn=(!r.ok && r.kind!=="stok" && r._f && isEditor())
+    const aiBtn=(!r.ok && r.kind!=="stok" && r.kind!=="phaseout" && r._f && isEditor())
       ? ` <button class="ghost sm" style="padding:2px 9px;font-size:12px" onclick="aiListeOku(${i})">🤖 AI ile Oku</button>` : "";
-    return `<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b>${aiBtn}<br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind==="stok"?"stok":"fiyat listesi"} — ${r.detay}</span></div>`;
+    return `<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b>${aiBtn}<br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind==="stok"?"stok":(r.kind==="phaseout"?"phase-out listesi":"fiyat listesi")} — ${r.detay}</span></div>`;
   }).join("");
   const okcount=window.topluItems.filter(r=>r.ok).length;
   const btn=$("topluYaz"); if(!btn) return;
@@ -2565,28 +2598,125 @@ async function asGonder(){
   }catch(e){ bekle.remove(); asYaz("asistan","⚠ Bağlantı hatası: "+e.message); }
   asMesgul=false; if(btn){ btn.disabled=false; btn.textContent="Sor"; }
 }
+// ===== 🗓️ AY GEÇİŞİ ONAY PANELİ (5 Eyl 2026) =====
+// Her ay tekrarlayan iki tuzağı KAPATIR:
+// 1) upsert ESKİYİ SİLMEZ → aynı döneme ikinci yükleme eski kodları bırakır
+//    (Ağustos "115 beklerken 118" olayı). Artık yazmadan önce DB'deki mevcut kayıt
+//    sayısı gösterilir ve "Değiştir / Üzerine ekle" seçtirilir.
+// 2) BSH toptan HAM gelir ama merkez REFERANS PH %3 ister (Eylül Bosch olayı).
+//    Artık phase_out tablosundaki kodlara %3'ü SİSTEM işler; ham değer
+//    toptan_fiyat_bagimsiz'a yazılır. Liste zaten %3 işliyse (REFERANS) "dokunma"
+//    seçilir — çift zam olmaz.
+// Stok dosyaları bu panelden MUAF: sabah taze stok yüklemesi tek tıkla sürer.
 async function topluYaz(){
   const items=window.topluItems.filter(r=>r.ok); const msg=$("topluMsg"); const btn=$("topluYaz");
-  if(!items.length) return; btn.disabled=true; msg.className="msg"; msg.textContent="Yükleniyor, bekle...";
-  let r_maxDonem=null;
+  if(!items.length) return;
+  // sadece stok varsa eski tek-tık akışı: panel yok
+  if(items.every(r=>r.kind==="stok")){ window._topluBekleyen=items; window._topluMevcut={}; return topluYazGercek(true); }
+  btn.disabled=true; msg.className="msg"; msg.textContent="Sistemdeki mevcut kayıtlar kontrol ediliyor...";
+  const eskiOnay=$("topluOnay"); if(eskiOnay) eskiOnay.remove();
+  // gruplar: tablo × marka × dönem — dosyadaki satır sayısı + DB'deki mevcut sayı
+  const gruplar={};
+  const say=(tablo,rows)=>{ (rows||[]).forEach(x=>{ const k=tablo+"|"+x.marka+"|"+x.donem; (gruplar[k]=gruplar[k]||{tablo,marka:x.marka,donem:x.donem,yeni:0}).yeni++; }); };
+  let toptanVar=false, phDosyasi=false;
+  for(const r of items){
+    if(r.kind==="stok") continue;
+    if(r.kind==="phaseout"){ phDosyasi=true; continue; }
+    say("toptan_fiyatlar",r.topRows); say("perakende_fiyatlar",r.perRows); say("bip",r.bipRows);
+    if((r.topRows||[]).length) toptanVar=true;
+  }
+  const gl=Object.values(gruplar); let mevcutVar=false;
+  window._topluMevcut={};
+  for(const g of gl){
+    try{ const {count}=await sb.from(g.tablo).select("model_kodu",{count:"exact",head:true}).eq("marka",g.marka).eq("donem",g.donem); g.mevcut=count||0; }catch(e){ g.mevcut=null; }
+    window._topluMevcut[g.tablo+"|"+g.marka+"|"+g.donem]=g.mevcut;
+    if(g.mevcut>0) mevcutVar=true;
+  }
+  // toptan varsa: markanın phase-out listesinde kaç kod var? (boşsa %3 işlenemez — uyar)
+  const phSay={};
+  if(toptanVar){ for(const mk of [...new Set(gl.filter(g=>g.tablo==="toptan_fiyatlar").map(g=>g.marka))]){
+      try{ const {count}=await sb.from("phase_out").select("model_kodu",{count:"exact",head:true}).eq("marka",mk); phSay[mk]=count||0; }catch(e){ phSay[mk]=null; } } }
+  const TAD={toptan_fiyatlar:"toptan",perakende_fiyatlar:"perakende",bip:"BİP"};
+  const satirlar=gl.map(g=>`<div style="padding:3px 0">${markaAd(g.marka)} · <b>${TAD[g.tablo]}</b> · dönem ${g.donem}: dosyada <b>${g.yeni}</b> — sistemde <b>${g.mevcut==null?"?":g.mevcut}</b> kayıt${g.mevcut>0?' <span style="color:var(--warn)">← eski kayıt var</span>':""}</div>`).join("");
+  const phBilgi = toptanVar ? Object.entries(phSay).map(([mk,n])=>`<div style="padding:3px 0">⛔ ${markaAd(mk)} phase-out listesi: <b>${n==null?"okunamadı":n+" kod"}</b>${(n===0&&!phDosyasi)?' <span style="color:var(--bad)">— BOŞ! %3 işlenecek kod yok. Önce phase-out dosyasını da bu kutuya bırakman önerilir.</span>':""}</div>`).join("") : "";
+  window._topluBekleyen=items;
+  $("topluSonuc").insertAdjacentHTML("beforeend", `<div id="topluOnay" style="margin-top:10px;border:1px solid var(--warn);border-radius:10px;padding:12px;background:rgba(245,158,11,.07)">
+    <b>📋 Yükleme özeti — son kontrol</b>
+    <div style="font-size:12.5px;margin-top:6px">${satirlar||'<span class="mut">fiyat grubu yok</span>'}${phBilgi}</div>
+    ${mevcutVar?`<div style="margin-top:9px;font-size:12.5px"><b>Aynı dönemde eski kayıt var. Ne yapılsın?</b><br>
+      <label style="cursor:pointer"><input type="radio" name="topluMod" value="degistir" checked> <b>Değiştir</b> — o markanın o dönem kayıtları önce silinir, yalnız bu dosyalardakiler kalır <span class="mut">(TAM liste yüklüyorsan — önerilen)</span></label><br>
+      <label style="cursor:pointer"><input type="radio" name="topluMod" value="ekle"> <b>Üzerine ekle</b> — eskiler kalır, çakışan kodlar güncellenir <span class="mut">(EK dosya yüklüyorsan; ör. atlanan Solo-Klima sayfası)</span></label></div>`:""}
+    ${toptanVar?`<div style="margin-top:9px;font-size:12.5px"><b>Toptan listesi ham mı?</b><br>
+      <label style="cursor:pointer"><input type="radio" name="topluPh" value="ham" checked> <b>HAM — BSH'tan geldiği gibi</b> → phase-out kodlarına <b>%3'ü sistem işler</b>, ham değer bağımsız sütununa yazılır <span class="mut">(önerilen)</span></label><br>
+      <label style="cursor:pointer"><input type="radio" name="topluPh" value="isli"> <b>Zaten %3 işli (REFERANS)</b> → dokunulmaz, geldiği gibi yazılır <span class="mut">(bağımsız sütunu bu yolda DOLMAZ)</span></label></div>`:""}
+    <div class="row" style="margin-top:10px"><button onclick="topluYazGercek()" style="background:var(--ok);color:#06200f">✓ Onayla, Yükle</button>
+    <button class="ghost sm" onclick="const o=$('topluOnay');if(o)o.remove();const b=$('topluYaz');if(b)b.disabled=false;const m=$('topluMsg');if(m){m.textContent='';m.className='msg';}">Vazgeç</button></div>
+  </div>`);
+  msg.textContent="";
+}
+async function topluYazGercek(stokKisayol){
+  const items=window._topluBekleyen||[]; const msg=$("topluMsg"); const btn=$("topluYaz");
+  if(!items.length) return;
+  const mod=(document.querySelector('input[name="topluMod"]:checked')||{}).value||"degistir";
+  const phMod=(document.querySelector('input[name="topluPh"]:checked')||{}).value||"ham";
+  const onay=$("topluOnay"); if(onay) onay.remove();
+  if(btn) btn.disabled=true; msg.className="msg"; msg.textContent="Yükleniyor, bekle...";
+  let r_maxDonem=null; const silinen={};
+  // "Değiştir" seçiliyse her (tablo, marka, dönem) için ESKİYİ BİR KEZ sil.
+  // count kontrolü kritik: RLS delete politikası yoksa Supabase HATASIZ 0 satır siler
+  // ve eski kayıtlar sessizce kalırdı — o zaman yükleme durdurulup SQL istenir.
+  const silBirKez=async(tablo,marka,donem)=>{
+    if(mod!=="degistir") return;
+    const k=tablo+"|"+marka+"|"+donem; if(k in silinen) return;
+    const {error,count}=await sb.from(tablo).delete({count:"exact"}).eq("marka",marka).eq("donem",donem);
+    if(error) throw new Error(tablo+" eski dönem temizliği: "+error.message);
+    silinen[k]=count||0;
+    const beklenen=(window._topluMevcut||{})[k];
+    if(beklenen>0 && !(count>0)) throw new Error(tablo+": eski kayıtlar SİLİNEMEDİ (yetki yok). ay_gecisi_kalici.sql Supabase'de çalıştırılmalı. Hiçbir şey yazılmadı.");
+  };
   try{
+    // 1) Önce phase-out dosyaları — toptan %3 taze listeyle işlensin
+    for(const r of items){ if(r.kind!=="phaseout") continue;
+      const {error:e1,count:c1}=await sb.from("phase_out").delete({count:"exact"}).eq("marka",r.brand);
+      if(e1) throw new Error("phase_out temizliği: "+e1.message);
+      if((r.phRows||[]).length) await upsert("phase_out",r.phRows,"model_kodu,marka");
+    }
+    // 2) markanın phase-out kod kümesi (toptan %3 için)
+    const phSet={};
+    const phGetir=async mk=>{ if(phSet[mk]) return phSet[mk];
+      const d=await sbTumu("phase_out","model_kodu",q=>q.eq("marka",mk));
+      return phSet[mk]=new Set(d.map(x=>(x.model_kodu||"").toUpperCase())); };
+    let phIslenen=0;
     for(const r of items){
       [...(r.topRows||[]),...(r.perRows||[])].forEach(x=>{ if(x.donem && (!r_maxDonem || x.donem>r_maxDonem)) r_maxDonem=x.donem; });
       if(r.kind==="stok"){ await sb.from("stok").delete().eq("bayi_id",stokSahibi()).eq("marka",r.brand).eq("depo",r.depo).eq("tip",r.tip); if(r.stokRows.length) await upsert("stok",r.stokRows,"bayi_id,model_kodu,marka,depo,tip"); }
       // NOT: eski (bayi_id'siz) benzersiz anahtara geri düşme KALDIRILDI — çok bayili
       // kullanımda o yedek yol bir bayinin satırını diğerinin üzerine yazardı.
-      else { if(r.topRows&&r.topRows.length) await upsert("toptan_fiyatlar",r.topRows,"model_kodu,marka,donem");
-             if(r.perRows&&r.perRows.length) await upsert("perakende_fiyatlar",r.perRows,"model_kodu,marka,donem");
-             if(r.bipRows&&r.bipRows.length) await upsert("bip",r.bipRows,"model_kodu,marka,donem");
+      else if(r.kind==="phaseout"){ /* yukarıda yazıldı */ }
+      else { if(r.topRows&&r.topRows.length){
+               let rows=r.topRows;
+               if(phMod==="ham"){ const ps=await phGetir(r.brand);
+                 rows=r.topRows.map(x=>{ const ph=ps.has((x.model_kodu||"").toUpperCase()); if(ph) phIslenen++;
+                   return {model_kodu:x.model_kodu,marka:x.marka,donem:x.donem,
+                     toptan_fiyat: ph? Math.round(x.toptan_fiyat*1.03*100)/100 : x.toptan_fiyat,
+                     toptan_fiyat_bagimsiz: x.toptan_fiyat}; }); }
+               await silBirKez("toptan_fiyatlar",r.brand,rows[0].donem);
+               await upsert("toptan_fiyatlar",rows,"model_kodu,marka,donem"); }
+             if(r.perRows&&r.perRows.length){ await silBirKez("perakende_fiyatlar",r.brand,r.perRows[0].donem); await upsert("perakende_fiyatlar",r.perRows,"model_kodu,marka,donem"); }
+             if(r.bipRows&&r.bipRows.length){ await silBirKez("bip",r.brand,r.bipRows[0].donem); await upsert("bip",r.bipRows,"model_kodu,marka,donem"); }
              // yüklenen ürünleri katalog (urunler) tablosuna da ekle ki öneri güncel kalsın
              const kodlar={}; [...(r.topRows||[]),...(r.perRows||[])].forEach(x=>{ kodlar[x.model_kodu]=1; });
              const urunRows=Object.keys(kodlar).map(k=>({model_kodu:k,marka:r.brand}));
              if(urunRows.length) await upsert("urunler",urunRows,"model_kodu,marka"); }
     }
     if(r_maxDonem) aktifDonem=r_maxDonem; // yeni yüklenen dönem artık aktif dönem
-    msg.className="msg ok"; msg.textContent="✓ Hepsi yüklendi! Yukarıdan 'Hızlı Stok Sorgu' ile kontrol edebilirsin.";
-    setTimeout(()=>{ topluTemizle(); const m=$("topluMsg"); if(m){ m.className="msg ok"; m.textContent="✓ Yüklendi. Yeni dosya bırakabilirsin."; } }, 4000); // birkaç saniye sonra kutuyu temizle
-  }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; btn.disabled=false; }
+    await loadPhaseOut(); renderRows();
+    const silToplam=Object.values(silinen).reduce((a,b)=>a+b,0);
+    msg.className="msg ok";
+    msg.textContent="✓ Hepsi yüklendi!"+(silToplam?" · "+silToplam+" eski kayıt temizlendi.":"")+(phIslenen?" · "+phIslenen+" toptan satırına PH %3 işlendi.":"")+(stokKisayol?" Yukarıdan 'Hızlı Stok Sorgu' ile kontrol edebilirsin.":" 🩺 Ay sonu kontrolü çalışıyor...");
+    setTimeout(()=>{ topluTemizle(); const m=$("topluMsg"); if(m){ m.className="msg ok"; m.textContent="✓ Yüklendi. Yeni dosya bırakabilirsin."; } }, 6000); // birkaç saniye sonra kutuyu temizle
+    if(!stokKisayol){ try{ await aySonuKontrol(); const aso=$("asoSonuc"); if(aso&&aso.scrollIntoView) aso.scrollIntoView({behavior:"smooth",block:"nearest"}); }catch(e){} }
+  }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message; if(btn) btn.disabled=false; }
 }
 
 function merkeziAc(){ const el=$("importers"); if(!el) return; const kapali=el.style.display==="none";
@@ -3052,6 +3182,7 @@ async function bpTara(files){
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
       if(!c.brand){ c.brand = detectBrandWb(wb) || brand; res.brand=c.brand; }
       if(c.kind==="stok"){ res.detay="⚠ Bu bir STOK dosyası — bayi paneline stok yüklenmez. Dış bayi kendi stoğunu kendi yükler."; window.bpItems.push(res); continue; }
+      if(c.kind==="phaseout"){ res.detay="⚠ Bu bir PHASE-OUT listesi — bayi paneline değil, yukarıdaki 🚀 Aylık Veri Güncelleme kutusuna bırak (rozet + %3 oradan beslenir)."; window.bpItems.push(res); continue; }
       const r=parsePriceWb(wb,c.brand,donem);
       res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
       const n=(r.topRows||[]).length+(r.perRows||[]).length+(r.bipRows||[]).length;
@@ -3064,22 +3195,66 @@ async function bpTara(files){
   box.innerHTML=window.bpItems.map(r=>`<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${esc(r.name)}</b><br><span class="mut" style="font-size:12px">${markaAd(r.brand)} · ${esc(r.detay)}</span></div>`).join("");
   const y=$("bpYaz"); if(y) y.disabled = !window.bpItems.some(r=>r.ok);
 }
+// 5 Eyl: bayi panelinde de "eski dönem kayıtları silinsin mi?" onayı var — merkezdeki
+// "115 beklerken 118" tuzağı bayi_* tablolarında da aynen geçerliydi. PH %3 YOK: dış bayi HAM görür.
 async function bpYaz(){
   const items=(window.bpItems||[]).filter(r=>r.ok); const msg=$("bpMsg"), btn=$("bpYaz");
-  if(!items.length) return; btn.disabled=true; msg.className="msg"; msg.textContent="Yükleniyor, bekle...";
+  if(!items.length) return;
+  btn.disabled=true; msg.className="msg"; msg.textContent="Sistemdeki mevcut kayıtlar kontrol ediliyor...";
+  const eski=$("bpOnay"); if(eski) eski.remove();
+  const gruplar={};
+  const say=(tablo,rows)=>{ (rows||[]).forEach(x=>{ const k=tablo+"|"+x.marka+"|"+x.donem; (gruplar[k]=gruplar[k]||{tablo,marka:x.marka,donem:x.donem,yeni:0}).yeni++; }); };
+  for(const r of items){ say("bayi_toptan_fiyatlar",r.topRows); say("bayi_perakende_fiyatlar",r.perRows); say("bayi_bip",r.bipRows); }
+  const gl=Object.values(gruplar); let mevcutVar=false; window._bpMevcut={};
+  for(const g of gl){
+    try{ const {count}=await sb.from(g.tablo).select("model_kodu",{count:"exact",head:true}).eq("marka",g.marka).eq("donem",g.donem); g.mevcut=count||0; }catch(e){ g.mevcut=null; }
+    window._bpMevcut[g.tablo+"|"+g.marka+"|"+g.donem]=g.mevcut;
+    if(g.mevcut>0) mevcutVar=true;
+  }
+  const TAD={bayi_toptan_fiyatlar:"toptan",bayi_perakende_fiyatlar:"perakende",bayi_bip:"BİP"};
+  const satirlar=gl.map(g=>`<div style="padding:3px 0">${markaAd(g.marka)} · <b>${TAD[g.tablo]}</b> · dönem ${g.donem}: dosyada <b>${g.yeni}</b> — sistemde <b>${g.mevcut==null?"?":g.mevcut}</b> kayıt${g.mevcut>0?' <span style="color:var(--warn)">← eski kayıt var</span>':""}</div>`).join("");
+  window._bpBekleyen=items;
+  $("bpSonuc").insertAdjacentHTML("beforeend", `<div id="bpOnay" style="margin-top:10px;border:1px solid #14b8a6;border-radius:10px;padding:12px;background:rgba(20,184,166,.07)">
+    <b>📋 Bayi paneli yükleme özeti — son kontrol</b>
+    <div style="font-size:12.5px;margin-top:6px">${satirlar}</div>
+    ${mevcutVar?`<div style="margin-top:9px;font-size:12.5px"><b>Aynı dönemde eski kayıt var. Ne yapılsın?</b><br>
+      <label style="cursor:pointer"><input type="radio" name="bpMod" value="degistir" checked> <b>Değiştir</b> — eski dönem kayıtları silinir, yalnız bu dosyalardakiler kalır <span class="mut">(TAM liste — önerilen)</span></label><br>
+      <label style="cursor:pointer"><input type="radio" name="bpMod" value="ekle"> <b>Üzerine ekle</b> — eskiler kalır, çakışan kodlar güncellenir <span class="mut">(EK dosya)</span></label></div>`:""}
+    <div class="row" style="margin-top:10px"><button onclick="bpYazGercek()" style="background:#14b8a6;color:#04231f">✓ Onayla, Bayi Paneline Yükle</button>
+    <button class="ghost sm" onclick="const o=$('bpOnay');if(o)o.remove();const b=$('bpYaz');if(b)b.disabled=false;const m=$('bpMsg');if(m){m.textContent='';m.className='msg';}">Vazgeç</button></div>
+  </div>`);
+  msg.textContent="";
+}
+async function bpYazGercek(){
+  const items=window._bpBekleyen||[]; const msg=$("bpMsg"), btn=$("bpYaz");
+  if(!items.length) return;
+  const mod=(document.querySelector('input[name="bpMod"]:checked')||{}).value||"degistir";
+  const onay=$("bpOnay"); if(onay) onay.remove();
+  msg.className="msg"; msg.textContent="Yükleniyor, bekle...";
+  const silinen={};
+  const silBirKez=async(tablo,marka,donem)=>{
+    if(mod!=="degistir") return;
+    const k=tablo+"|"+marka+"|"+donem; if(k in silinen) return;
+    const {error,count}=await sb.from(tablo).delete({count:"exact"}).eq("marka",marka).eq("donem",donem);
+    if(error) throw new Error(tablo+" eski dönem temizliği: "+error.message);
+    silinen[k]=count||0;
+    const beklenen=(window._bpMevcut||{})[k];
+    if(beklenen>0 && !(count>0)) throw new Error(tablo+": eski kayıtlar SİLİNEMEDİ (yetki yok). ay_gecisi_kalici.sql Supabase'de çalıştırılmalı. Hiçbir şey yazılmadı.");
+  };
   try{
     let t=0,p=0,b=0;
     for(const r of items){
-      if(r.topRows&&r.topRows.length){ await upsert("bayi_toptan_fiyatlar",r.topRows,"model_kodu,marka,donem"); t+=r.topRows.length; }
-      if(r.perRows&&r.perRows.length){ await upsert("bayi_perakende_fiyatlar",r.perRows,"model_kodu,marka,donem"); p+=r.perRows.length; }
-      if(r.bipRows&&r.bipRows.length){ await upsert("bayi_bip",r.bipRows,"model_kodu,marka,donem"); b+=r.bipRows.length; }
+      if(r.topRows&&r.topRows.length){ await silBirKez("bayi_toptan_fiyatlar",r.brand,r.topRows[0].donem); await upsert("bayi_toptan_fiyatlar",r.topRows,"model_kodu,marka,donem"); t+=r.topRows.length; }
+      if(r.perRows&&r.perRows.length){ await silBirKez("bayi_perakende_fiyatlar",r.brand,r.perRows[0].donem); await upsert("bayi_perakende_fiyatlar",r.perRows,"model_kodu,marka,donem"); p+=r.perRows.length; }
+      if(r.bipRows&&r.bipRows.length){ await silBirKez("bayi_bip",r.brand,r.bipRows[0].donem); await upsert("bayi_bip",r.bipRows,"model_kodu,marka,donem"); b+=r.bipRows.length; }
       // Katalog ortak: dış bayi de ürün adını/önerisini görsün
       const kodlar={}; [...(r.topRows||[]),...(r.perRows||[])].forEach(x=>{ kodlar[x.model_kodu]=1; });
       const urunRows=Object.keys(kodlar).map(k=>({model_kodu:k,marka:r.brand}));
       if(urunRows.length) await upsert("urunler",urunRows,"model_kodu,marka");
     }
-    msg.className="msg ok"; msg.textContent=`✓ Bayi paneline yüklendi — ${t} toptan · ${p} perakende · ${b} BİP. Bunları SADECE dış bayiler görür.`;
-    setTimeout(bpTemizle, 5000);
+    const silToplam=Object.values(silinen).reduce((a,b2)=>a+b2,0);
+    msg.className="msg ok"; msg.textContent=`✓ Bayi paneline yüklendi — ${t} toptan · ${p} perakende · ${b} BİP.`+(silToplam?` ${silToplam} eski kayıt temizlendi.`:"")+" Bunları SADECE dış bayiler görür.";
+    setTimeout(bpTemizle, 6000);
   }catch(e){ msg.className="msg bad"; msg.textContent="Hata: "+e.message+" (bayi_paneli.sql çalıştırıldı mı?)"; btn.disabled=false; }
 }
 
@@ -3657,6 +3832,12 @@ async function kampEkle(i){
   $("ka_msg"+i).className="msg "+(error?"bad":"ok");
   if(!error){ kampEklenen++; updateKampOzet(); loadKampanyalar(); }
 }
+
+// ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
+// Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
+// sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
+const FQ_SURUM="5 Eyl 2026 · ay geçişi sihirbazı";
+try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
 // Mağaza ekranı günlerce açık kalabiliyor; yeni index yüklendiğinde eski sürümü
