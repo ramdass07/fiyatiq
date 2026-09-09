@@ -264,6 +264,97 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
  .simple-sale #grid td:nth-child(8)::before{content:'Peşin · TL';font-size:12px;color:var(--mut)}.simple-sale #grid td:nth-child(9)::before{content:'Taksitli · TL';font-size:12px;color:var(--mut)}
  .simple-sale #grid td:last-child{grid-column:1/-1;grid-row:4;text-align:right}.simple-sale #gridWrap{overflow:visible}
 }
+</style><style>
+/* v11: compact sales desk, with all controls and totals present from the start. */
+#bayiView{max-width:none;padding:10px 16px 20px}
+header{padding:8px 16px;gap:12px;min-height:42px;box-sizing:border-box}
+header .brand{font-size:22px}header .seg button{padding:8px 20px}
+#quickStock{padding:7px 12px;margin:0 0 0 auto;border-radius:6px;min-width:180px}
+#quickStock[open]{flex-basis:100%;margin-left:0}
+#quickStock[open] .row{margin-top:8px}
+#salesWorkspace,#salesWorkspace:not(.simple-sale){display:flex;flex-direction:column;gap:6px}
+#salesWorkspace>*{width:100%;box-sizing:border-box}
+#salesWorkspace>.card{padding:8px 12px;border-radius:9px}
+#saleControls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;order:0}
+#saleControls .fld{min-width:0;display:grid;grid-template-columns:auto auto;align-items:center;gap:8px}#saleControls label{font-size:14px;margin:0}
+#ticariUyari{grid-column:1/-1}
+#saleControls input,#saleControls select{min-height:34px;padding:6px 9px;border-radius:6px;font-size:14px}
+#saleControls #banka{width:260px}#saleControls #taksit{width:85px}#saleControls #karOrani{width:85px!important}
+.sale-control-note{margin-left:auto;align-self:center;color:var(--mut);font-size:12px}
+#productsCard{order:1}#uyariKutu{order:2}#kampPanel{order:3}
+.sale-heading{margin-bottom:6px;align-items:center}.sale-heading h2{font-size:16px}
+.sale-tools{display:flex;gap:6px;flex-wrap:wrap}.sale-tools button{font-size:13px;padding:6px 10px;min-height:32px}
+.sale-hint{font-size:12px;line-height:1.4;margin:4px 0 6px}
+#gridWrap{border-radius:6px;overflow:auto;max-height:calc(100dvh - 375px);min-height:120px;margin-top:0;padding:0 6px}
+#fqDataIssue:empty{display:none}#fqDataIssue:not(:empty){margin:6px 0}
+#grid{width:100%;border-collapse:collapse;min-width:990px;margin-top:0}
+#grid th{position:sticky;top:0;z-index:2;background:#172334;padding:6px;font-size:13px;text-align:right;white-space:nowrap}
+#grid th:nth-child(1),#grid th:nth-child(2){text-align:left}
+#grid td{padding:5px 6px;font-size:14px;line-height:1.25;border-bottom:1px solid var(--line)}
+#grid td:nth-child(1){width:145px}#grid td:nth-child(1) input{width:140px!important}
+#grid td:nth-child(2){width:26%;max-width:300px;min-width:120px;line-height:1.25}
+.product-name{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.product-name:focus{white-space:normal;outline:1px solid var(--acc)}
+#grid td input{min-height:30px;padding:5px 7px;border-radius:5px;font-size:14px;box-sizing:border-box}
+#grid td:nth-child(3) input{width:54px!important}
+#grid td:last-child{min-width:100px;white-space:nowrap!important}#grid td:last-child button{padding:5px 7px;margin:0;min-height:29px;font-size:12px}
+.stock-summary{font-size:12px;line-height:1.25;margin-top:2px}.stock-total:empty{display:none}
+.simple-sale #grid th:nth-child(n+11):nth-child(-n+13),.simple-sale #grid td:nth-child(n+11):nth-child(-n+13){display:table-cell!important}
+.simple-sale #grid td:nth-child(n+11):nth-child(-n+13){min-width:48px}
+#salesWorkspace #altPanelCard{order:4;position:sticky;bottom:8px;top:auto;z-index:8;background:#172334;border:1px solid var(--brand);box-shadow:0 -4px 16px #0003;padding:10px 12px}
+#altPanelCard>h2{display:none}
+#salesWorkspace .payment-grid{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px 16px}
+#salesWorkspace .payment-grid>.fld{grid-area:auto;flex:1;min-width:105px;text-align:left!important}
+#salesWorkspace .payment-grid label{font-size:13px;white-space:nowrap}
+#salesWorkspace .payment-grid .big{font-size:25px;line-height:1.2;font-weight:750}
+#salesWorkspace .payment-grid #karPct{font-size:15px;line-height:1.35}
+#manualPriceDetails{float:left;margin:6px 12px 0 0;padding:7px 0;border-top:0}
+#manualPriceDetails[open]{float:none;width:100%;border-top:1px solid var(--line)}
+#altPanelCard:after{content:'';display:block;clear:both}.support-metric b{font-size:21px;color:var(--ok)}
+#manualPriceDetails summary{font-size:13px}#manuelToplamRow input{max-width:180px}
+.support-total{float:left;margin:6px 16px 0 0;padding:0;border:0;align-items:center;gap:12px;min-height:32px;font-size:14px}
+#kampInfoRow{font-size:12px;margin:0!important}#kampInfoRow:not(:has(details)){display:none!important}
+#kampInfoRow>span{font-size:12px!important}#kampInfoRow details{margin:0}
+#kampInfoRow details:not([open]){display:inline-block;margin-left:6px}
+#kampInfoRow details[open]{max-height:190px;overflow:auto}
+.sale-actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.sale-actions button{padding:7px 12px;font-size:13px;min-height:32px}
+.sale-actions #saveMsg{flex-basis:100%;font-size:12px}.sale-actions #saveMsg:empty{display:none}
+.quote-action:disabled{opacity:.45;cursor:not-allowed}
+#salesWorkspace>#kampPanel{padding:6px 12px}#kampPanel h2{font-size:14px;margin:0 0 2px;line-height:1.2}
+.campaign-choice{padding:3px 0;gap:8px;min-height:28px;line-height:1.2}.campaign-choice>div{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.campaign-choice b{font-size:14px}.campaign-choice .mut{font-size:12px;margin:0}.campaign-choice button{min-height:29px;padding:5px 9px}
+#kampList{max-height:125px;overflow:auto}#kampList .sale-hint{margin:3px 0 0;line-height:1.2}
+#uyariKutu .uyari-kritik,#uyariKutu .uyari-sari{animation:none;border-width:1px;border-radius:6px;padding:6px 10px;margin:0 0 3px;gap:8px;font-size:12px}
+#uyariKutu .big-red{font-size:13px;white-space:nowrap}
+#netDokumCard{margin-top:8px;padding:8px 12px;border-width:1px!important;border-radius:8px}#netDokumCard>summary{margin:0;font-size:13px}
+#customerDialog{color:var(--txt);background:#172334;border:1px solid var(--line);border-radius:12px;width:min(800px,calc(100% - 32px));max-height:85dvh;padding:20px;box-sizing:border-box}
+#customerDialog::backdrop{background:#020617bb;backdrop-filter:blur(3px)}
+#customerDialog .customer-fields{display:flex;flex-wrap:wrap;gap:10px}#customerDialog label{font-size:14px}
+#customerDialog input,#customerDialog select{font-size:16px;max-width:100%;box-sizing:border-box}
+#customerDialog #siparisBilgiCard{margin-top:16px;padding:12px;border-radius:8px}#siparisBilgiCard h2{font-size:14px}
+#customerDialog .fld{min-width:0!important}#customerError{color:var(--bad);font-size:14px}
+.customer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+@media(max-width:1100px){#grid{min-width:930px}#grid td:nth-child(2){max-width:190px}.product-name{max-width:190px}#saleControls #banka{width:230px}}
+@media(max-width:700px){
+ #bayiView{padding:8px}header{position:static;flex-wrap:wrap;padding:8px}header #who{font-size:12px}
+ #saleControls{gap:8px}#saleControls .fld{display:flex;flex-direction:column;align-items:flex-start;gap:4px}#saleControls .fld:nth-child(2){flex:1}#saleControls #banka{width:100%;max-width:220px}
+ #quickStock{margin:0;flex-basis:100%}#manualPriceDetails{float:none;margin:8px 0 0}
+ #saleControls .sale-control-note{display:none}.sale-heading{align-items:flex-start}.sale-tools{justify-content:flex-end}
+ #salesWorkspace #altPanelCard{position:static}.payment-grid{gap:10px!important}#salesWorkspace .payment-grid>.fld{min-width:120px}
+ #salesWorkspace .payment-grid .big{font-size:24px}.support-total{float:none;margin:8px 0 0}.sale-actions{justify-content:flex-start!important}
+ #gridWrap{max-height:none}.simple-sale #grid{min-width:0;display:block}.simple-sale #grid thead{display:none}.simple-sale #grid tbody{display:block}
+ .simple-sale #grid tr{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;border-bottom:1px solid var(--line);padding:8px 0}
+ .simple-sale #grid td{border:0;padding:0;min-width:0!important;max-width:none!important;width:auto;white-space:normal!important}
+ .simple-sale #grid td:nth-child(1){grid-column:1/5;grid-row:1}.simple-sale #grid td:nth-child(3){grid-column:5/7;grid-row:1}
+ .simple-sale #grid td:nth-child(2){grid-column:1/-1;grid-row:2}.product-name{max-width:none}
+ .simple-sale #grid td:nth-child(8){grid-column:1/4;grid-row:3}.simple-sale #grid td:nth-child(9){grid-column:4/7;grid-row:3}
+ .simple-sale #grid td:nth-child(11){grid-column:1/3;grid-row:4}.simple-sale #grid td:nth-child(12){grid-column:3/5;grid-row:4}.simple-sale #grid td:nth-child(13){grid-column:5/7;grid-row:4}
+ .simple-sale #grid td:nth-child(11)::before{content:'Mars ';color:var(--mut);font-size:12px}.simple-sale #grid td:nth-child(12)::before{content:'Horoz ';color:var(--mut);font-size:12px}.simple-sale #grid td:nth-child(13)::before{content:'Depo ';color:var(--mut);font-size:12px}
+ .simple-sale #grid td:last-child{grid-column:1/-1;grid-row:5;text-align:right}.simple-sale #grid td:nth-child(8)::before{content:'Peşin · TL';font-size:12px;color:var(--mut)}.simple-sale #grid td:nth-child(9)::before{content:'Taksitli · TL';font-size:12px;color:var(--mut)}
+ .simple-sale #gridWrap{overflow:visible}#customerDialog .customer-fields>.fld{flex-basis:100%}#customerDialog .row{flex-wrap:wrap}
+ #customerDialog #siparisBilgiCard input{width:100%!important}.sale-actions button{flex:1;min-width:130px}
+}
+
 </style></head>
 <body class="brand-siemens">
 
@@ -346,13 +437,13 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <h3>3 · Teklif hazırlama</h3>
       <div class="box"><b>Hesap mağazaya aittir</b>, kişiye değil. Teklifi kimin hazırladığı <b>Satış Personeli</b> alanından anlaşılır — bu yüzden başında bir kez adını yaz; bilgisayar hatırlar, başka biri geçtiğinde adı değiştirsin.</div>
       <ol>
-        <li><b>Satış Personeli</b> alanına adını yaz — bir kere yeter, tarayıcı hatırlar; teklifin altında adın çıkar. Boşsa çıktı alınmaz.</li>
-        <li><b>Müşteri Adı Soyadı</b> ve <b>Müşteri GSM</b> zorunlu: teklifi sonra bulup müşteriyi arayabilmek için.</li>
-        <li><span class="k">+ Ürün satırı</span> → <b>Ürün Kodu</b> hücresine yazmaya başla, öneriden doğru olanı seç.</li>
-        <li>Seçtiğin an ürün adı, maliyet, BİP, perakende fiyat ve depo stokları <b>otomatik dolar</b>.</li>
-        <li><b>Adet</b> yaz. Birden fazla ürün için tekrar <span class="k">+ Ürün satırı</span>.</li>
+        <li>Üstten <b>kâr oranını, banka ve taksiti</b> seç. Bu ayarlar ürün girmeden de görünür.</li>
+        <li>Hazır satırlara ürün kodlarını yaz. <b>Enter</b> ile ürünü sorgulayıp sonraki satıra geçebilirsin.</li>
+        <li>Kodun bir kısmını yazıp açılan öneriden de ürün seçebilirsin. Daha fazla ürün için <span class="k">+ Ürün satırı</span>.</li>
+        <li>Ürün adı, depo stokları ve satış fiyatları <b>otomatik dolar</b>. Ayrılan ve hasarlı ürünler düşüldükten sonraki stok ürünün altında görünür.</li>
+        <li><b>Adedi</b> yaz, uygun kampanyayı seç ve alttaki toplamları kontrol et. Kaydetme veya çıktı aşamasında satış personeli, müşteri adı ve telefonu istenir.</li>
       </ol>
-      <p>Tablo kalabalık geliyorsa <span class="k">📋 Basite geç</span> ile iç sütunları gizle, <span class="k">📊 Detaylıya geç</span> ile geri aç. Seçimin hatırlanır.</p>
+      <p>Tablo kalabalık geliyorsa <span class="k">Sade görünüm</span> ile iç sütunları gizle, <span class="k">Detaylı görünüm</span> ile geri aç. Seçimin hatırlanır.</p>
 
       <h3>4 · Fiyatı belirleme</h3>
       <table>
@@ -388,7 +479,7 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       </table>
 
       <h3>8 · Sipariş formu ek bilgileri</h3>
-      <p>Satış kapandığında <b>📋 Müşteri &amp; Sipariş Ek Bilgileri</b> başlığını aç: TC kimlik, ikinci telefon, e-posta, sevk/teslim tarihleri, ödeme şekli, çıkış deposu, sevk adresi, faturalıysa ünvan ve vergi bilgileri. Girdiğin her şey sipariş formu çıktısına yazılır.</p>
+      <p><b>Müşteri bilgileri</b> düğmesinden açılan pencerede <b>📋 Müşteri &amp; Sipariş Ek Bilgileri</b> başlığını aç: TC kimlik, ikinci telefon, e-posta, sevk/teslim tarihleri, ödeme şekli, çıkış deposu, sevk adresi, faturalıysa ünvan ve vergi bilgileri. Girdiğin her şey sipariş formu çıktısına yazılır.</p>
 
       <h3>9 · Sık karşılaşılan durumlar</h3>
       <table>
@@ -517,26 +608,32 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
   </header>
 
   <main id="bayiView">
-    <details class="card" id="quickStock"><summary>Hızlı stok sorgula</summary>
-      <div class="row" style="position:relative"><input id="stokSorguInput" placeholder="Ürün kodu ya da adı (3 harf yeter)" style="width:320px" autocomplete="off" oninput="stokOner(this.value); if(!this.value.trim()&&$('stokSorguSonuc'))$('stokSorguSonuc').innerHTML=''" onblur="setTimeout(stokKapatOner,200)" onkeydown="if(event.key==='Enter'){stokKapatOner();stokSorgula();}"><button class="sm" onclick="stokSorgula()">Sorgula</button><div id="stokOneri" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:50;background:var(--field);border:1px solid #ffffff22;border-radius:8px;min-width:340px;max-height:300px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div></div>
-      <div id="stokSorguSonuc" style="margin-top:10px"></div>
-    </details>
+
     <div class="card" id="bayiStokCard" style="display:none">
       <h2>Stoğum <span class="badge">kendi stok dosyan</span></h2>
       <p class="mut" style="font-size:12px;margin:0 0 8px">İlk iki sütun: <code>ürün kodu</code> ve <code>adet</code> olan Excel/CSV. Yüklediğinde mevcut stoğunun yerine geçer.</p>
       <div class="row"><input id="bsFile" type="file" accept=".xlsx,.xls,.csv"><button onclick="bayiStokYukle()">Stoğumu Yükle</button><span id="bsMsg" class="msg"></span></div>
     </div>
     <div id="salesWorkspace" class="simple-sale">
+    <section class="card" id="saleControls" aria-label="Satış ayarları">      <div class="fld"><label for="karOrani">Hedef kâr %</label><input id="karOrani" type="number" step="0.5" value="4" style="width:100px" oninput="recalc()"></div>
+      <div class="fld"><label for="banka">Banka</label><select id="banka" onchange="onBankChange()"></select>
+        <div id="ticariUyari" style="display:none;margin-top:4px;padding:4px 8px;border-radius:6px;background:#fef2f2;border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;max-width:230px">⚠ Bu, TİCARİ kart oranıdır — müşterinin kartı bireyselse bireysel satırı seçin.</div></div>
+      <div class="fld"><label for="taksit">Taksit</label><select id="taksit" onchange="onTaksitChange()"></select></div>
+      <div class="fld" id="elleKomFld" style="display:none"><label style="color:#f59e0b">✏️ Banka adı &amp; Komisyon %</label>
+        <span style="display:flex;gap:6px">
+          <input id="elleBanka" type="text" placeholder="banka adı" style="width:150px" oninput="renderRows()" onkeydown="if(event.key==='Enter')this.blur()">
+          <input id="elleOran" type="text" inputmode="decimal" placeholder="oran" style="width:80px;border-color:#f59e0b" oninput="elleOranDegisti()" onkeydown="if(event.key==='Enter')this.blur()">
+        </span></div>
+
+    <details class="card" id="quickStock"><summary>Hızlı stok sorgula</summary>
+      <div class="row" style="position:relative"><input id="stokSorguInput" placeholder="Ürün kodu ya da adı (3 harf yeter)" style="width:320px" autocomplete="off" oninput="stokOner(this.value); if(!this.value.trim()&&$('stokSorguSonuc'))$('stokSorguSonuc').innerHTML=''" onblur="setTimeout(stokKapatOner,200)" onkeydown="if(event.key==='Enter'){stokKapatOner();stokSorgula();}"><button class="sm" onclick="stokSorgula()">Sorgula</button><div id="stokOneri" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:50;background:var(--field);border:1px solid #ffffff22;border-radius:8px;min-width:340px;max-height:300px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div></div>
+      <div id="stokSorguSonuc" style="margin-top:10px"></div>
+    </details></section>
     <div class="card" id="productsCard">
-      <div class="sale-heading"><h2>Satış teklifi</h2></div>
-      <div class="row customer-fields" style="margin-bottom:6px">
-        <div class="fld"><label>Satış Personeli</label><input id="satisPersonel" placeholder="Adın" style="width:150px" onchange="try{localStorage.setItem('fq_personel',this.value)}catch(e){}"></div>
-        <div class="fld"><label>Müşteri Adı Soyadı <span style="color:var(--bad)">*</span></label><input id="mAd" style="width:200px" placeholder="zorunlu"></div>
-        <div class="fld"><label>Müşteri GSM <span style="color:var(--bad)">*</span></label><input id="mTel" style="width:140px" inputmode="tel" placeholder="zorunlu"></div>
-        <div class="grow"></div>
-        <button class="ghost sm" id="gorunumBtn" onclick="toggleGorunum()">📋 Basite geç</button>
-        <button class="sm" onclick="addRow()">+ Ürün satırı</button>
-      </div>
+      <div class="sale-heading"><h2>Satış teklifi</h2><div class="sale-tools">
+        <button class="ghost sm" onclick="openCustomerDialog('bilgi')">Müşteri bilgileri</button>
+        <button class="ghost sm" id="gorunumBtn" onclick="toggleGorunum()">Detaylı görünüm</button>
+        <button class="sm" onclick="addRow(true)">+ Ürün satırı</button></div></div>
       <p class="sale-hint" id="salePriceHint">Fiyatlar satır toplamıdır; uygulanan hakediş ve varsa toplam pazarlık fiyatı dahildir. Tutarlar TL.</p>
       <div id="gridWrap"><table id="grid"><thead><tr>
         <th>Ürün Kodu</th><th>Ürün Adı</th><th>Adet</th><th>Maliyet</th><th>BİP</th><th title="Maliyet − BİP (net maliyet)">Net Maliyet</th><th title="BSH resmi perakende (etiket) fiyatı">Perakende</th><th>Peşin Fiyat</th><th>Taksitli Fiyat</th>
@@ -549,23 +646,13 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <h2 style="margin-top:0;cursor:pointer;user-select:none" onclick="toggleKampPanel()"><span id="kampArrow">▶</span> 🎁 Kampanyalar <span id="kampCount" class="badge">otomatik</span></h2>
       <div id="kampList" style="display:none"></div>
     </div>
-    <div class="card totalsCard" id="altPanelCard" style="display:none"><h2>Ödeme ve toplam</h2><div class="row payment-grid">
-      <div class="fld"><label for="karOrani">Hedef kâr %</label><input id="karOrani" type="number" step="0.5" value="4" style="width:100px" oninput="recalc()"></div>
-      <div class="fld"><label for="banka">Banka</label><select id="banka" onchange="onBankChange()"></select>
-        <div id="ticariUyari" style="display:none;margin-top:4px;padding:4px 8px;border-radius:6px;background:#fef2f2;border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;max-width:230px">⚠ Bu, TİCARİ kart oranıdır — müşterinin kartı bireyselse bireysel satırı seçin.</div></div>
-      <div class="fld"><label for="taksit">Taksit</label><select id="taksit" onchange="onTaksitChange()"></select></div>
-      <div class="fld" id="elleKomFld" style="display:none"><label style="color:#f59e0b">✏️ Banka adı &amp; Komisyon %</label>
-        <span style="display:flex;gap:6px">
-          <input id="elleBanka" type="text" placeholder="banka adı" style="width:150px" oninput="renderRows()" onkeydown="if(event.key==='Enter')this.blur()">
-          <input id="elleOran" type="text" inputmode="decimal" placeholder="oran" style="width:80px;border-color:#f59e0b" oninput="elleOranDegisti()" onkeydown="if(event.key==='Enter')this.blur()">
-        </span></div>
-      <div class="grow"></div>
+    <section class="card totalsCard" id="altPanelCard" aria-label="Ödeme ve toplam"><h2>Ödeme ve toplam</h2><div class="row payment-grid">
       <div class="fld" style="text-align:right" id="sumNakitOdeBox"><label style="color:#22c55e">💵 Nakit Toplam <span class="mut" style="font-size:9px">elden / havale</span></label><span class="big" id="sumNakitOde" style="color:#22c55e">—</span></div>
       <div class="fld" style="text-align:right"><label>Peşin Toplam <span class="mut" style="font-size:9px">kart tek çekim</span></label><span class="big" id="sumNakit">—</span></div>
       <div class="fld" style="text-align:right"><label>Taksitli Toplam <span class="mut" style="font-size:9px">karta bölerek</span></label><span class="big" id="sumTaksit">—</span></div>
       <div class="fld" style="text-align:right"><label>Aylık Taksit</label><span id="aylik" class="mut">—</span></div>
       <div class="fld" style="text-align:right"><label>Komisyon</label><span id="komShow" class="mut">—</span></div>
-      <div class="fld" style="text-align:right"><label>Gerçek kâr</label><span class="big" id="karPct">—</span></div>
+      <div class="fld support-metric"><label>Uygulanan hakediş</label><b id="saleHakedis">0 ₺</b></div><div class="fld" style="text-align:right"><label>Gerçek kâr %</label><span class="big" id="karPct">—</span></div>
     </div>
     <details id="manualPriceDetails"><summary>Pazarlık / manuel fiyat</summary><div class="row" id="manuelToplamRow" style="margin-top:10px;gap:12px;align-items:flex-end;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:10px">
       <span class="mut" style="font-size:12px;align-self:center">✏️ Manuel Fiyat:</span>
@@ -575,19 +662,19 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       <span id="mtNot" class="mut" style="font-size:11px;align-self:center;color:var(--acc)"></span>
     </div>
     </details>
-    <div class="support-total"><span>Uygulanan hakediş</span><b id="saleHakedis">0 ₺</b></div>
-    <div class="row" id="kampInfoRow" style="margin-top:6px;display:none"><span id="kampInfo" class="mut" style="font-size:12px"></span></div>
+    
     <div class="row sale-actions" style="justify-content:flex-end">
-      <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
-      <button style="background:#e2e8f0;color:#0f172a" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
-      <button style="background:#22c55e;color:#06200f" onclick="shareWhatsApp()">WhatsApp</button>
-      <button onclick="saveQuote()">Teklifi Kaydet</button>
+      <button class="quote-action" style="background:#e2e8f0;color:#0f172a" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
+      <button class="quote-action" style="background:#e2e8f0;color:#0f172a" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
+      <button class="quote-action" style="background:#22c55e;color:#06200f" onclick="shareWhatsApp()">WhatsApp</button>
+      <button class="quote-action" onclick="saveQuote()">Teklifi Kaydet</button>
       <span id="saveMsg" class="mut" style="align-self:center"></span>
     </div>
-    </div>
+    </section>
     </div><!-- salesWorkspace -->
     <details class="card" id="netDokumCard" style="display:none;border:2px solid var(--ok)">
-      <summary>Net fiyat dökümü / Excel’e kopyala</summary>
+      <summary>Net fiyat dökümü / Excel’e kopyala</summary>    <div class="row" id="kampInfoRow" style="margin-top:6px;display:none"><span id="kampInfo" class="mut" style="font-size:12px"></span></div>
+
       <p class="mut" style="font-size:12px;margin:0 0 8px">Her ürünün <b>net satış fiyatı</b> — kampanya indirimi ürünlere dağıtılmış. Peşin sütunu <b>Peşin Toplam</b>'a, taksitli sütunu <b>Taksitli Toplam</b>'a birebir eşittir. Kopyala → satış takip Excel'ine yapıştır.</p>
       <div id="netDokumTablo" style="overflow-x:auto"></div>
       <div class="row" style="margin-top:8px;align-items:center;flex-wrap:wrap">
@@ -597,6 +684,17 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
         <span id="netDokumMsg" class="msg"></span>
       </div>
     </details>
+
+  </main>
+
+<dialog id="customerDialog" aria-labelledby="customerDialogTitle" oncancel="customerAction=null">
+  <div class="sale-heading"><h2 id="customerDialogTitle">Müşteri ve teklif bilgileri</h2><button class="ghost sm" aria-label="Müşteri bilgilerini kapat" onclick="closeCustomerDialog()">✕</button></div>
+  <p class="mut" id="customerDialogHint">Kaydetmek veya çıktı almak için bu bilgileri tamamla.</p>
+      <div class="row customer-fields" style="margin-bottom:6px">
+        <div class="fld"><label for="satisPersonel">Satış Personeli</label><input id="satisPersonel" placeholder="Adın" style="width:150px" onchange="try{localStorage.setItem('fq_personel',this.value)}catch(e){}"></div>
+        <div class="fld"><label for="mAd">Müşteri Adı Soyadı <span style="color:var(--bad)">*</span></label><input id="mAd" style="width:200px" placeholder="zorunlu"></div>
+        <div class="fld"><label for="mTel">Müşteri GSM <span style="color:var(--bad)">*</span></label><input id="mTel" style="width:140px" inputmode="tel" placeholder="zorunlu"></div>
+      </div>
     <div class="card" id="siparisBilgiCard">
       <h2 style="cursor:pointer;user-select:none;margin:0" onclick="const b=$('sbBody');const kapali=b.style.display==='none';b.style.display=kapali?'':'none';$('sbArrow').textContent=kapali?'▼':'▶'"><span id="sbArrow">▶</span> 📋 Müşteri & Sipariş Ek Bilgileri <span class="badge">sipariş formuna yazılır</span></h2>
       <div id="sbBody" style="display:none;margin-top:12px">
@@ -626,7 +724,9 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
       </div>
     </div>
 
-  </main>
+  <p id="customerError" role="alert"></p>
+  <div class="customer-actions"><button class="ghost" onclick="closeCustomerDialog()">Vazgeç</button><button id="customerContinue" onclick="completeCustomerAction()">Devam et</button></div>
+</dialog>
 
   <main id="adminView" style="display:none">
     <div id="adminBrandBanner" style="position:relative;z-index:1;margin:0 0 14px;padding:12px 16px;border-radius:10px;font-weight:800;font-size:15px;letter-spacing:.5px;text-align:center;background:#0e7490;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.35)">ŞU AN: SIEMENS — tüm yüklemeler, stoklar ve kampanyalar SIEMENS'e yazılır</div>
@@ -967,7 +1067,7 @@ async function showApp(session){
   await loadAktifKampanyalar();
   if(typeof hkInit==="function" && (isEditor() || disBayiMi())) hkInit();
   if(typeof hsInit==="function") hsInit();
-  fqPricingError="";fqDataReady=true;if(quoteRows.length===0) addRow();else renderRows();
+  fqPricingError="";fqDataReady=true;if(quoteRows.length===0) quoteRows=Array.from({length:5},bosSatir);renderRows();
 }
 // Yüklü en güncel dönemi bul; sorgular sadece bu döneme bakar (eski ay verisi sızmaz, marka karışmaz)
 async function loadAktifDonem(){ const mk=brand,epoch=fqEpoch;const {data,error}=await sb.rpc("fl_aktif_donem",{p_marka:mk});if(error)throw new Error("Fiyat dönemi okunamadı. Güncelleme kurulumu kontrol edilmeli.");if(epoch===fqEpoch&&mk===brand)aktifDonem=data||_donem(); }
@@ -1307,7 +1407,9 @@ async function bayiStokYukle(){
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
 function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,ikiliEsIdx:null,nakitSecili:false,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}; }
-function addRow(){ quoteRows.push(bosSatir()); renderRows(); }
+function addRow(focus=false){ quoteRows.push(bosSatir()); renderRows(); if(focus)focusCodeRow(quoteRows.length-1); }
+function focusCodeRow(i){const e=document.querySelectorAll('#rows input[placeholder="model kodu"]')[i];if(e)e.focus();}
+async function codeEnter(i,value){await onCode(i,value);if(!quoteRows[i]||quoteRows[i].veriHata)return;if(i===quoteRows.length-1)quoteRows.push(bosSatir());renderRows();focusCodeRow(i+1);}
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
 function recalc(){ renderRows(); }
 function toggleManuel(i){
@@ -1425,7 +1527,8 @@ function renderRows(){
   // Alt panel (kâr/banka/toplamlar) sepet boşken gizli — ekran dar kalsın, ürün girilince açılır
   const dataProblems=quoteRows.filter(r=>r.kod&&(r.veriHata||(r.netStok!=null&&r.adet>r.netStok))).map(r=>r.kod+": "+(r.veriHata||"istenen adet stoktan fazla"));
   let issue=$("fqDataIssue");if(!issue){issue=document.createElement('div');issue.id='fqDataIssue';issue.className='msg bad';$("grid").parentNode.insertBefore(issue,$("grid"));}issue.textContent=[fqPricingError,...dataProblems].filter(Boolean).join(' · ');
-  const apc=$("altPanelCard"); if(apc) apc.style.display = quoteRows.some(r=>r.kod) ? "" : "none";
+  const apc=$("altPanelCard"); if(apc) apc.style.display="";
+  document.querySelectorAll('.quote-action').forEach(b=>{b.disabled=!quoteRows.some(r=>r.kod);});
   const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
   tb.innerHTML="";
   let tMaliyet=0,tBip=0,tBipli=0,tAdet=0,tPer=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
@@ -1459,9 +1562,9 @@ function renderRows(){
     const tr=document.createElement("tr");
     tr.innerHTML=`
       <td><input value="${esc(r.kod)}" placeholder="model kodu" autocomplete="off" style="width:118px"
-           oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();setTimeout(()=>{const rr=quoteRows[${i}]; if(rr&&rr.kod)refetch(rr);},250)"
-           onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();onCode(${i},this.value);}"></td>
-      <td>${esc(r.ad||"")}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary">${r.kod?(r.netStok==null?"Stok: sorgu bekleniyor":"Stok: "+fmt(r.netStok)+" adet"):""}</span>${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+           oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();codeBlur(${i},this.value)"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();codeEnter(${i},this.value);}"></td>
+      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?"Stok: sorgu bekleniyor":"Kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" min="1" step="1" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -1677,19 +1780,20 @@ function toggleKampanya(id){
   }
   renderRows();
 }
-async function onCode(i,val){ fqSetCode(quoteRows[i],val);await refetch(quoteRows[i]); }
+async function onCode(i,val){const r=quoteRows[i];if(!r)return;fqSetCode(r,val);r._codePending=true;try{await refetch(r);}finally{r._codePending=false;}}
+function codeBlur(i,value){const r=quoteRows[i];setTimeout(()=>{if(r&&quoteRows[i]===r&&r.kod===value&&r.kod&&!r._codePending&&(r.veriHata||(!r.isET&&r.toptan==null)))onCode(i,value);},250);}
 let acRow=-1, acTimer=null;
 function fqSetCode(r,val){const kod=String(val||'').toUpperCase().replace(/[^A-Z0-9._/-]/g,'');if(r.kod!==kod){const adet=r.adet,rid=(r._fetchId||0)+1;Object.assign(r,bosSatir(),{kod,adet,_fetchId:rid,veriHata:kod?'Ürün verisi yükleniyor':null});}return kod;}
 function onCodeInput(i,val,el){val=fqSetCode(quoteRows[i],val);if(el)el.value=val;clearTimeout(acTimer);if(el)acTimer=setTimeout(()=>showAC(i,val,el),150);}
 
 async function showAC(i,val,el){const ac=$("ac"),q=String(val||"").trim(),epoch=fqEpoch;if(q.length<2){ac.classList.remove('show');return;}
  const safe=q.replace(/[,%()]/g,'');const {data,error}=await sb.from("urunler").select("model_kodu,urun_adi").eq("marka",brand).or(`model_kodu.ilike.%${safe}%,urun_adi.ilike.%${safe}%`).limit(15);
- if(epoch!==fqEpoch||!quoteRows[i]||quoteRows[i].kod!==String(val).toUpperCase())return;
+ if(epoch!==fqEpoch||!el.isConnected||document.activeElement!==el||!quoteRows[i]||quoteRows[i].kod!==String(val).toUpperCase())return;
  if(error||!data||!data.length){ac.classList.remove('show');return;}acRow=i;ac.replaceChildren();
  for(const p of data){const div=document.createElement('div');div.className='ac-item';const code=document.createElement('span');code.className='ac-code';code.textContent=p.model_kodu;const name=document.createElement('span');name.className='ac-name';name.textContent=p.urun_adi||'';div.append(code,name);div.onmousedown=()=>pickProduct(p.model_kodu);ac.append(div);}
  const rc=el.getBoundingClientRect();ac.style.left=(rc.left+window.scrollX)+'px';ac.style.top=(rc.bottom+window.scrollY+2)+'px';ac.style.width=Math.max(rc.width,340)+'px';ac.classList.add('show');}
 function pickProduct(code){ if(acRow<0)return; fqSetCode(quoteRows[acRow],code); $("ac").classList.remove("show"); refetch(quoteRows[acRow]); }
-function hideAC(){ setTimeout(()=>$("ac").classList.remove("show"),180); }
+function hideAC(){ clearTimeout(acTimer);setTimeout(()=>$("ac").classList.remove("show"),180); }
 async function refetch(r){
   const kod=r.kod,mk=brand,epoch=fqEpoch,donem=aktifDonem||_donem(),rid=r._fetchId=(r._fetchId||0)+1;
   const stale=()=>epoch!==fqEpoch||mk!==brand||r.kod!==kod||r._fetchId!==rid;
@@ -1855,23 +1959,26 @@ function magazaPrefix(){ const m=((profil&&(profil.magaza||profil.ad))||"MGZ").t
 function genTeklifNo(){ const d=new Date(),yy=String(d.getFullYear()).slice(2),mm=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'),rnd=Math.random().toString(36).slice(2,6).toUpperCase(); return magazaPrefix()+"-"+yy+mm+dd+"-"+rnd; }
 function getTeklifNo(){ if(!currentTeklifNo) currentTeklifNo=genTeklifNo(); return currentTeklifNo; }
 // Çıktı alınmadan önce müşteri adı + GSM ŞART: her basılan teklifin sahibi kayıtta görünsün
-function musteriKontrol(){
-  // Hesaplar mağaza bazlı olduğu için teklifi kimin hazırladığı sadece bu alandan anlaşılıyor.
-  const pers=((($("satisPersonel")||{}).value)||"").trim();
-  if(pers.length<2){
-    const pe=$("satisPersonel");
-    if(pe){ pe.style.outline="2px solid #f59e0b"; pe.focus(); pe.scrollIntoView({block:"center",behavior:"smooth"}); setTimeout(()=>{ pe.style.outline=""; },3000); }
-    alert("Satış Personeli alanına adını yaz.\n\nTeklifin altında kimin hazırladığı görünsün diye gerekiyor.\n(Bir kere yazman yeterli, bu bilgisayar hatırlar.)");
-    return false;
-  }
-  const ad=((($("mAd")||{}).value)||"").trim();
-  const tel=((($("mTel")||{}).value)||"").replace(/\D/g,"");
-  if(ad.length>=2 && tel.length>=10) return true;
-  const el = ad.length<2 ? $("mAd") : $("mTel");
-  if(el){ el.style.outline="2px solid #ef4444"; el.focus(); el.scrollIntoView({block:"center",behavior:"smooth"}); setTimeout(()=>{ el.style.outline=""; },3000); }
-  alert("Müşteri adı ve telefonu eksik.\n\nTeklifi sonra bulabilmek ve müşteriye geri dönebilmek için gerekiyor.\n(Telefon en az 10 hane)");
-  return false;
+let customerAction=null;
+function customerMissing(){
+ if(!String(($("satisPersonel")||{}).value||"").trim()||String($("satisPersonel").value).trim().length<2)return ['satisPersonel','Satış personelinin adını yaz.'];
+ if(String(($("mAd")||{}).value||"").trim().length<2)return ['mAd','Müşteri adını yaz.'];
+ if(String(($("mTel")||{}).value||"").replace(/\D/g,"").length<10)return ['mTel','Müşteri telefonunu en az 10 hane olarak yaz.'];
+ return null;
 }
+function openCustomerDialog(action='bilgi'){
+ customerAction=action;const d=$("customerDialog");$("customerError").textContent='';
+ $("customerContinue").textContent=({save:'Teklifi kaydet',teklif:'Kaydet ve yazdır',siparis:'Sipariş formunu hazırla',whatsapp:'WhatsApp için hazırla',bilgi:'Tamam'})[action]||'Devam et';
+ if(!d.open)d.showModal();const missing=customerMissing();$(missing?missing[0]:'mAd').focus();
+}
+function closeCustomerDialog(){customerAction=null;$("customerDialog").close();}
+function musteriKontrol(action='save'){if(!customerMissing())return true;openCustomerDialog(action);return false;}
+function completeCustomerAction(){
+ const action=customerAction,missing=customerMissing();
+ if(action!=='bilgi'&&missing){$("customerError").textContent=missing[1];$(missing[0]).focus();return;}
+ closeCustomerDialog();if(action==='save')return saveQuote();if(action==='teklif'||action==='siparis')return printDoc(action);if(action==='whatsapp')return shareWhatsApp();
+}
+
 let savedTeklifId=null;
 // sessiz=true → çıktı alınırken otomatik kayıt; aynı teklif no tekrar basılırsa mükerrer satır açılmaz, mevcut kayıt güncellenir
 async function saveQuote(sessiz){ if(fqSaving)return fqSaving;
@@ -1974,7 +2081,7 @@ function teklifSatirlar(items){
 function teklifToplam(items){ return lastTot? Math.round((komisOran>0?lastTot.finalTaksit:lastTot.finalNakit)) : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0); }
 async function shareWhatsApp(){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
-  if(!musteriKontrol()) return;
+  if(!musteriKontrol("whatsapp")) return;
   const shareWindow=window.open("","_blank");if(!shareWindow){alert("Açılır pencere engellendi.");return;}shareWindow.opener=null;
   if(!await saveQuote(true)){shareWindow.close();return;}
   const tk=+$("taksit").value, bk=bankaAdi();
@@ -2007,7 +2114,7 @@ async function shareWhatsApp(){
 }
 async function printDoc(kind){
   const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
-  if(!musteriKontrol()) return;
+  if(!musteriKontrol(kind)) return;
   const w=window.open("","_blank");if(!w){alert("Açılır pencere engellendi.");return;}
   w.document.body.textContent="Teklif kaydediliyor…";if(!await saveQuote(true)){w.close();return;}
   const ad=esc(($("mAd")||{}).value||""), tel=esc(($("mTel")||{}).value||""), personel=esc(($("satisPersonel")||{}).value||""), toplam=teklifToplam(items), tk=+$("taksit").value, bk=bankaAdi();
@@ -2122,7 +2229,7 @@ async function fqReloadData(){const epoch=fqEpoch;for(const load of [loadAktifDo
 
 function fqLoadFail(e){fqPricingError='Veriler yüklenemedi: '+e.message;renderRows();}
 function fqInvalidateCatalog(){asKatalogCache=null;asKatalogMarka=null;}
-function fqResetSession(){profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
+function fqResetSession(){customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
 async function fqApiHeaders(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Oturum süresi doldu.');return {'content-type':'application/json',Authorization:'Bearer '+session.access_token};}
 async function fqAtomic(operations){
  const merged=new Map();for(const op of operations){const scope=Object.fromEntries(Object.entries(op.scope).sort(([a],[b])=>a.localeCompare(b))),key=op.table+'|'+op.mode+'|'+JSON.stringify(scope);
@@ -3554,7 +3661,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="9 Eyl 2026 · sade satış v10.1";
+const FQ_SURUM="9 Eyl 2026 · tek ekran v11";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
