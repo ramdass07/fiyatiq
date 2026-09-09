@@ -1,3 +1,5 @@
+const {authorize,fail,assistantCatalog}=require('../lib/api-security');
+const Core=require('../js/fiyat-core');
 // Vercel Serverless Function — Kampanya Sihirbazı beyni (Claude Opus) — v2
 // v2: mail metni desteği — kampanya durumu (devam/bitti), hariç modeller ve FİYAT FARKI tablosu da çıkarılır.
 // API anahtarı SUNUCUDA gizli: process.env.ANTHROPIC_API_KEY (Vercel > Settings > Environment Variables)
@@ -41,6 +43,7 @@ MATCH_TYPE anlamları:
 - Aynı belgede birden çok kampanya olabilir; her birini ayrı nesne yap. Emin olamadığın sayısal alanı 0, tarihi null bırak; uydurma.`;
 
 module.exports = async function handler(req, res) {
+  let ctx;try{ctx=await authorize(req,res,'kampanya-oku');}catch(e){fail(res,e);return;}
   if (req.method !== 'POST') { res.status(405).json({ error: 'Sadece POST' }); return; }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) { res.status(500).json({ error: 'Sunucuda ANTHROPIC_API_KEY tanımlı değil. Vercel > Settings > Environment Variables ekleyin.' }); return; }
@@ -60,9 +63,10 @@ ${metin.slice(0, 120000)}`;
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: AbortSignal.timeout(90000),
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: 'claude-opus-4-8',
+        model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-8',
         max_tokens: 8000,
         system: SEMA,
         messages: [{ role: 'user', content: kullanici }]
@@ -74,7 +78,8 @@ ${metin.slice(0, 120000)}`;
     const m = txt.match(/\{[\s\S]*\}/);
     let parsed = null;
     try { parsed = JSON.parse(m ? m[0] : txt); } catch (e) { res.status(502).json({ error: 'Model JSON döndürmedi', ham: txt.slice(0, 1500) }); return; }
-    const list = Array.isArray(parsed) ? parsed : (parsed.kampanyalar || []);
+    const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.kampanyalar)?parsed.kampanyalar:[]);
+    const validDate=v=>v==null||v===''?null:(/^\d{4}-\d{2}-\d{2}$/.test(String(v))&&new Date(v+'T00:00:00Z').toISOString().slice(0,10)===v?v:(()=>{throw Error('Geçersiz kampanya tarihi');})());
     const toArr = v => Array.isArray(v) ? v : (v ? String(v).split(/[,\n]/).map(s => s.trim()).filter(Boolean) : []);
     const out = list.map(k => ({
       ad: (k.ad || '').toString().trim(),
@@ -84,17 +89,17 @@ ${metin.slice(0, 120000)}`;
       secili_modeller: toArr(k.secili_modeller).map(s => String(s).trim().toUpperCase()).filter(Boolean),
       haric_modeller: toArr(k.haric_modeller).map(s => String(s).trim().toUpperCase()).filter(Boolean),
       durum: (['devam','bitti','yeni'].includes((k.durum || '').toString().trim()) ? k.durum.toString().trim() : 'yeni'),
-      musteri_indirimi: +k.musteri_indirimi || 0,
-      hakedis: +k.hakedis || 0,
-      kota: +k.kota || 0,
-      bitis_tarihi: k.bitis_tarihi || null,
+      musteri_indirimi: Core.money(k.musteri_indirimi),
+      hakedis: Core.money(k.hakedis),
+      kota: Core.money(k.kota),
+      bitis_tarihi: validDate(k.bitis_tarihi),
       kurallar: (k.kurallar || '').toString().trim()
-    })).filter(k => k.ad);
+    })).filter(k => k.ad && ['all','all+any','any2','xl','xxl','xl+xxl','model_list','tumu'].includes(k.match_type));
     const farklar = (Array.isArray(parsed.fiyat_farklari) ? parsed.fiyat_farklari : []).map(f => ({
       model_kodu: (f.model_kodu || '').toString().trim().toUpperCase(),
-      yeni_perakende: +f.yeni_perakende || 0,
-      fark: +f.fark || 0
-    })).filter(f => f.model_kodu);
+      yeni_perakende: Core.money(f.yeni_perakende),
+      fark: Core.money(f.fark)
+    })).filter(f => /^[A-Z0-9][A-Z0-9._/-]{4,39}$/.test(f.model_kodu));
     res.status(200).json({ kampanyalar: out, fiyat_farklari: farklar, adet: out.length });
   } catch (e) {
     res.status(500).json({ error: 'Sunucu hatası: ' + (e && e.message) });

@@ -1,0 +1,11 @@
+# Deploy the application only; price files, SQL and internal notes are private.
+*
+!index.html
+!vercel.json
+!package.json
+!api
+!api/**
+!js
+!js/**
+!lib
+!lib/**
