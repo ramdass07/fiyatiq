@@ -1,3 +1,5 @@
+const {authorize,fail,assistantCatalog}=require('../lib/api-security');
+const Core=require('../js/fiyat-core');
 // Vercel Serverless Function — FiyatIQ Satış Asistanı (Claude)
 // Görevi: Mağaza personelinin doğal dille sorduğu soruya, SADECE stoktaki ürünler
 //         ve gerçek fiyatlar üzerinden cevap vermek.
@@ -21,6 +23,7 @@ NASIL CEVAP VERİRSİN:
 ÜRÜN LİSTESİ ALANLARI: k=model kodu, ad=ürün adı, adet=net satılabilir stok, pesin=peşin perakende fiyat (TL), toptan=bayi maliyeti (TL).`;
 
 module.exports = async function handler(req, res) {
+  let ctx;try{ctx=await authorize(req,res,'asistan');}catch(e){fail(res,e);return;}
   if (req.method !== 'POST') { res.status(405).json({ error: 'Sadece POST' }); return; }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) { res.status(500).json({ error: 'Sunucuda ANTHROPIC_API_KEY tanımlı değil. Vercel > Settings > Environment Variables ekleyin.' }); return; }
@@ -30,7 +33,7 @@ module.exports = async function handler(req, res) {
   const marka = (body && body.marka) || '';
   const soru = ((body && body.soru) || '').toString().trim();
   const gecmis = Array.isArray(body && body.gecmis) ? body.gecmis.slice(-10) : [];
-  const urunler = Array.isArray(body && body.urunler) ? body.urunler.slice(0, 1200) : [];
+  let urunler;try{urunler=await assistantCatalog(ctx);}catch(e){fail(res,e);return;}
   if (!soru) { res.status(400).json({ error: 'Soru boş geldi.' }); return; }
 
   const katalog = urunler.map(u =>
@@ -51,9 +54,10 @@ ${katalog || '(liste boş geldi — stok verisi yüklenmemiş olabilir, kullanı
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: AbortSignal.timeout(90000),
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: 'claude-opus-4-8',
+        model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-8',
         max_tokens: 1500,
         system: sistem,
         messages

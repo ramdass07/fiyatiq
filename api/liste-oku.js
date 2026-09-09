@@ -1,3 +1,5 @@
+const {authorize,fail,assistantCatalog}=require('../lib/api-security');
+const Core=require('../js/fiyat-core');
 // Vercel Serverless Function — AI Liste Okuyucu (Claude)
 // Görevi: "Akıllı Tara"nın çözemediği DAĞINIK fiyat listelerini yapay zekâya okutmak.
 // API anahtarı SUNUCUDA gizli: process.env.ANTHROPIC_API_KEY (Vercel > Settings > Environment Variables)
@@ -28,6 +30,7 @@ SÜTUN EŞLEME KURALLARI:
 - Hiç ürün bulamazsan {"satirlar":[],"not":"neden bulunamadı"} döndür.`;
 
 module.exports = async function handler(req, res) {
+  let ctx;try{ctx=await authorize(req,res,'liste-oku');}catch(e){fail(res,e);return;}
   if (req.method !== 'POST') { res.status(405).json({ error: 'Sadece POST' }); return; }
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) { res.status(500).json({ error: 'Sunucuda ANTHROPIC_API_KEY tanımlı değil. Vercel > Settings > Environment Variables ekleyin.' }); return; }
@@ -46,9 +49,10 @@ ${metin.slice(0, 150000)}`;
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: AbortSignal.timeout(90000),
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: 'claude-opus-4-8',
+        model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-8',
         max_tokens: 16000,
         system: SEMA,
         messages: [{ role: 'user', content: kullanici }]
@@ -61,23 +65,15 @@ ${metin.slice(0, 150000)}`;
     let parsed = null;
     try { parsed = JSON.parse(m ? m[0] : txt); } catch (e) { res.status(502).json({ error: 'Model JSON döndürmedi', ham: txt.slice(0, 1500) }); return; }
 
-    const num = v => {
-      if (v == null || v === '') return 0;
-      if (typeof v === 'number') return isFinite(v) ? v : 0;
-      let s = String(v).replace(/[^\d.,-]/g, '');
-      if (s.indexOf(',') > -1 && s.indexOf('.') > -1) s = s.replace(/\./g, '').replace(',', '.');
-      else if (s.indexOf(',') > -1) s = s.replace(',', '.');
-      const n = parseFloat(s);
-      return isFinite(n) ? n : 0;
-    };
-    const seen = {};
+    const num = v => Core.money(v);
+    const seen = Object.create(null);
     const out = (Array.isArray(parsed.satirlar) ? parsed.satirlar : []).map(s => ({
       model_kodu: String(s.model_kodu || '').trim().toUpperCase(),
       toptan: num(s.toptan),
       perakende: num(s.perakende),
       bip: num(s.bip)
     })).filter(s => {
-      if (s.model_kodu.length < 5) return false;
+      if (!/^[A-Z0-9][A-Z0-9._/-]{4,39}$/.test(s.model_kodu)) return false;
       if (!/\d/.test(s.model_kodu) || !/[A-Z]/.test(s.model_kodu)) return false;
       if (s.toptan <= 0 && s.perakende <= 0 && s.bip <= 0) return false;
       if (seen[s.model_kodu]) return false;
