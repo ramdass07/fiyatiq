@@ -1067,7 +1067,7 @@ async function showApp(session){
   await loadAktifKampanyalar();
   if(typeof hkInit==="function" && (isEditor() || disBayiMi())) hkInit();
   if(typeof hsInit==="function") hsInit();
-  fqPricingError="";fqDataReady=true;if(quoteRows.length===0) quoteRows=Array.from({length:5},bosSatir);renderRows();
+  fqPricingError="";fqDataReady=true;if(!quoteRows.some(r=>r.kod)) quoteRows=Array.from({length:5},bosSatir);renderRows();
 }
 // Yüklü en güncel dönemi bul; sorgular sadece bu döneme bakar (eski ay verisi sızmaz, marka karışmaz)
 async function loadAktifDonem(){ const mk=brand,epoch=fqEpoch;const {data,error}=await sb.rpc("fl_aktif_donem",{p_marka:mk});if(error)throw new Error("Fiyat dönemi okunamadı. Güncelleme kurulumu kontrol edilmeli.");if(epoch===fqEpoch&&mk===brand)aktifDonem=data||_donem(); }
@@ -3661,7 +3661,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="9 Eyl 2026 · tek ekran v11";
+const FQ_SURUM="9 Eyl 2026 · tek ekran v11.1";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
