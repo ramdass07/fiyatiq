@@ -295,6 +295,12 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
 #grid td:nth-child(2){width:26%;max-width:300px;min-width:120px;line-height:1.25}
 .product-name{display:block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .product-name:focus{white-space:normal;outline:1px solid var(--acc)}
+.sale-cost-breakdown{display:none}.simple-sale .sale-cost-breakdown{display:block;margin:6px 0;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--field);text-align:left}
+.sale-cost-basis,.sale-cost-note{display:block;font-size:11px;line-height:1.4;color:var(--mut);white-space:normal}
+.sale-cost-breakdown dl{margin:4px 0 0}.sale-cost-breakdown dl>div{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 0;font-size:12px}
+.sale-cost-breakdown dt{color:var(--mut);white-space:normal}.sale-cost-breakdown dd{margin:0;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:650}
+.sale-cost-breakdown .sale-cost-net{border-top:1px solid var(--line);margin-top:3px;padding-top:5px}.sale-cost-net dt,.sale-cost-net dd{color:var(--acc);font-weight:750}
+.sale-cost-breakdown input{width:110px!important;max-width:100%}
 #grid td input{min-height:30px;padding:5px 7px;border-radius:5px;font-size:14px;box-sizing:border-box}
 #grid td:nth-child(3) input{width:54px!important}
 #grid td:last-child{min-width:100px;white-space:nowrap!important}#grid td:last-child button{padding:5px 7px;margin:0;min-height:29px;font-size:12px}
@@ -1535,6 +1541,17 @@ function gunFark(d){ if(!d) return null; const gun=Math.round((new Date(_bugun()
 function fmtTarih(d){ if(!d) return ''; const p=(''+d).split('-'); return p.length===3? p[2]+'.'+p[1]+'.'+p[0].slice(2) : (''+d); }
 function karBadge(p){ if(p==null||isNaN(p)) return '<span class="mut">—</span>'; if(p>-0.005&&p<0.005) p=0; if(p<0) return '<span class="blink">ZARAR '+p.toFixed(2)+'%</span>'; const c=p<3?'bad':p<8?'warn':'ok'; return '<span class="'+c+'">'+p.toFixed(2)+'%</span>'; }
 function calcParts(r,kar,komis){ return FiyatIQCore.calcParts(r,kar,komis,nakitHedefi(r)); }
+function saleCostBreakdownHTML(r,p,manualInput){
+  if(!basitMod||!r.kod)return '';
+  const pending=!!r.veriHata||!!fqPricingError||!fqDataReady;
+  const known=!pending&&Number.isFinite(p.unitToptan)&&p.unitToptan>0;
+  const money=n=>Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
+  const cost=pending?'—':r.isET?manualInput:known?money(p.unitToptan):'Girilmedi';
+  const bip=pending?'—':r.isET?'Uygulanmıyor':known&&Number.isFinite(p.unitBip)?money(p.unitBip):'—';
+  const net=known&&Number.isFinite(p.unitBipli)?money(p.unitBipli):'—';
+  const note=pending?'Fiyat bilgisi doğrulanamadı.':r.isET?'Manuel maliyet kullanılır; BİP ayrıca düşülmez.':'Net maliyet = maliyet − BİP. Hakediş ayrıca hesaplanır.';
+  return `<div class="sale-cost-breakdown" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl><div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip">${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note">${note}</span></div>`;
+}
 function renderRows(){
   for(const r of quoteRows){try{r.adet=FiyatIQCore.quantity(r.adet);}catch(e){r.adet=1;alert(e.message);}}
   const tb=$("rows"); if(!tb) return;
@@ -1599,11 +1616,11 @@ function renderRows(){
       <td><input data-fq-row="${i}" data-fq-field="kod" value="${esc(r.kod)}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();codeBlur(${i},this.value)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();codeEnter(${i},this.value);}"></td>
-      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
+      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${saleCostBreakdownHTML(r,p,maliyetCell)}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" min="1" step="1" data-fq-row="${i}" data-fq-field="adet" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
-      <td class="num">${maliyetCell}</td>
+      <td class="num">${basitMod&&r.isET?fmt(maliyetL):maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
-      <td class="num" title="Maliyet − BİP">${(p.unitBipli>0)?fmt(p.unitBipli*p.adet):'<span class="mut">—</span>'}</td>
+      <td class="num" title="Maliyet − BİP">${(valid&&Number.isFinite(p.unitBipli))?fmt(p.unitBipli*p.adet):'<span class="mut">—</span>'}</td>
       <td class="num" title="BSH resmi perakende (etiket) fiyatı">${(+r.etiket>0)?fmt((+r.etiket)*p.adet):'<span class="mut">—</span>'}</td>
       <td class="num"><span class="raw-price">${pesinCell}</span><strong class="net-price" id="saleP${i}">—</strong>${r.isET?`<span class="manual-entry">${pesinCell}</span>`:""}</td>
       <td class="num"><span class="raw-price">${taksitCell}</span><strong class="net-price" id="saleT${i}">—</strong>${r.isET?`<span class="manual-entry">${taksitCell}</span>`:""}</td>
@@ -1836,7 +1853,7 @@ function toggleKampanya(id){
 async function onCode(i,val){const r=quoteRows[i];if(!r)return;fqSetCode(r,val);r._codePending=true;try{await refetch(r);}finally{r._codePending=false;}}
 function codeBlur(i,value){const r=quoteRows[i];setTimeout(()=>{if(r&&quoteRows[i]===r&&r.kod===value&&r.kod&&!r._codePending&&(r.veriHata||(!r.isET&&r.toptan==null)))onCode(i,value);},250);}
 let acRow=-1, acTimer=null;
-function fqSetCode(r,val){const kod=String(val||'').toUpperCase().replace(/[^A-Z0-9._/-]/g,'');if(r.kod!==kod){const adet=r.adet,rid=(r._fetchId||0)+1;Object.assign(r,bosSatir(),{kod,adet,_fetchId:rid,veriHata:kod?'Ürün verisi yükleniyor':null});}return kod;}
+function fqSetCode(r,val){const kod=String(val||'').toUpperCase().replace(/[^A-Z0-9._/-]/g,'');if(r.kod!==kod){document.querySelectorAll('#rows>tr')[quoteRows.indexOf(r)]?.querySelector('.sale-cost-breakdown')?.remove();const adet=r.adet,rid=(r._fetchId||0)+1;Object.assign(r,bosSatir(),{kod,adet,_fetchId:rid,veriHata:kod?'Ürün verisi yükleniyor':null});}return kod;}
 function onCodeInput(i,val,el){val=fqSetCode(quoteRows[i],val);if(el)el.value=val;clearTimeout(acTimer);if(el)acTimer=setTimeout(()=>showAC(i,val,el),150);}
 
 async function showAC(i,val,el){const ac=$("ac"),q=String(val||"").trim(),epoch=fqEpoch;if(q.length<2){ac.classList.remove('show');return;}
@@ -1851,6 +1868,7 @@ async function refetch(r){
   const kod=r.kod,mk=brand,epoch=fqEpoch,donem=aktifDonem||_donem(),rid=r._fetchId=(r._fetchId||0)+1;
   const stale=()=>epoch!==fqEpoch||mk!==brand||r.kod!==kod||r._fetchId!==rid;
   r.veriHata="Ürün verisi yükleniyor";r.stockFreshness=null;r.kadikoyTarih=null;r.netStok=null;
+  document.querySelectorAll('#rows>tr')[quoteRows.indexOf(r)]?.querySelector('.sale-cost-breakdown')?.remove();
 
   if(!r.kod){ renderRows(); return; }
   const {data:f,error:fe} = await sb.rpc("urun_fiyat",{p_model_kodu:kod,p_marka:mk,p_donem:donem});
@@ -1956,7 +1974,7 @@ function teklifDetayHTML(t){
  const names=Array.isArray(h.appliedNames)?h.appliedNames:null;
  const campaigns=names?(names.length?names.map(n=>`<li>${esc(n)}</li>`).join(''):'<li>Uygulanan kampanya yok.</li>'):'<li>Kampanya bilgisi bu teklife kaydedilmemiş.</li>';
  const rows=items.map(r=>`<tr><td>${esc(r.model||r.kod||'—')}</td><td>${esc(r.ad||'—')}</td><td class="num">${esc(r.adet??'—')}</td><td class="num">${esc(money(net?r.net_nakit:r.nakit))}</td><td class="num">${esc(money(net?r.net_taksit:r.taksit))}</td></tr>`).join('');
- return `<p class="mut">Teklifin kaydedildiği bilgiler gösterilir.</p>${fqSavedQuoteActionsHTML(t.id)}<div class="detail-grid">${field('Teklif no',s.no||t.teklif_no)}${field('Tarih',date)}${field('Mağaza',s.magaza)}${field('Satış personeli',s.personel)}${field('Müşteri',t.musteri_ad)}${field('Telefon',t.musteri_tel)}${field('Marka',t.marka)}${field('Durum',DURUM_AD[t.durum||s.durum]||t.durum||s.durum)}</div>
+ return `<p class="mut">Teklifin kaydedildiği bilgiler gösterilir.</p>${fqSavedQuoteActionsHTML(t.id)}${fqQuoteHistoryActionsHTML(t.id)}<div class="detail-grid">${field('Teklif no',s.no||t.teklif_no)}${field('Tarih',date)}${field('Mağaza',s.magaza)}${field('Satış personeli',s.personel)}${field('Müşteri',t.musteri_ad)}${field('Telefon',t.musteri_tel)}${field('Marka',t.marka)}${field('Durum',DURUM_AD[t.durum||s.durum]||t.durum||s.durum)}</div>
  ${fqValidityHTML(s.gecerlilik)}<h3>Ürünler</h3><p class="mut">${net?'Fiyatlar, indirimler sonrası satır toplamıdır.':'Bu eski kayıtta indirim sonrası satır dağılımı saklanmamış. Aşağıda kayıtlı birim fiyatlar, altta teklifin toplamı gösterilir.'}</p>
  <div class="detail-scroll"><table><thead><tr><th>Model</th><th>Ürün</th><th class="num">Adet</th><th class="num">${net?'Peşin satır toplamı':'Peşin birim fiyat'}</th><th class="num">${net?'Taksitli satır toplamı':'Taksitli birim fiyat'}</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Ürün bilgisi kaydedilmemiş.</td></tr>'}</tbody></table></div>
  <h3>Ödeme ve kampanyalar</h3><div class="detail-grid">${field('Banka',s.banka)}${field('Taksit sayısı',s.taksit)}${field('Banka komisyonu',pct(h.komis))}${field('Gerçek peşin kâr',pct(h.karPct))}${field('Hakediş',money(h.hakedis))}${field('Kampanya müşteri indirimi',money(h.musteriInd))}</div><ul>${campaigns}</ul>
@@ -2272,7 +2290,7 @@ async function fqReloadData(){const epoch=fqEpoch;for(const load of [loadAktifDo
 
 function fqLoadFail(e){fqPricingError='Veriler yüklenemedi: '+e.message;renderRows();}
 function fqInvalidateCatalog(){asKatalogCache=null;asKatalogMarka=null;}
-function fqResetSession(){if(typeof fqResetSavedOutputs==='function')fqResetSavedOutputs();if(typeof fqResetAdminReport==='function')fqResetAdminReport();if(typeof fqApprovalReset==='function')fqApprovalReset();if(typeof fqCloseCustomerView==='function')fqCloseCustomerView();fqResetFollowup();fqWorkflowEnd();hkExcelReset();closeTeklifDetay();const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
+function fqResetSession(){if(typeof fqResetQuoteHistory==='function')fqResetQuoteHistory();if(typeof fqResetSavedOutputs==='function')fqResetSavedOutputs();if(typeof fqResetAdminReport==='function')fqResetAdminReport();if(typeof fqApprovalReset==='function')fqApprovalReset();if(typeof fqCloseCustomerView==='function')fqCloseCustomerView();fqResetFollowup();fqWorkflowEnd();hkExcelReset();closeTeklifDetay();const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
 async function fqApiHeaders(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Oturum süresi doldu.');return {'content-type':'application/json',Authorization:'Bearer '+session.access_token};}
 async function fqAtomic(operations){
  const merged=new Map();for(const op of operations){const scope=Object.fromEntries(Object.entries(op.scope).sort(([a],[b])=>a.localeCompare(b))),key=op.table+'|'+op.mode+'|'+JSON.stringify(scope);
@@ -3796,7 +3814,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="10 Eyl 2026 · kayıtlı teklif paylaşımı ve satış raporları v11.8";
+const FQ_SURUM="10 Eyl 2026 · aylık satış raporu ve teklif geçmişi v11.9";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
@@ -3843,5 +3861,6 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSuru
 <script src="js/stok-guncellik.js"></script>
 <script src="js/kayitli-teklif.js"></script>
 <script src="js/yonetim-raporu.js"></script>
+<script src="js/teklif-gecmisi.js"></script>
 </body>
 </html>

@@ -1,14 +1,14 @@
-# FiyatIQ v11.8 doğrulama
+# FiyatIQ v11.9 doğrulama
 
 `npm ci`, `npm run check`, `npm test` ile çalıştırılır. Node 20 ve üzeri gerekir.
 
-135 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; canlı hesaba e-posta gönderilmez veya canlı veritabanına yazılmaz.
+167 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; canlı hesaba e-posta gönderilmez veya canlı veritabanına yazılmaz.
 
 Kapsam: müşteri değiştirirken eski teklifin korunması, yeni teklif numarası, hesap kapsamlı teklif arama, kayıt hataları, taslak saklama/geri yükleme, güncel fiyat onayı, manuel fiyatlar, geçersiz kurtarma bağlantıları, oturum yenileme ve ilk açılış verileri yüklenirken işlem koruması.
 
 ## Yayın sonrası kabul kontrolü
 
-- Şifre kurtarma e-postasının geldiğini ve şifresini değiştirdiğini hesap sahibi 10 Eylül 2026'da doğruladı. Bu kabul maddesi kapalıdır; v11.8 için yeniden e-posta gönderilmedi.
+- Şifre kurtarma e-postasının geldiğini ve şifresini değiştirdiğini hesap sahibi 10 Eylül 2026'da doğruladı. Bu kabul maddesi kapalıdır; v11.9 için yeniden e-posta gönderilmedi.
 - Mağaza hesabıyla teklif kaydet, Tekliflerim içinden incele; Yeni teklif ile farklı müşteri kaydının önceki teklifi değiştirmediğini doğrula.
 - Sayfayı yenileyip Taslaklar üzerinden devam et; güncel fiyatları onaylayıp yeni kopya kaydet.
 
@@ -50,3 +50,28 @@ Satıldı seçildiğinde müşterinin kabul ettiği gerçek tutar, ödeme şekli
 `tests/reporting-sales-rls.sql` Deneme üzerinde başarıyla çalıştı: 1.205 teklif, 4 Türkiye tarih sınırı kaydı; tam özet ve dışa aktarım, durumdan bağımsız dönüşüm, eski dizi kayıtları, arama karakterleri, aktif merkez erişimi, pasif/bayi/anon retleri, kendi kaydını güncelleme, gerçek tutar tutarlılığı, sürüm/damga ve saklanmış fiyatların korunması. Sentetik şifresiz hesaplar ve teklifler işlem sonunda ROLLBACK ile kaldırıldı. Canlı migration: `20260910143846_sales_reporting_v118`. Canlıdaki 16 teklifin önceki tüm alanlarının parmak izi migration öncesi ve sonrası aynı kaldı.
 
 Otomatik arayüz testleri jsdom, veri testi gerçek Deneme PostgreSQL üzerinde çalışır. Bunlar canlı kullanıcı hesabında uçtan uca tarayıcı kullanımının veya bir mesajın tesliminin kanıtı değildir.
+
+## v11.9 satış tarihi raporu ve teklif geçmişi
+
+Yönetim raporundaki Gerçekleşen satışlar görünümü `fq_satis_raporu` üzerinden kayıtlı satış tarihine göre çalışır. Ağustosta oluşturulup eylülde satılan teklif eylül satışlarına girer. Tarih aralığının iki sınırı da dahildir; Bu ay ve Önceki ay seçimleri Türkiye takvimini kullanır. Teklif ve satış görünümleri kendi filtrelerini ayrı saklar. Satış görünümünde satış sayısı, gerçekleşen toplam ve ortalama gösterilir; teklif dönüşüm oranı hesaplanmaz. Satış tarihi eksik veya geçersiz Satıldı kayıtları aya atanmaz; seçili mağaza ve aramadaki tüm dönemleri kapsayan ayrı bir sayıyla açıklanır. Eksik tutar veya tarih tahmin edilmez; gerçekleşen satış tutarı tahsilat değildir.
+
+Satış Excel'i eşleşen kayıtların tamamını sayfalar halinde alır ve rapor kapsamını ayrı sayfada açıklar. Görünüm, filtre veya oturum değişirse devam eden aktarım iptal edilir. Eksik sayfa, mükerrer kayıt veya değişen rapor revizyonunda dosya oluşturulmaz. Arayüz testleri ay/yıl geçişlerini, artık yılı, bağımsız görünüm filtrelerini, geciken yanıtları, sıfır ve kuruşlu tutarları, tarihsiz kayıt açıklamasını ve tam Excel aktarımını kapsar.
+
+Teklif ve görüşme geçmişi, başarılı teklif değişikliğiyle aynı işlem içinde sunucu tarafından eklenir. Müşteri, ürün/fiyat, durum, görüşme notu, arama ve gerçek satış bilgilerindeki değişiklikler önce/sonra değerleriyle tutulur. İstemci geçmişe doğrudan kayıt ekleyemez, değiştiremez veya silemez; okuma mevcut teklif ve marka erişimine bağlıdır. Başarısız veya geri alınan kayıt geçmiş bırakmaz; izlenen bilgiler değişmediyse yeni olay oluşmaz. Geçmiş ekranını açıp kapatmak takip formundaki kaydedilmemiş notları değiştirmez.
+
+Mevcut teklifler için Başlangıç olayı, geçmiş kaydı açıldığı andaki bilgiyi saklar; eski görüşmeleri veya geçmişteki işlemleri yeniden kurmaz. İşlemi yapan bilgisi kullanılan mağaza/yönetim hesabını gösterir. Ayrı kişisel çalışan hesapları eklenmediği için ortak hesabı kullanan kişinin kimliği kesin olarak belirlenemez. İç geçmiş müşteri çıktısına eklenmez; maliyet, kâr, komisyon ve kimlik numarası gibi izin verilmeyen özet alanları geçmişe kopyalanmaz.
+
+`tests/sales-date-report-rls.sql` Deneme üzerinde başarıyla çalıştı: 1.205 satışın eksiksiz sayfalanması, teklif ve satış ayının ayrılması, dahil tarih sınırları, sıfır/kuruşlu toplamlar, boş/sonsuz tarihler için ayrı sayım, arama/mağaza filtresi, yetkili merkez erişimi, bayi/pasif/eksik profil/anon retleri ve aktarım revizyonunun değişiklikleri yakalaması doğrulandı. `tests/quote-history-rls.sql` başlangıç anlamını, sistem işlemlerini, bozuk/eski özetlerin güvenli okunmasını, izinli alanları, hesap atfını, önceki notların korunmasını, teklif fiyatıyla gerçek tutarın ayrılmasını, sürüm çakışmasını, başarısız işlemlerin atomikliğini, geçmişe doğrudan yazmanın reddini, bayi/marka/anon sınırlarını, sayfalamayı ve geçmişi olan teklifin silinmesinin reddini doğruladı. İki SQL testi yalnız Deneme projesinde sentetik kayıtlarla çalıştırıldı; tüm test kayıtları ROLLBACK ile kaldırıldı.
+
+Canlı migration: `20260910151518_sales_report_history_v119`. Mevcut 16 teklifin parmak izi işlem öncesi ve sonrası aynı kaldı (`e50207ab7db3c6f74ae4d2b7f9f51507`); her teklif için bir başlangıç olayı oluşturuldu. Geçmiş tablosunda RLS açık, authenticated rolünün doğrudan yazma yetkisi kapalıdır. İki yeni okuma RPC'si SECURITY INVOKER kullanır ve anon erişimi yoktur. 167 jsdom testi ve 15 JavaScript kaynağının sözdizimi kontrolü geçti. Canlı kullanıcı hesabıyla yeni akışların uçtan uca tarayıcı kullanımı ayrıca test edilmedi; bu doğrulamalar böyle bir kabul testi yerine geçmez.
+
+
+## v11.9 satışçı maliyet görünürlüğü düzeltmesi
+
+Sade görünüm maliyet/BİP/net maliyet sütunlarını gizlediği için satışçı bu tutarları yalnız Detaylı görünümde görebiliyordu. Ürün adının altına sürekli görünen Maliyet, BİP desteği ve Net maliyet alanları eklendi. Bunlar 1 adet için, kuruşlarıyla gösterilir; peşin/taksitli satış fiyatları mevcut satır toplamı anlamını korur. Net maliyet maliyet−BİP'tir; bundle hakedişi buradan ikinci kez düşülmez.
+
+Manuel modda mevcut motor kuralı korunur: girilen birim maliyet kullanılır ve BİP ayrıca uygulanmaz. Bu durum açıkça yazılır. Manuel maliyet girdisi sade ekranda erişilebilir hale geldi; görünüm değişirken ikinci gizli input bırakılmaz. Sıfır BİP ve sıfır net maliyet görünür, bilinmeyen maliyet sıfır olarak sunulmaz. Ürün kodu değişince eski maliyet alanı temizlenir; başarısız/bekleyen veri için eski tutar gösterilmez.
+
+`tests/sales-cost-visibility.test.cjs` altı yeni kontrol içerir: mağaza/merkez/yönetim görünürlüğü, çok adet için birim değer ve kuruşlar, manuel girdinin tek kalması ve müşteri görünümünün açılması, sıfır/eksik bilgi, değişen ürün/yükleme, pazarlık fiyatından bağımsız maliyet ve müşteri görünümünde iç bilgilerin bulunmaması. Müşteri görünümü ve kayıtlı yazdırma/WhatsApp regresyonlarıyla 26 hedefli kontrol geçti; 15 JavaScript kaynağı sözdizimi kontrolünden geçti.
+
+Bu düzeltme v11.9 yayın paketine eklendi. Kullanıcı 10 Eylül 2026'da v11.9 kodlarının, migration ve test dosyalarının mevcut herkese açık GitHub deposunda paylaşılmasını ve fiyatiq.com üzerinde yayımlanmasını onayladı. Yeni veritabanı migration'ı gerekmiyor. Hesaplama motoru, fiyat kaynağı, PH oranı, erişim rolleri ve müşteri çıktılarının alan listeleri değiştirilmedi.

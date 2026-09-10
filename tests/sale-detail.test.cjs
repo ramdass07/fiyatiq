@@ -44,12 +44,20 @@ test('historical detail distinguishes a confirmed zero actual sale from absent v
 });
 
 test('historical detail exposes recorded-print and WhatsApp actions for the original quote identity',t=>{
- const h=harness(t),body=render(h,record()),buttons=[...body.querySelectorAll('.fq-actions button')];
+ const h=harness(t),body=render(h,record()),buttons=[...body.querySelectorAll('.fq-actions button')].filter(button=>/fqPrintSavedQuote|fqShareSavedQuote/.test(button.getAttribute('onclick')||''));
  assert.deepEqual(buttons.map(button=>button.textContent),['Kayıtlı teklifi yazdır','Kayıtlı teklifi WhatsApp’ta aç']);
  assert.ok(buttons.every(button=>button.dataset.quote==='historical-sale'));
  assert.equal(buttons[0].getAttribute('onclick'),'fqPrintSavedQuote(this.dataset.quote)');
  assert.equal(buttons[1].getAttribute('onclick'),'fqShareSavedQuote(this.dataset.quote)');
  assert.equal(field(body,'Teklif no'),'FQ-OLD-42');
+});
+
+test('historical detail opens internal history for the original saved quote',t=>{
+ const h=harness(t),id='11920000-0000-4000-8000-000000000001',body=render(h,record({id}));
+ const button=[...body.querySelectorAll('button')].find(button=>button.textContent==='Geçmiş');
+ assert.ok(button);
+ assert.equal(button.dataset.quote,id);
+ assert.equal(button.getAttribute('onclick'),'fqOpenQuoteHistory(this.dataset.quote)');
 });
 
 test('nonsold historical details show quote totals without presenting actual-sale data',t=>{
