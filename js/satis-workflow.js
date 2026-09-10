@@ -111,7 +111,7 @@ function fqCapture(){
   if(row&&FQ_ROW_KEYS.includes(key)){const value=key==='kod'?active.value.trim().toUpperCase():trSayi(active.value);
    if(key==='kod'||Number.isFinite(value)&&(key!=='adet'||value>0))row[key]=value;}}
 
- return {version:1,brand,fields,inputs:Object.fromEntries(FQ_INPUT_IDS.map(id=>[id,($(id)||{}).value||''])),rows:rows.filter(r=>r.kod).map(r=>Object.fromEntries(FQ_ROW_KEYS.map(k=>[k,r[k]??null]))),campaigns:[...secilenKampanya],total:lastTot?lastTot.finalNakit:null};
+ return {version:1,brand,fields,validity_requested:fqValidityValue(),inputs:Object.fromEntries(FQ_INPUT_IDS.map(id=>[id,($(id)||{}).value||''])),rows:rows.filter(r=>r.kod).map(r=>Object.fromEntries(FQ_ROW_KEYS.map(k=>[k,r[k]??null]))),campaigns:[...secilenKampanya],total:lastTot?lastTot.finalNakit:null};
 }
 function fqFingerprint(d){const {total,...state}=d;return JSON.stringify(state);}
 function fqHasWork(){return fqCapture().rows.length>0||FQ_CUSTOMER_IDS.some(id=>!['satisPersonel','mSipT'].includes(id)&&($(id)||{}).value);}
@@ -141,6 +141,7 @@ function fqDraftReadAll(){
 }
 function fqValidDraft(d){return !!d&&d.version===1&&typeof d.id==='string'&&['bosch','siemens'].includes(d.brand)&&Array.isArray(d.rows)&&d.rows.length<=1000&&d.rows.every(r=>r&&typeof r.kod==='string'&&r.kod.length<=100&&/^[A-Z0-9._/-]+$/i.test(r.kod)&&Number.isFinite(Number(r.adet))&&Number(r.adet)>0)&&d.fields&&typeof d.fields==='object'&&d.inputs&&typeof d.inputs==='object'&&Array.isArray(d.campaigns)&&Number.isFinite(d.updatedAt);}
 function fqWorkflowReady(){
+ fqValidityReset();
  fqFlow.ready=true;fqFlow.baseline=fqFingerprint(fqCapture());fqFlow.savedCustomer=null;fqFlow.review=false;fqFlow.draftId=null;
  $('fqReviewBox').hidden=true;
  try{const count=fqDraftReadAll().length;fqDraftStatus(count?count+' taslak bulundu · Taslaklar düğmesinden devam edebilirsin.':'Değişiklikler bu tarayıcıda otomatik taslak olarak tutulur.');}catch(e){fqDraftStatus('Tarayıcı taslak kaydına izin vermiyor. Teklifini kaydetmeyi unutma.',true);}
@@ -150,6 +151,7 @@ function fqWorkflowEnd(){
  for(const id of ['fqMyQuotes','fqDraftDialog','fqNewDialog']){const d=$(id);if(d&&d.open)d.close();}
  for(const id of ['fqMyList','fqDraftList'])if($(id))$(id).innerHTML='';
  for(const id of FQ_CUSTOMER_IDS)if($(id))$(id).value='';
+ fqValidityReset();
 }
 function fqClearWorkspace(){
  clearTimeout(fqFlow.timer);fqFlow.restoring=true;fqEpoch++;
@@ -158,7 +160,7 @@ function fqClearWorkspace(){
  $('banka').value='';$('taksit').innerHTML='<option value="">—</option>';komisOran=0;$('elleBanka').value='';$('elleOran').value='';$('elleKomFld').style.display='none';ticariKontrol();
  if(fqDataReady)fqPricingError='';
  for(const id of ['mtPesin','mtTaksit'])$(id).value='';$('saveMsg').textContent='';fqFlow.review=false;$('fqReviewBox').hidden=true;
- renderRows();fqFlow.restoring=false;fqFlow.baseline=fqFingerprint(fqCapture());fqDraftStatus('Yeni teklif · müşteri bilgileri temizlendi.');
+ fqValidityReset();renderRows();fqFlow.restoring=false;fqFlow.baseline=fqFingerprint(fqCapture());fqDraftStatus('Yeni teklif · müşteri bilgileri temizlendi.');
 }
 function fqCanStartWork(){if(fqFlow.ready&&fqDataReady)return true;alert('Fiyat verileri henüz hazır değil. Yüklemenin tamamlanmasını bekle; hata varsa sayfayı yenile.');return false;}
 function fqRequestNew(){if(!fqCanStartWork())return;if(fqSaving||fqFlow.busy){alert('Devam eden işlemin bitmesini bekle.');return;}if(!fqHasWork()){fqClearWorkspace();return;}$('fqNewMessage').textContent='';$('fqNewDialog').showModal();}
@@ -184,7 +186,7 @@ async function fqRestoreDraft(id){
  await fqRestoreInputs(d);$('fqDraftDialog').close();
  }catch(e){$('fqDraftMessage').textContent='Taslak açılamadı. Kaydı, marka erişimini ve bağlantını kontrol et.';}
 }
-async function fqRestoreInputs(d){
+async function fqRestoreInputs(d,options={}){
  if(!allowedBrands().includes(d.brand))throw Error('brand');
  const user=authUid;fqFlow.busy=true;fqClearWorkspace();fqFlow.restoring=true;fqFlow.review=true;$('fqReviewBox').hidden=false;
  try{
@@ -203,7 +205,7 @@ async function fqRestoreInputs(d){
  secilenKampanya=new Set(d.campaigns.filter(id=>aktifKampanyalar.some(k=>k.id===id)));
  manuelToplamPesin=trSayi(d.inputs.mtPesin);manuelToplamTaksit=trSayi(d.inputs.mtTaksit);$('mtPesin').value=d.inputs.mtPesin||'';$('mtTaksit').value=d.inputs.mtTaksit||'';
  savedTeklifId=null;currentTeklifNo=null;fqFlow.savedCustomer=null;fqFlow.draftId=null;fqFlow.review=true;$('fqReviewBox').hidden=false;
- const previous=Number(d.total);renderRows();
+ fqValidityRestore(d,options);const previous=Number(d.total);renderRows();
  $('fqReviewBox').firstChild.textContent='Güncel fiyat, stok ve kampanyalar sorgulandı. '+(Number.isFinite(previous)&&previous>0?'Önceki peşin toplam '+fmt(previous)+' ₺; güncel '+fmt(lastTot&&lastTot.finalNakit)+' ₺. ':'')+(bankExists?'':'Önceki banka bulunamadı; banka seçimini yenile. ')+'Kontrol ettikten sonra onayla. ';
  fqFlow.baseline='';
  }catch(e){if(user===authUid){fqPricingError='Geri yükleme tamamlanamadı. Bağlantıyı kontrol edip taslağı yeniden aç.';fqFlow.review=true;$('fqReviewBox').hidden=false;}throw e;
@@ -237,7 +239,7 @@ async function fqCopyQuote(id){
  const s=t.satirlar&&!Array.isArray(t.satirlar)?t.satirlar:{};
  const saved=s.workflow_inputs,items=Array.isArray(t.satirlar)?t.satirlar:(s.items||[]);
  const d=saved&&Array.isArray(saved.rows)?{...saved,brand:t.marka,fields:{...saved.fields,mAd:t.musteri_ad||'',mTel:t.musteri_tel||''}}:{brand:t.marka,fields:{mAd:t.musteri_ad||'',mTel:t.musteri_tel||'',satisPersonel:s.personel||''},inputs:{karOrani:'4',banka:s.banka||'',taksit:String(s.taksit||''),mtPesin:'',mtTaksit:''},rows:items.map(r=>({kod:r.model||r.kod,adet:r.adet||1,isET:false})),campaigns:[],total:t.toplam};
- await fqRestoreInputs(d);$('fqMyQuotes').close();$('adminView').style.display='none';$('bayiView').style.display='block';
+ await fqRestoreInputs(d,{copy:true});$('fqMyQuotes').close();$('adminView').style.display='none';$('bayiView').style.display='block';
  }catch(e){if(user===authUid)$('fqMyMessage').textContent='Teklif kopyalanamadı. Erişimini ve bağlantını kontrol et.';}finally{fqFlow.busy=false;}
 }
 

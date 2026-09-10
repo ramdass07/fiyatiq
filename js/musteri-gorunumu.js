@@ -58,7 +58,7 @@ function fqCustomerViewSnapshot(){
  if(rows.some(r=>!Number.isFinite(r.cash)||r.cash<0||(hasInstallments&&(!Number.isFinite(r.installment)||r.installment<0))))throw Error('Ürün fiyatlarını kontrol et.');
  const cash=Math.round(lastTot.finalNakit),installment=Math.round(lastTot.finalTaksit);
  if(rows.reduce((sum,r)=>sum+r.cash,0)!==cash||(hasInstallments&&rows.reduce((sum,r)=>sum+r.installment,0)!==installment))throw Error('Ürün fiyatları ve teklif toplamı uyuşmuyor.');
- return {rows,cash,installment,hasInstallments,bank:hasInstallments?bankaAdi():'',installments};
+ return {rows,cash,installment,hasInstallments,bank:hasInstallments?bankaAdi():'',installments,validityText:fqValidityText()};
 }
 function fqShowCustomerView(){
  fqCloseCustomerView();let offer;try{offer=fqCustomerViewSnapshot();}catch(error){alert(error.message);return false;}
@@ -78,5 +78,5 @@ function fqShowCustomerView(){
  function addTotal(label,amount,payment){const card=fqCustomerViewElement('div',null,'fq-cv-total');card.appendChild(fqCustomerViewElement('div',label,'fq-cv-total-label'));card.appendChild(fqCustomerViewElement('div',fmt(amount)+' ₺','fq-cv-total-amount'));if(payment)card.appendChild(fqCustomerViewElement('div',payment,'fq-cv-payment'));totals.appendChild(card);}
  addTotal('Peşin toplam',offer.cash);
  if(offer.hasInstallments)addTotal('Taksitli toplam',offer.installment,[offer.bank,offer.installments>1?offer.installments+' taksit':null].filter(Boolean).join(' · '));
- page.appendChild(totals);dialog.appendChild(page);dialog.showModal();return true;
+ page.appendChild(totals);page.appendChild(fqCustomerViewElement('p',offer.validityText,'fq-cv-payment'));dialog.appendChild(page);dialog.showModal();return true;
 }

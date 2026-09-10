@@ -378,13 +378,15 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
     <button class="ghost" onclick="showSignup()">Hesabın yok mu? Kayıt ol</button>
   </div>
   <div class="card" id="signupCard" style="display:none">
-    <input id="suAd" placeholder="Ad Soyad">
-    <input id="suMagaza" placeholder="Mağaza adı">
-    <select id="suMarka"><option value="siemens">Siemens bayisiyim</option><option value="bosch">Bosch bayisiyim</option></select>
-    <input id="suEmail" type="email" placeholder="E-posta">
-    <input id="suPass" type="password" placeholder="Şifre (en az 6 karakter)">
-    <button onclick="signUp()">Kayıt Ol</button>
-    <div id="suMsg" class="ok-msg"></div>
+    <h2>Mağaza başvurusu</h2>
+    <label for="suAd">Ad soyad</label><input id="suAd" placeholder="Ad soyad" autocomplete="name" maxlength="60" required>
+    <label for="suMagaza">Mağaza adı</label><input id="suMagaza" placeholder="Mağaza adı" autocomplete="organization" maxlength="60" required>
+    <label for="suMarka">Başvurulan marka</label><select id="suMarka"><option value="">Marka seç</option><option value="siemens">Siemens</option><option value="bosch">Bosch</option><option value="both">Siemens ve Bosch</option></select>
+    <label for="suEmail">E-posta</label><input id="suEmail" type="email" placeholder="E-posta" autocomplete="email" required>
+    <label for="suPass">Şifre (en az 8 karakter)</label><input id="suPass" type="password" placeholder="En az 8 karakter" autocomplete="new-password" minlength="8" required onkeydown="if(event.key==='Enter')signUp()">
+    <p class="mut" style="font-size:12px;margin:0">Marka seçimin başvuruya eklenir. Mağaza, stok ve fiyat listesi erişimini yönetici onaylar.</p>
+    <button id="suSubmit" onclick="signUp()">Başvuru gönder</button>
+    <div id="suMsg" class="ok-msg" role="status"></div>
     <button class="ghost" onclick="showLogin()">Zaten hesabın var mı? Giriş yap</button>
   </div>
 </div>
@@ -1068,14 +1070,7 @@ async function signIn(){
  fqAuthMessage(error?fqAuthError(error):'');if(!error)$('pass').value='';
  }catch(e){fqAuthMessage('Bağlantı kurulamadı. Lütfen tekrar dene.');}finally{button.disabled=false;}
 }
-async function signUp(){
-  const ad=$("suAd").value.trim(), magaza=$("suMagaza").value.trim(), marka=$("suMarka").value;
-  const email=$("suEmail").value.trim(), pass=$("suPass").value;
-  if(!ad||!email||pass.length<6){ $("suMsg").className="err"; $("suMsg").textContent="Ad, e-posta ve en az 6 karakter şifre gerekli."; return; }
-  const {error}=await sb.auth.signUp({email, password:pass, options:{data:{ad, magaza, marka}}});
-  if(error){ $("suMsg").className="err"; $("suMsg").textContent="Hata: "+error.message; return; }
-  $("suMsg").className="ok-msg"; $("suMsg").textContent="✓ Kaydın alındı. Yönetici onayından sonra giriş yapabilirsin.";
-}
+async function signUp(){return fqSubmitSignup();}
 async function signOut(){ if(fqFollowupDirty()&&!confirm('Kaydedilmemiş müşteri takip notları bırakılarak çıkış yapılsın mı?'))return;if(fqSaving||fqFlow.busy||fqFollowup.saving){alert('İşlem tamamlanınca çıkış yapabilirsin.');return;}if(!fqDraftFlush()){alert('Taslak saklanamadı. Çıkmadan önce teklifi kaydet.');return;}fqResetSession();appReady=false;await sb.auth.signOut({scope:'local'});show('loginView'); }
 
 async function showApp(session){
@@ -1215,7 +1210,7 @@ async function setBrand(b){
  if(!fqFlow.restoring){if(fqSaving||fqFlow.busy)return;if(fqHasWork()&&!confirm('Marka değiştirilsin mi? Mevcut çalışma taslakta tutulur; yeni markada boş teklif açılır.'))return;if(!fqDraftFlush())return;fqClearWorkspace();}
  hkExcelReset();brand=b;fqDataReady=false;fqPricingError="Marka verileri yükleniyor…";const epoch=++fqEpoch;secilenKampanya.clear();fqInvalidateCatalog();setManuelToplam('sifirla');
  primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};
- quoteRows.forEach(r=>{r.toptan=null;r.bip=0;r.etiket=null;r.kampFiyat=null;r.primliFiyat=null;r.netStok=null;r._fetchId=(r._fetchId||0)+1;});
+ quoteRows.forEach(r=>{r.toptan=null;r.bip=0;r.etiket=null;r.kampFiyat=null;r.primliFiyat=null;r.netStok=null;r.stockFreshness=null;r.kadikoyTarih=null;r._fetchId=(r._fetchId||0)+1;});
  document.body.classList.toggle('brand-bosch',b==='bosch');document.body.classList.toggle('brand-siemens',b==='siemens');
  document.querySelectorAll('#brandSeg button').forEach(x=>x.classList.toggle('on',x.dataset.b===b));
  const am=$('aktifMarka');if(am)am.textContent='Aktif: '+markaAd(b);syncAdminBrand();topluTemizle();renderRows();
@@ -1348,7 +1343,10 @@ async function bankaExcelYukle(){
 
 // ===== BAYİLER =====
 async function loadBayiler(){
-  const {data} = await sb.from("profiller").select("id,ad,magaza,rol,abonelik_durumu,marka_erisimi,bayi_sahibi").order("created_at",{ascending:false});
+  const epoch=fqEpoch,uid=authUid;
+  const {data,error} = await sb.from("profiller").select("id,ad,magaza,rol,abonelik_durumu,marka_erisimi,bayi_sahibi,basvuru_markalari").order("created_at",{ascending:false});
+  if(epoch!==fqEpoch||uid!==authUid)return;
+  if(error){const msg=$('bayiMsg');if(msg)msg.textContent='Başvurular yüklenemedi. Bağlantını kontrol edip tekrar dene.';return;}
   const tb=$("bayiList"); if(!tb) return;
   window._bayiCache={}; (data||[]).forEach(p=>window._bayiCache[p.id]=p);
   tb.innerHTML=(data||[]).map(p=>{
@@ -1359,7 +1357,7 @@ async function loadBayiler(){
       return `<button class="ghost sm" title="${on?ad+' erişimi AÇIK — kapatmak için tıkla':ad+' erişimi kapalı — açmak için tıkla'}" style="${on?`background:${renk};border-color:${acikRenk};color:${acikRenk};font-weight:800`:''}" onclick="setBayiMarka('${p.id}','${marka}')">${on?'✓ ':''}${ad}</button>`; };
     const subeBtn=`<button class="ghost sm" title="${sube?'ŞUBEN: şirketin ORTAK stok havuzunu ve primli listesini görür. Bağımsız yapmak için tıkla.':'BAĞIMSIZ bayi: kendi stok havuzu vardır, senin stoklarını GÖREMEZ. Şuben yapmak için tıkla.'}" style="${sube?'background:rgba(56,189,248,.22);border-color:var(--acc);color:var(--acc);font-weight:800':''}" onclick="setBayiSube('${p.id}',${sube?'false':'true'})">${sube?'🏬 Şubem':'Bağımsız'}</button>`;
     return `<tr>
-      <td><b>${esc(p.ad||"—")}</b><div class="mut" style="font-size:12px">${esc(p.magaza||"")}</div></td>
+      <td><b>${esc(p.ad||"—")}</b><div class="mut" style="font-size:12px">${esc(p.magaza||"")}</div>${!aktif&&p.basvuru_markalari&&p.basvuru_markalari.length?`<div class="mut" style="font-size:12px">Marka talebi: ${esc(p.basvuru_markalari.join(', '))}</div>`:''}</td>
       <td>${mk}</td><td>${p.rol==='personel'?'Merkez editörü':esc(p.rol)}</td>
       <td><span class="pill ${aktif?'aktif':'pasif'}">${p.abonelik_durumu}</span></td>
       <td>${p.rol==='admin' ? '<span class="badge">👑 Yönetici — her zaman aktif</span>' : `
@@ -1413,7 +1411,7 @@ async function setBayiSube(id,yap){
   if(error){ alert("Kaydedilemedi: "+error.message); return; }
   loadBayiler();
 }
-async function setBayiDurum(id,durum){ await sb.from("profiller").update({abonelik_durumu:durum}).eq("id",id); loadBayiler(); }
+async function setBayiDurum(id,durum){return fqChangeBayiStatus(id,durum);}
 // Marka butonları AÇ/KAPA çalışır: tıklanan marka ekleniyor/çıkarılıyor; en az bir marka açık kalmalı
 async function setBayiMarka(id,marka){
   const p=(window._bayiCache||{})[id]; const cur=(p&&p.marka_erisimi)||[];
@@ -1451,7 +1449,7 @@ async function bayiStokYukle(){
 
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
-function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,ikiliEsIdx:null,nakitSecili:false,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,netStok:null}; }
+function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,ikiliEsIdx:null,nakitSecili:false,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,stockFreshness:null,netStok:null}; }
 function addRow(focus=false){ quoteRows.push(bosSatir()); renderRows(); if(focus)focusCodeRow(quoteRows.length-1); }
 function focusCodeRow(i){const e=document.querySelectorAll('#rows input[placeholder="model kodu"]')[i];if(e)e.focus();}
 async function codeEnter(i,value){await onCode(i,value);if(!quoteRows[i]||quoteRows[i].veriHata)return;if(i===quoteRows.length-1)quoteRows.push(bosSatir());renderRows();focusCodeRow(i+1);}
@@ -1489,40 +1487,32 @@ function stokSec(kod){ $("stokSorguInput").value=kod; stokKapatOner(); stokSorgu
 function stokKapatOner(){ const b=$("stokOneri"); if(b) b.style.display="none"; }
 async function stokSorgula(){
   const q=($("stokSorguInput").value||"").trim().toUpperCase(); const box=$("stokSorguSonuc");
+  const mk=brand,owner=stokSahibi(),epoch=fqEpoch,uid=authUid,period=aktifDonem||_donem(),request=stokSorgula.requestId=(stokSorgula.requestId||0)+1;
+  const current=()=>request===stokSorgula.requestId&&epoch===fqEpoch&&uid===authUid&&mk===brand&&owner===stokSahibi()&&q===($("stokSorguInput").value||"").trim().toUpperCase();
   if(!q){ box.innerHTML=""; return; }
   box.innerHTML='<span class="mut">Sorgulanıyor...</span>';
-  const {data:f,error:fe}=await sb.rpc("urun_fiyat",{p_model_kodu:q,p_marka:brand,p_donem:aktifDonem||_donem()});
+  const {data:f,error:fe}=await sb.rpc("urun_fiyat",{p_model_kodu:q,p_marka:mk,p_donem:period});
+  if(!current())return;
   if(fe){box.textContent="Fiyat sorgulanamadı. Bağlantıyı kontrol edip yeniden deneyin.";return;}
   const row=f&&f[0];
   let stokHtml="";
   {
-    const {data:st,error:se}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",q).eq("marka",brand).eq("bayi_id",stokSahibi());
+    const {data:st,error:se}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",q).eq("marka",mk).eq("bayi_id",owner);
+    if(!current())return;
     if(se){box.textContent="Stok sorgulanamadı; bu durum stok sıfır demek değildir. Yeniden deneyin.";return;}
-    const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
-    const tar={mars:null,horoz:null,kadikoy:null};   // 📅 her deponun SAYIM tarihi
-    (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return;
-      if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0);
-      if(x.stok_tarihi && (!tar[x.depo] || x.stok_tarihi>tar[x.depo])) tar[x.depo]=x.stok_tarihi; });
-    const kadikoyTarih=tar.kadikoy;
-    const netHam=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
+    const freshness=stockFreshnessFromRows(st);
+    if(!freshness){box.textContent="Stok kayıtları doğrulanamadı. Yeniden deneyin.";return;}
+    const depots=freshness.depots,hasExisting=depots.some(d=>d.mevcutRows>0);
+    const netHam=hasExisting?depots.reduce((sum,d)=>sum+d.mevcut-d.ayrilmis,0):null;
     const dus=hasarliDusum(q,null);                     // 🚫 sorunlu adet
-    const net=netHam-dus;
-    // 📅 Sayım tarihi rozeti — eskiyince renk değişir. Kendi depo haftada bir sayılabildiği için
-    //    ona 7 gün, Mars/Horoz otomatik geldiği için 3 gün tolerans (31 Ağu, Burak isteği).
-    const tarRozet=(d,esik)=>{ if(!d) return ' <span class="mut" style="font-size:10px">(sayım tarihi yok)</span>';
-      const g=gunFark(d); const eski=g>esik;
-      const renk = g>esik*2 ? 'var(--bad)' : (eski ? 'var(--warn)' : '');
-      return ` <span style="font-size:10px;${renk?`color:${renk};font-weight:800`:'opacity:.65'}" title="Son sayım ${fmtTarih(d)} · ${g} gün önce">${eski?'⚠ ':''}sayım ${fmtTarih(d)}${eski?` · ${g} gün`:''}</span>`; };
-    const kdEski = tar.kadikoy ? gunFark(tar.kadikoy) : null;
+    const net=netHam===null?null:netHam-dus;
+    const depoSatiri=d=>`<tr><td>${esc(d.key==='mars'?'Mars':d.key==='horoz'?'Horoz':depoAdi())} ${d.key==='kadikoy'&&d.mevcut>0?'<span class="kd">KD</span>':''}</td><td class="num">${d.mevcutRows?stokCell(d.mevcut):'<span class="mut">Kayıt yok</span>'}</td><td class="num">${d.ayrilmisRows?stokCell(d.ayrilmis):'<span class="mut">Kayıt yok</span>'}</td></tr>`;
     stokHtml=`<table style="margin-top:6px;width:auto"><thead><tr><th>Depo</th><th class="num">Mevcut</th><th class="num">Ayrılan</th></tr></thead><tbody>
-      <tr><td>Mars${tarRozet(tar.mars,3)}</td><td class="num">${stokCell(acc.mars.m)}</td><td class="num">${ayrCell(acc.mars.a)}</td></tr>
-      <tr><td>Horoz${tarRozet(tar.horoz,3)}</td><td class="num">${stokCell(acc.horoz.m)}</td><td class="num">${ayrCell(acc.horoz.a)}</td></tr>
-      <tr><td>${depoAdi()} ${acc.kadikoy.m>0?'<span class="kd">KD</span>':''}${tarRozet(tar.kadikoy,7)}</td><td class="num">${stokCell(acc.kadikoy.m)}</td><td class="num">${ayrCell(acc.kadikoy.a)}</td></tr>
-      </tbody><tfoot><tr><th>NET satılabilir</th><th class="num ${net<=0?'bad':net<=3?'warn':'ok'}" colspan="2">${net}</th></tr></tfoot></table>
-      ${dus>0?`<div class="mut" style="margin-top:4px;font-size:12px">Görünen ${netHam} · <span style="color:var(--bad);font-weight:700">sorunlu ${dus}</span> → NET ${net}</div>`:''}
-      ${(kdEski!=null&&kdEski>7)?`<div style="margin-top:5px;background:${kdEski>14?'var(--bad)':'var(--warn)'};color:${kdEski>14?'#fff':'#1a1300'};border-radius:8px;padding:7px 10px;font-weight:800;font-size:12.5px">📅 ${depoAdi()} deposu ${kdEski} gündür sayılmamış (son sayım ${fmtTarih(tar.kadikoy)}) — bu rakama güvenme, depoyu say.</div>`:''}
-      ${(kdEski==null&&acc.kadikoy.m>0)?`<div class="mut" style="margin-top:5px;font-size:12px">📅 ${depoAdi()} deposunda sayım tarihi yok.</div>`:''}
-      ${net<=0?'<div class="nostock" style="margin-top:4px">⚠ BU ÜRÜNDE STOK YOK</div>':''}`;
+      ${depots.map(depoSatiri).join('')}
+      </tbody><tfoot><tr><th>Kayıtlara göre NET satılabilir</th><th class="num ${net===null?'mut':net<=0?'bad':net<=3?'warn':'ok'}" colspan="2">${net===null?'Mevcut stok kaydı yok':net}</th></tr></tfoot></table>
+      ${net!==null&&dus>0?`<div class="mut" style="margin-top:4px;font-size:12px">Görünen ${netHam} · <span style="color:var(--bad);font-weight:700">sorunlu ${dus}</span> → NET ${net}</div>`:''}
+      ${stockFreshnessHTML({kod:q,stockFreshness:freshness})}
+      ${net!==null&&net<=0?'<div class="nostock" style="margin-top:4px">⚠ KAYITLARA GÖRE KULLANILABİLİR STOK YOK</div>':''}`;
   }
   const ad=row&&row.urun_adi?row.urun_adi:q;
   const pm=primliMap[q];
@@ -1535,7 +1525,7 @@ async function stokSorgula(){
   const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null && !pm)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
   box.innerHTML=`<div class="card" style="background:var(--field);margin:0;padding:14px;position:relative">
     <button class="ghost sm" title="Sonucu kapat" style="position:absolute;top:8px;right:8px;padding:2px 9px;font-size:13px" onclick="stokSorguKapat()">✕</button>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:34px"><b style="font-size:16px">${ad}</b> <span class="badge" style="font-size:9px">${brand}</span>${primliRozet(q)}${kampRozet(q)}${yok}</div>${hasarliUyariKutu(q)}${fiyat}${stokHtml}</div>`;
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:34px"><b style="font-size:16px">${ad}</b> <span class="badge" style="font-size:9px">${mk}</span>${primliRozet(q)}${kampRozet(q)}${yok}</div>${hasarliUyariKutu(q)}${fiyat}${stokHtml}</div>`;
 }
 function stokSorguKapat(){ const b=$("stokSorguSonuc"); if(b) b.innerHTML=""; const i=$("stokSorguInput"); if(i) i.value="";
 }
@@ -1565,7 +1555,7 @@ function renderRows(){
     if(secilenKampanya.size) secilenKampanya.clear();
     // Kaydedilmiş teklif kapandıysa yeni müşteriye temiz başla: teklif no ve müşteri alanları sıfırlanır
     if(savedTeklifId){ savedTeklifId=null; currentTeklifNo=null;
-      fqClearCustomer();fqFlow.savedCustomer=null;
+      fqClearCustomer();fqFlow.savedCustomer=null;fqValidityReset();
       const sm=$("saveMsg"); if(sm){ sm.textContent=""; sm.className="mut"; } }
     else currentTeklifNo=null;
   }
@@ -1609,7 +1599,7 @@ function renderRows(){
       <td><input data-fq-row="${i}" data-fq-field="kod" value="${esc(r.kod)}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();codeBlur(${i},this.value)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();codeEnter(${i},this.value);}"></td>
-      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?"Stok: sorgu bekleniyor":"Kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Hiçbir depoda stok yok">⚠ BU ÜRÜNDE STOK YOK</span>':''}</td>
+      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" min="1" step="1" data-fq-row="${i}" data-fq-field="adet" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -1702,6 +1692,7 @@ function renderRows(){
     else kr.style.display="none"; }
   renderKampanyaPanel();
   try{ renderNetDokum(); }catch(e){}
+  fqValidityRefresh();
   fqDraftSchedule();
 }
 // Satış uyarıları: stok yok / kritik stok / düşük kâr — büyük kırmızı yanıp söner
@@ -1859,7 +1850,7 @@ function hideAC(){ clearTimeout(acTimer);setTimeout(()=>$("ac").classList.remove
 async function refetch(r){
   const kod=r.kod,mk=brand,epoch=fqEpoch,donem=aktifDonem||_donem(),rid=r._fetchId=(r._fetchId||0)+1;
   const stale=()=>epoch!==fqEpoch||mk!==brand||r.kod!==kod||r._fetchId!==rid;
-  r.veriHata="Ürün verisi yükleniyor";
+  r.veriHata="Ürün verisi yükleniyor";r.stockFreshness=null;r.kadikoyTarih=null;r.netStok=null;
 
   if(!r.kod){ renderRows(); return; }
   const {data:f,error:fe} = await sb.rpc("urun_fiyat",{p_model_kodu:kod,p_marka:mk,p_donem:donem});
@@ -1879,16 +1870,16 @@ async function refetch(r){
     // 🏬 Şubem hesapları merkezin havuzunu paylaşır — bkz. stokSahibi().
     const {data:st,error:se}=await sb.from("stok").select("depo,tip,adet,stok_tarihi").eq("model_kodu",kod).eq("marka",mk).eq("bayi_id",stokSahibi());
     if(stale())return;if(se){r.veriHata="Stok sorgulanamadı";r.netStok=null;renderRows();return;}
-    const acc={mars:{m:0,a:0},horoz:{m:0,a:0},kadikoy:{m:0,a:0}};
-    let kadikoyTarih=null;
-    (st||[]).forEach(x=>{ const d=acc[x.depo]; if(!d) return; if(x.tip==='ayrilmis') d.a+=(x.adet||0); else d.m+=(x.adet||0); if(x.depo==='kadikoy' && x.stok_tarihi) kadikoyTarih=x.stok_tarihi; });
-    r.kadikoyTarih=kadikoyTarih;
-    r.marsMevcut=acc.mars.m; r.horozMevcut=acc.horoz.m; r.kadikoyMevcut=acc.kadikoy.m;
-    r.marsAyrilan=acc.mars.a; r.horozAyrilan=acc.horoz.a;
-    r.sKadikoy=acc.kadikoy.m-acc.kadikoy.a;
-    r.netStokHam=(acc.mars.m+acc.horoz.m+acc.kadikoy.m)-(acc.mars.a+acc.horoz.a+acc.kadikoy.a);
+    r.stockFreshness=stockFreshnessFromRows(st);
+    if(!r.stockFreshness){r.veriHata="Stok sorgulanamadı";renderRows();return;}
+    const depots=r.stockFreshness.depots,[mars,horoz,kadikoy]=depots;
+    r.kadikoyTarih=stockFreshnessDepotDate(r.stockFreshness,'kadikoy');
+    r.marsMevcut=mars.mevcutRows?mars.mevcut:null;r.horozMevcut=horoz.mevcutRows?horoz.mevcut:null;r.kadikoyMevcut=kadikoy.mevcutRows?kadikoy.mevcut:null;
+    r.marsAyrilan=mars.ayrilmisRows?mars.ayrilmis:null;r.horozAyrilan=horoz.ayrilmisRows?horoz.ayrilmis:null;
+    r.sKadikoy=kadikoy.mevcutRows?kadikoy.mevcut-kadikoy.ayrilmis:0;
+    r.netStokHam=depots.some(d=>d.mevcutRows>0)?depots.reduce((sum,d)=>sum+d.mevcut-d.ayrilmis,0):null;
     r.hasarliDus=hasarliDusum(r.kod,null);              // 🚫 sorunlu adet düşülür
-    r.netStok=r.netStokHam-r.hasarliDus;
+    r.netStok=r.netStokHam===null?null:r.netStokHam-r.hasarliDus;
   }
   r.veriHata=null;
   renderRows();
@@ -2016,7 +2007,7 @@ function teklifDetayHTML(t){
  const campaigns=names?(names.length?names.map(n=>`<li>${esc(n)}</li>`).join(''):'<li>Uygulanan kampanya yok.</li>'):'<li>Kampanya bilgisi bu teklife kaydedilmemiş.</li>';
  const rows=items.map(r=>`<tr><td>${esc(r.model||r.kod||'—')}</td><td>${esc(r.ad||'—')}</td><td class="num">${esc(r.adet??'—')}</td><td class="num">${esc(money(net?r.net_nakit:r.nakit))}</td><td class="num">${esc(money(net?r.net_taksit:r.taksit))}</td></tr>`).join('');
  return `<p class="mut">Teklifin kaydedildiği bilgiler gösterilir.</p><div class="detail-grid">${field('Teklif no',s.no||t.teklif_no)}${field('Tarih',date)}${field('Mağaza',s.magaza)}${field('Satış personeli',s.personel)}${field('Müşteri',t.musteri_ad)}${field('Telefon',t.musteri_tel)}${field('Marka',t.marka)}${field('Durum',DURUM_AD[t.durum||s.durum]||t.durum||s.durum)}</div>
- <h3>Ürünler</h3><p class="mut">${net?'Fiyatlar, indirimler sonrası satır toplamıdır.':'Bu eski kayıtta indirim sonrası satır dağılımı saklanmamış. Aşağıda kayıtlı birim fiyatlar, altta teklifin toplamı gösterilir.'}</p>
+ ${fqValidityHTML(s.gecerlilik)}<h3>Ürünler</h3><p class="mut">${net?'Fiyatlar, indirimler sonrası satır toplamıdır.':'Bu eski kayıtta indirim sonrası satır dağılımı saklanmamış. Aşağıda kayıtlı birim fiyatlar, altta teklifin toplamı gösterilir.'}</p>
  <div class="detail-scroll"><table><thead><tr><th>Model</th><th>Ürün</th><th class="num">Adet</th><th class="num">${net?'Peşin satır toplamı':'Peşin birim fiyat'}</th><th class="num">${net?'Taksitli satır toplamı':'Taksitli birim fiyat'}</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Ürün bilgisi kaydedilmemiş.</td></tr>'}</tbody></table></div>
  <h3>Ödeme ve kampanyalar</h3><div class="detail-grid">${field('Banka',s.banka)}${field('Taksit sayısı',s.taksit)}${field('Banka komisyonu',pct(h.komis))}${field('Gerçek peşin kâr',pct(h.karPct))}${field('Hakediş',money(h.hakedis))}${field('Kampanya müşteri indirimi',money(h.musteriInd))}</div><ul>${campaigns}</ul>
  <div class="detail-grid detail-totals">${field('Kayıtlı peşin toplam',money(t.toplam))}${field('Kayıtlı taksitli toplam',money(h.finalTaksit))}</div>`;
@@ -2089,12 +2080,17 @@ async function saveQuote(sessiz){ if(fqSaving)return fqSaving;
  if(fqFlow.savedCustomer&&fqCustomerKey()!==fqFlow.savedCustomer)throw new Error("Müşteri değişti. Yeni teklif aç.");
  const items=quoteRows.filter(r=>r.kod&&r.ad!=="— bulunamadı —").map(r=>({model:r.kod,ad:r.ad,adet:FiyatIQCore.quantity(r.adet),nakit:r.nakit,taksit:r.taksit,maliyet:r.maliyet,kd:r.sKadikoy>0}));
  if(!items.length)throw new Error("Geçerli ürün yok.");
- const quoteEpoch=fqEpoch,quoteUser=authUid,quoteFingerprint=fqFingerprint(fqCapture()),quoteCustomer=fqCustomerKey();
- const no=getTeklifNo(),satirlar={customer_fields:fqCapture().fields,workflow_inputs:fqCapture(),no,personel:($("satisPersonel")||{}).value||null,magaza:profil.magaza||null,items,snapshot_version:1,net_items:teklifSatirlar(teklifItems()).rows.map(x=>({model:x.r.kod,ad:x.r.ad,adet:x.r.adet,net_nakit:x.netP,net_taksit:x.netT})),hesap:JSON.parse(JSON.stringify(lastTot||{})),banka:bankaAdi(),taksit:+$("taksit").value||0};
+ const quoteEpoch=fqEpoch,quoteUser=authUid,quoteInputs=fqCapture(),quoteFingerprint=fqFingerprint(quoteInputs),quoteCustomer=fqCustomerKey();
+ const captureNetItems=()=>teklifSatirlar(teklifItems()).rows.map(x=>({model:x.r.kod,ad:x.r.ad,adet:x.r.adet,net_nakit:x.netP,net_taksit:x.netT}));
+ const no=getTeklifNo(),satirlar={customer_fields:quoteInputs.fields,workflow_inputs:quoteInputs,gecerlilik:fqValiditySnapshot(),no,personel:($("satisPersonel")||{}).value||null,magaza:profil.magaza||null,items,snapshot_version:1,net_items:captureNetItems(),hesap:JSON.parse(JSON.stringify(lastTot||{})),banka:bankaAdi(),taksit:+$("taksit").value||0};
  const toplam=lastTot?Math.round(lastTot.finalNakit):0;if(!Number.isFinite(toplam)||toplam<=0)throw new Error("Teklif toplamı geçersiz.");
  const kayit={bayi_id:user.id,teklif_no:no,marka:brand,musteri_ad:$("mAd").value||null,musteri_tel:$("mTel").value||null,satirlar,toplam,satis_tutari:toplam};
  const q=savedTeklifId?sb.from("teklifler").update(kayit).eq("id",savedTeklifId):sb.from("teklifler").upsert(kayit,{onConflict:"bayi_id,teklif_no"});
  const {data,error}=await q.select("id").single();if(error||!data)throw new Error(error&&error.message||"Kayıt güncellenmedi.");if(quoteEpoch!==fqEpoch||quoteUser!==authUid)return false;savedTeklifId=data.id;fqSaved(quoteFingerprint,quoteCustomer);
+ if(fqFingerprint(fqCapture())!==quoteFingerprint||JSON.stringify(lastTot||{})!==JSON.stringify(satirlar.hesap)||JSON.stringify(fqValiditySnapshot())!==JSON.stringify(satirlar.gecerlilik)||JSON.stringify(captureNetItems())!==JSON.stringify(satirlar.net_items)){
+  const retry="Teklifin önceki hali kaydedildi. Kayıt sırasında bilgi veya fiyat değişti; son değişiklikleri kaydetmek ve çıktı almak için tekrar dene.";
+  if(msg){msg.textContent=retry;msg.className="warn";}if(sessiz)alert(retry);return false;
+ }
  if(msg){msg.textContent="✓ Teklif kaydedildi · No: "+no;msg.className="ok";}return true;
  }catch(e){if(msg){msg.textContent="Kayıt hatası: "+e.message;msg.className="bad";}if(sessiz)alert("Çıktı hazırlanmadı: "+e.message);return false;}})();
  try{return await fqSaving;}finally{fqSaving=null;}
@@ -2179,10 +2175,13 @@ function teklifSatirlar(items){
 }
 function teklifToplam(items){ return lastTot? Math.round((komisOran>0?lastTot.finalTaksit:lastTot.finalNakit)) : items.reduce((a,r)=>a+(r.nakit||0)*(r.adet||1),0); }
 async function shareWhatsApp(){
-  const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
+  if(!teklifItems().length){ alert("Önce ürün ekle."); return; }
   if(!musteriKontrol("whatsapp")) return;
+  const outputFingerprint=fqFingerprint(fqCapture()),outputEpoch=fqEpoch,outputUser=authUid;
   const shareWindow=window.open("","_blank");if(!shareWindow){alert("Açılır pencere engellendi.");return;}shareWindow.opener=null;
   if(!await saveQuote(true)){shareWindow.close();return;}
+  if(outputEpoch!==fqEpoch||outputUser!==authUid||fqFlow.baseline!==outputFingerprint||fqFingerprint(fqCapture())!==outputFingerprint){shareWindow.close();alert("Teklif hazırlanırken bilgiler değişti. Güncel hali göndermek için WhatsApp düğmesine tekrar bas.");return;}
+  const items=teklifItems();
   const tk=+$("taksit").value, bk=bankaAdi();
   const taksitliVar=(tk>1)&&(komisOran>0 || ((($("banka")||{}).value)||"")!=="");
   const kampNames=(lastTot&&lastTot.appliedNames&&lastTot.appliedNames.length)?lastTot.appliedNames:[];
@@ -2206,16 +2205,20 @@ async function shareWhatsApp(){
   if(ind>0&&kampNames.length) m+=`🎁 Kampanya: ${kampNames.join(", ")} (toplam ${fmt(ind)} ₺ indirim fiyatlara dahil)\n`;
   else if(ind>0) m+=`🎁 Toplam indirim: ${fmt(ind)} ₺ (fiyatlara dahil)\n`;
   const personel=(($("satisPersonel")||{}).value)||""; if(personel) m+=`👤 Satış Personeli: ${personel}\n`;
+  m+='\n'+fqValidityText()+'\n';
   m+="\n_Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlıdır._";
   let phone=((($("mTel")||{}).value)||"").replace(/\D/g,""); if(phone.startsWith("0")) phone="90"+phone.slice(1); else if(phone.length===10) phone="90"+phone;
   const url= phone? `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(m)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(m)}`;
   shareWindow.location.href=url;
 }
 async function printDoc(kind){
-  const items=teklifItems(); if(!items.length){ alert("Önce ürün ekle."); return; }
+  if(!teklifItems().length){ alert("Önce ürün ekle."); return; }
   if(!musteriKontrol(kind)) return;
+  const outputFingerprint=fqFingerprint(fqCapture()),outputEpoch=fqEpoch,outputUser=authUid;
   const w=window.open("","_blank");if(!w){alert("Açılır pencere engellendi.");return;}
   w.document.body.textContent="Teklif kaydediliyor…";if(!await saveQuote(true)){w.close();return;}
+  if(outputEpoch!==fqEpoch||outputUser!==authUid||fqFlow.baseline!==outputFingerprint||fqFingerprint(fqCapture())!==outputFingerprint){w.close();alert("Teklif hazırlanırken bilgiler değişti. Güncel hali yazdırmak için yazdır düğmesine tekrar bas.");return;}
+  const items=teklifItems();
   const ad=esc(($("mAd")||{}).value||""), tel=esc(($("mTel")||{}).value||""), personel=esc(($("satisPersonel")||{}).value||""), toplam=teklifToplam(items), tk=+$("taksit").value, bk=bankaAdi();
   const baslik= kind==="siparis"?"SİPARİŞ FORMU":"FİYAT TEKLİFİ";
   // ÇIKTI = EKRAN: indirim İLGİLİ ürüne dağıtılır; PRİMLİ ürün fiyatı sabit; satırlar tam liraya yuvarlı
@@ -2308,6 +2311,7 @@ async function printDoc(kind){
   .info{display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
   table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px}th{background:#eff6ff;color:#1e40af}
   .tot{text-align:right;font-size:18px;font-weight:800;color:#1e40af;margin-top:12px}.foot{margin-top:18px;font-size:11px;color:#64748b}
+  .fq-validity-copy{font-size:11px;color:#475569;margin:8px 0}
   ${sipCss}</style></head>
   <body>${kind==="siparis"
     ? `<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:17px;font-weight:900">${markaBuyuk}</span><span style="font-size:14px;font-weight:900;color:#1e40af">fiyat<span style="color:#16a34a">iq</span></span></div>${sipUst}<div style="font-size:9px;color:#64748b;margin-top:1px">Teklif No: ${getTeklifNo()}</div>`
@@ -2317,7 +2321,7 @@ async function printDoc(kind){
   ${listeGoster?`<div style="margin-top:8px;font-size:13px;color:#16a34a;font-weight:800">Toplam avantajınız: ${fmt(avantajTop)} ₺ &nbsp;<span style="color:#64748b;font-weight:400;font-size:11px">(${markaBuyuk} tavsiye edilen perakende satış fiyatlarına göre)</span></div>`:""}
   ${(ind>0&&kampNames.length)?`<div style="margin-top:${kind==="siparis"?4:8}px;font-size:${kind==="siparis"?10:12}px;color:#1e40af"><b>Uygulanan Kampanya:</b> ${esc(kampNames.join(", "))} &nbsp;·&nbsp; Toplam indirim ${fmt(ind)} ₺ (ilgili ürünlerin fiyatlarına işlenmiştir)</div>`:(ind>0?`<div style="margin-top:${kind==="siparis"?4:8}px;font-size:${kind==="siparis"?10:12}px;color:#1e40af"><b>Toplam indirim:</b> ${fmt(ind)} ₺ (fiyatlara işlenmiştir)</div>`:"")}
   <div class="tot">PEŞİN TOPLAM: ${fmt(Math.round(finalP))} ₺${taksitliVar?`<br>TAKSİTLİ TOPLAM: ${fmt(Math.round(finalT))} ₺ &nbsp;(${esc(bk)} ${tk} Taksit — Aylık ${fmt(Math.round(finalT/tk))} ₺)`:""}</div>
-  ${servis}${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
+  ${kind==='siparis'?'':fqValidityHTML()}${servis}${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();
 }
@@ -2328,7 +2332,7 @@ async function fqReloadData(){const epoch=fqEpoch;for(const load of [loadAktifDo
 
 function fqLoadFail(e){fqPricingError='Veriler yüklenemedi: '+e.message;renderRows();}
 function fqInvalidateCatalog(){asKatalogCache=null;asKatalogMarka=null;}
-function fqResetSession(){if(typeof fqCloseCustomerView==='function')fqCloseCustomerView();fqResetFollowup();fqWorkflowEnd();hkExcelReset();closeTeklifDetay();tfCache=[];const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
+function fqResetSession(){if(typeof fqApprovalReset==='function')fqApprovalReset();if(typeof fqCloseCustomerView==='function')fqCloseCustomerView();fqResetFollowup();fqWorkflowEnd();hkExcelReset();closeTeklifDetay();tfCache=[];const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
 async function fqApiHeaders(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Oturum süresi doldu.');return {'content-type':'application/json',Authorization:'Bearer '+session.access_token};}
 async function fqAtomic(operations){
  const merged=new Map();for(const op of operations){const scope=Object.fromEntries(Object.entries(op.scope).sort(([a],[b])=>a.localeCompare(b))),key=op.table+'|'+op.mode+'|'+JSON.stringify(scope);
@@ -3852,7 +3856,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="10 Eyl 2026 · müşteri takibi v11.6";
+const FQ_SURUM="10 Eyl 2026 · mağaza başvurusu ve teklif geçerliliği v11.7";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
@@ -3892,7 +3896,10 @@ window.addEventListener("focus", ()=>{ _fqSurumKontrol(); });   // sekmeye dön�
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSurumKontrol(); });
 </script>
 <script src="js/satis-workflow.js"></script>
+<script src="js/kayit-akisi.js"></script>
+<script src="js/teklif-gecerlilik.js"></script>
 <script src="js/teklif-takip.js"></script>
 <script src="js/musteri-gorunumu.js"></script>
+<script src="js/stok-guncellik.js"></script>
 </body>
 </html>
