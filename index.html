@@ -843,6 +843,25 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
         <button onclick="hizliKampanya()">Ekle</button>
       </div>
       <div id="hkMsg" class="msg"></div>
+      <fieldset id="hkExcelControls" style="border:1px solid var(--line);border-radius:8px;margin:16px 0;padding:12px;min-width:0">
+       <legend>Excel'den hızlı kampanya yükle</legend>
+       <p class="mut">Hazır Excel dosyanı seç veya buraya bırak. Sütun sırası değişebilir; model ve fiyat başlıkları otomatik tanınır. Stok sütunları yok sayılır.</p>
+       <label style="display:block;border:1px dashed var(--acc);padding:12px;border-radius:8px" ondragover="event.preventDefault()" ondrop="event.preventDefault();hkExcelRead(event.dataTransfer.files[0])">Excel dosyası <input id="hkExcelFile" type="file" accept=".xlsx,.xls" onchange="hkExcelRead(this.files[0])" style="max-width:100%"></label>
+       <p id="hkExcelName" class="mut"></p>
+       <div id="hkExcelSettings" style="display:none">
+        <div class="row" style="margin-top:12px">
+         <label class="fld">Sayfa<select id="hkExcelSheet" onchange="hkExcelSheet()"></select></label>
+         <label class="fld">Başlık satırı<input id="hkExcelHeader" type="number" min="1" max="30" value="1" onchange="hkExcelColumns()" style="width:95px"></label>
+         <label class="fld">Başlangıç (boş satırlara)<input id="hkExcelStart" type="date" oninput="hkExcelInvalidate()"></label>
+         <label class="fld">Bitiş (boş satırlara)<input id="hkExcelEnd" type="date" oninput="hkExcelInvalidate()"></label>
+        </div>
+        <div id="hkExcelMap" class="row" style="margin:12px 0"></div>
+        <button class="ghost" onclick="hkExcelPreview()">Önizleme oluştur</button>
+        <button id="hkExcelWrite" onclick="hkExcelWrite()" disabled>Onayla ve yükle</button>
+       </div>
+      </fieldset>
+      <div id="hkExcelMsg" class="msg" role="status" style="white-space:pre-line"></div>
+      <div id="hkExcelPreview"></div>
       <div id="hkList" style="margin-top:12px"></div>
     </div>
 
@@ -1179,7 +1198,7 @@ function applyBrandAccess(){
 }
 async function setBrand(b){
  if(!allowedBrands().includes(b)||b===brand)return;
- brand=b;fqDataReady=false;fqPricingError="Marka verileri yükleniyor…";const epoch=++fqEpoch;secilenKampanya.clear();fqInvalidateCatalog();setManuelToplam('sifirla');
+ hkExcelReset();brand=b;fqDataReady=false;fqPricingError="Marka verileri yükleniyor…";const epoch=++fqEpoch;secilenKampanya.clear();fqInvalidateCatalog();setManuelToplam('sifirla');
  primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};
  quoteRows.forEach(r=>{r.toptan=null;r.bip=0;r.etiket=null;r.kampFiyat=null;r.primliFiyat=null;r.netStok=null;r._fetchId=(r._fetchId||0)+1;});
  document.body.classList.toggle('brand-bosch',b==='bosch');document.body.classList.toggle('brand-siemens',b==='siemens');
@@ -2290,7 +2309,7 @@ async function fqReloadData(){const epoch=fqEpoch;for(const load of [loadAktifDo
 
 function fqLoadFail(e){fqPricingError='Veriler yüklenemedi: '+e.message;renderRows();}
 function fqInvalidateCatalog(){asKatalogCache=null;asKatalogMarka=null;}
-function fqResetSession(){closeTeklifDetay();tfCache=[];const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
+function fqResetSession(){hkExcelReset();closeTeklifDetay();tfCache=[];const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
 async function fqApiHeaders(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Oturum süresi doldu.');return {'content-type':'application/json',Authorization:'Bearer '+session.access_token};}
 async function fqAtomic(operations){
  const merged=new Map();for(const op of operations){const scope=Object.fromEntries(Object.entries(op.scope).sort(([a],[b])=>a.localeCompare(b))),key=op.table+'|'+op.mode+'|'+JSON.stringify(scope);
@@ -2980,6 +2999,98 @@ function hkInit(){
   loadIkiliList();
   if(typeof hsInit==="function") hsInit();
 }
+// Quick campaign import: explicit mapping, validation and one scoped bulk upsert. Stock is never read.
+let hkExcelBook=null,hkExcelPlan=null,hkExcelToken=0,hkExcelBusy=false;
+const HK_COLS={model:'Model / ürün kodu',price:'Taksitli fiyat',cash:'Nakit fiyat (isteğe bağlı)',start:'Başlangıç tarihi (isteğe bağlı)',end:'Bitiş tarihi (isteğe bağlı)',brand:'Marka (isteğe bağlı)'};
+function hkExcelAllowed(){return isEditor()||disBayiMi();}
+function hkExcelInvalidate(){hkExcelPlan=null;$('hkExcelWrite').disabled=true;$('hkExcelPreview').innerHTML='';}
+function hkExcelReset(){hkExcelToken++;hkExcelBook=null;hkExcelInvalidate();$('hkExcelSettings').style.display='none';$('hkExcelFile').value='';$('hkExcelName').textContent='';$('hkExcelMsg').textContent='';}
+function hkExcelKey(v){return tkc(String(v??''));}
+function hkExcelStock(v){return /stok|stock|mevcut|ayrilan|ayrilmis|envanter/.test(hkExcelKey(v));}
+function hkExcelGuess(headers){
+ const aliases={model:['urun','model','modelkodu','urunkodu','kod','malzemekodu'],price:['fiyat','kampanyafiyati','kampanyafiyat','taksitlifiyat','taksitli','satisfiyati'],cash:['nakit','nakitfiyat','nakitfiyati','pesin','pesinfiyat','pesinfiyati','havale'],start:['baslangic','baslangictarihi','kampanyabaslangici'],end:['bitis','bitistarihi','songecerlilik','gecerlilikbitisi'],brand:['marka','brand']};
+ return Object.fromEntries(Object.entries(aliases).map(([k,names])=>{const hits=headers.map((h,i)=>!hkExcelStock(h)&&names.includes(hkExcelKey(h))?i:-1).filter(i=>i>=0);return [k,hits.length===1?hits[0]:-1];}));
+}
+function hkExcelDate(v,date1904=false){
+ if(v===null||v===undefined||String(v).trim()==='')return null;
+ let y,m,d;
+ if(typeof v==='number'){const x=XLSX.SSF.parse_date_code(v,{date1904});if(!x)throw Error('Tarih geçersiz.');({y,m,d}=x);}
+ else if(Object.prototype.toString.call(v)==='[object Date]'){y=v.getFullYear();m=v.getMonth()+1;d=v.getDate();}
+ else{const t=String(v).trim();let a=t.match(/^(\d{4})-(\d{2})-(\d{2})$/);if(a)[,y,m,d]=a;else{a=t.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);if(!a)throw Error('Tarih GG.AA.YYYY veya YYYY-AA-GG olmalı.');[,d,m,y]=a;}}
+ y=Number(y);m=Number(m);d=Number(d);const x=new Date(Date.UTC(y,m-1,d));if(y<2000||y>2100||x.getUTCFullYear()!==y||x.getUTCMonth()+1!==m||x.getUTCDate()!==d)throw Error('Tarih geçersiz.');return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function hkExcelParse(aoa,header,map,defaults){
+ const rows=[],errors=[],seen=new Map(),heads=aoa[header]||[];
+ if(!(map.model>=0)||!(map.price>=0))return {rows,errors:['Model ve taksitli fiyat sütunlarını seç.']};
+ const selected=Object.values(map).filter(i=>i>=0);if(new Set(selected).size!==selected.length)return {rows,errors:['Aynı sütun iki alan için seçilemez.']};
+ if(selected.some(i=>hkExcelStock(heads[i])))return {rows,errors:['Stok sütunları kampanya alanı olarak kullanılamaz.']};
+ const get=(r,k)=>map[k]>=0?r[map[k]]:null,blank=v=>v===null||v===undefined||String(v).trim()==='';
+ for(let i=header+1;i<aoa.length;i++){
+  const r=aoa[i]||[];if(['model','price','cash'].every(k=>blank(get(r,k))))continue;
+  try{
+   const model=String(get(r,'model')??'').trim().toUpperCase();if(!/^[A-Z0-9][A-Z0-9/-]{3,29}$/.test(model)||!/[A-Z]/.test(model)||!/[0-9]/.test(model))throw Error('Geçerli ürün kodu gerekli.');
+   const price=typeof get(r,'price')==='number'?get(r,'price'):trSayi(get(r,'price'));if(!(price>=0.01)||!Number.isFinite(price))throw Error('Taksitli fiyat sıfırdan büyük olmalı.');
+   const rawCash=get(r,'cash'),cash=blank(rawCash)?null:typeof rawCash==='number'?rawCash:trSayi(rawCash);if(!blank(rawCash)&&(!(cash>0)||!Number.isFinite(cash)||cash>price))throw Error('Nakit fiyat pozitif olmalı ve taksitli fiyatı geçmemeli.');
+   const mk=blank(get(r,'brand'))?defaults.brand:hkExcelKey(get(r,'brand'));if(!['bosch','siemens'].includes(mk)||mk!==defaults.brand)throw Error('Satırın markası seçili markayla uyuşmuyor.');
+   const start=hkExcelDate(blank(get(r,'start'))?defaults.start:get(r,'start'),defaults.date1904),end=hkExcelDate(blank(get(r,'end'))?defaults.end:get(r,'end'),defaults.date1904);
+   if(!start||!end)throw Error('Başlangıç ve bitiş tarihlerini tamamla.');if(end<start)throw Error('Bitiş başlangıçtan önce olamaz.');if(end<defaults.today)throw Error('Kampanyanın bitiş tarihi geçmiş.');
+   if(seen.has(model))throw Error('Ürün kodu tekrarlanıyor; ilk satır '+seen.get(model)+'.');seen.set(model,i+1);
+   rows.push({model_kodu:model,marka:mk,kampanya_fiyat:Math.round(price*100)/100,kampanya_nakit:cash===null?null:Math.round(cash*100)/100,baslangic:start,bitis:end});
+  }catch(e){errors.push(`Satır ${i+1}: ${e.message}`);}
+ }
+ if(!rows.length&&!errors.length)errors.push('Yüklenecek ürün bulunamadı.');if(rows.length>1000)errors.push('Tek dosyada en fazla 1.000 ürün yüklenebilir.');return {rows,errors};
+}
+async function hkExcelRead(file){
+ if(!file||hkExcelBusy)return;hkExcelReset();const token=hkExcelToken,epoch=fqEpoch,mk=brand;
+ try{
+  if(!hkExcelAllowed()||!stokSahibi())throw Error('Kampanya yükleme yetkiniz yok.');
+  if(!/\.(xlsx|xls)$/i.test(file.name))throw Error('Excel (.xlsx veya .xls) dosyası seç.');if(file.size>10*1024*1024)throw Error('Dosya 10 MB sınırını aşıyor.');
+  const nameBrand=/bosch/i.test(file.name)?'bosch':/siemens/i.test(file.name)?'siemens':null;if(nameBrand&&nameBrand!==mk)throw Error('Dosya '+markaAd(nameBrand)+' için. Önce üstten doğru markayı seç.');
+  $('hkExcelMsg').textContent='Excel okunuyor…';const bytes=await file.arrayBuffer();if(token!==hkExcelToken||epoch!==fqEpoch)return;
+  const wb=XLSX.read(bytes,{type:'array',cellDates:false,sheetRows:2002});hkExcelBook={wb,brand:mk,owner:stokSahibi(),epoch,name:file.name};
+  $('hkExcelSheet').innerHTML=wb.SheetNames.map((n,i)=>`<option value="${i}">${esc(n)}</option>`).join('');$('hkExcelSheet').value='0';
+  $('hkExcelStart').value=$('hkBas').value||_bugun();$('hkExcelEnd').value='';$('hkExcelSettings').style.display='';hkExcelSheet();
+  $('hkExcelName').textContent=file.name;$('hkExcelMsg').textContent=file.name+' — bitiş tarihini kontrol edip önizlemeyi oluştur.';
+ }catch(e){if(token===hkExcelToken)$('hkExcelMsg').textContent=e.message;}
+}
+function hkExcelData(){const b=hkExcelBook;if(!b)throw Error('Önce dosya seç.');return XLSX.utils.sheet_to_json(b.wb.Sheets[b.wb.SheetNames[+$('hkExcelSheet').value]],{header:1,raw:true,defval:null,blankrows:true});}
+function hkExcelSheet(){
+ hkExcelInvalidate();const data=hkExcelData();let best=0,score=-1;
+ data.slice(0,30).forEach((row,i)=>{const g=hkExcelGuess(row),s=(g.model>=0?2:0)+(g.price>=0?2:0);if(s>score){best=i;score=s;}});
+ $('hkExcelHeader').value=String(best+1);hkExcelColumns();
+}
+function hkExcelColumns(){
+ hkExcelInvalidate();const data=hkExcelData(),h=+$('hkExcelHeader').value-1,headers=data[h]||[],guess=hkExcelGuess(headers);
+ $('hkExcelMap').innerHTML=Object.entries(HK_COLS).map(([key,label])=>`<label class="fld">${label}<select id="hkMap_${key}" onchange="hkExcelInvalidate()"><option value="-1">${['model','price'].includes(key)?'Sütun seç':'Kullanma'}</option>${headers.map((v,i)=>`<option value="${i}"${hkExcelStock(v)?' disabled':''}${guess[key]===i?' selected':''}>${XLSX.utils.encode_col(i)} — ${esc(v||'Başlıksız')}${hkExcelStock(v)?' (stok: yok sayılır)':''}</option>`).join('')}</select></label>`).join('');
+}
+function hkExcelPreview(){
+ hkExcelInvalidate();try{
+  const b=hkExcelBook;if(!b||b.epoch!==fqEpoch||b.brand!==brand||b.owner!==stokSahibi())throw Error('Marka veya oturum değişti; dosyayı yeniden seç.');
+  const sheet=b.wb.Sheets[b.wb.SheetNames[+$('hkExcelSheet').value]];if(sheet['!fullref']&&sheet['!fullref']!==sheet['!ref'])throw Error('Sayfa çok uzun. En fazla 1.000 ürün içeren bir dosya kullan.');
+  const header=Number($('hkExcelHeader').value)-1;if(!Number.isInteger(header)||header<0||header>=30)throw Error('Başlık satırı 1–30 arasında olmalı.');
+  const map=Object.fromEntries(Object.keys(HK_COLS).map(k=>[k,Number($('hkMap_'+k).value)]));
+  const result=hkExcelParse(hkExcelData(),header,map,{brand,start:$('hkExcelStart').value,end:$('hkExcelEnd').value,today:_bugun(),date1904:!!b.wb.Workbook?.WBProps?.date1904});
+  if(result.errors.length){$('hkExcelMsg').textContent=result.errors.slice(0,12).join('\n')+(result.errors.length>12?`\n… ${result.errors.length} hata var.`:'');return;}
+  hkExcelPlan={...b,rows:result.rows,day:_bugun()};
+  $('hkExcelPreview').innerHTML=`<p><b>${esc(markaAd(brand))} · ${result.rows.length} ürün</b> · Fiyatlar taksitli kampanya fiyatıdır. Stoklar dikkate alınmaz.</p><p class="mut">Aynı modelin mevcut hızlı kampanyası bu fiyat ve tarihlerle güncellenir. Dosyada olmayan ürünler korunur. Nakit fiyatı boş olan satırın ayrı nakit kampanya fiyatı kaldırılır.</p><div style="overflow:auto;max-height:360px"><table><thead><tr><th>Model</th><th>Taksitli ₺</th><th>Nakit ₺</th><th>Başlangıç</th><th>Bitiş</th></tr></thead><tbody>${result.rows.map(r=>`<tr><td>${esc(r.model_kodu)}</td><td>${fmt(r.kampanya_fiyat)}</td><td>${r.kampanya_nakit===null?'—':fmt(r.kampanya_nakit)}</td><td>${r.baslangic}</td><td>${r.bitis}</td></tr>`).join('')}</tbody></table></div>`;
+  $('hkExcelMsg').textContent='Önizleme hazır. Model, fiyat ve tarihleri kontrol ederek onayla.';$('hkExcelWrite').disabled=false;
+ }catch(e){$('hkExcelMsg').textContent=e.message;}
+}
+async function hkExcelWrite(){
+ if(hkExcelBusy)return;const p=hkExcelPlan;
+ if(!p||!hkExcelAllowed()||p.epoch!==fqEpoch||p.brand!==brand||p.owner!==stokSahibi()||p.day!==_bugun()){hkExcelInvalidate();$('hkExcelMsg').textContent='Güncel önizleme gerekli; dosyayı ve tarihleri tekrar kontrol et.';return;}
+ hkExcelBusy=true;$('hkExcelWrite').disabled=true;$('hkExcelControls').disabled=true;
+ try{
+  const rows=p.rows.map(r=>({...r,bayi_id:p.owner}));
+  const {data,error}=await sb.from('kampanya_fiyat').upsert(rows,{onConflict:'bayi_id,model_kodu,marka'}).select('model_kodu');
+  if(error)throw Error('Yükleme tamamlanamadı: '+error.message);
+  if(!data||data.length!==rows.length)throw Error('Kaydedilen satır sayısı doğrulanamadı. Tekrar denemeden önce kampanya listesini yenile.');
+  if(p.epoch!==fqEpoch)return;hkExcelPlan=null;$('hkExcelPreview').innerHTML='';$('hkExcelMsg').textContent=`✓ ${rows.length} ürünün hızlı kampanyası kaydedildi. Stoklar değiştirilmedi.`;
+  try{await loadKampFiyat();await loadHizliKampList();if(p.epoch===fqEpoch)await Promise.all(quoteRows.filter(r=>r.kod).map(refetch));}catch(e){if(p.epoch===fqEpoch)$('hkExcelMsg').textContent+=' Listeyi görmek için sayfayı yenile.';}
+ }catch(e){if(p.epoch===fqEpoch){$('hkExcelMsg').textContent=e.message;$('hkExcelWrite').disabled=false;}}
+ finally{hkExcelBusy=false;$('hkExcelControls').disabled=false;}
+}
+
 async function hizliKampanya(){
   try{
     const kod=(parseModeller($("hkKod").value)[0])||"";
@@ -3722,7 +3833,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="10 Eyl 2026 · tek ekran v11.3";
+const FQ_SURUM="10 Eyl 2026 · tek ekran v11.4";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
