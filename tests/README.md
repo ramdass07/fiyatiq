@@ -1,8 +1,8 @@
-# FiyatIQ v11.9 doğrulama
+# FiyatIQ v11.9.1 doğrulama
 
 `npm ci`, `npm run check`, `npm test` ile çalıştırılır. Node 20 ve üzeri gerekir.
 
-167 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; canlı hesaba e-posta gönderilmez veya canlı veritabanına yazılmaz.
+170 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; canlı hesaba e-posta gönderilmez veya canlı veritabanına yazılmaz.
 
 Kapsam: müşteri değiştirirken eski teklifin korunması, yeni teklif numarası, hesap kapsamlı teklif arama, kayıt hataları, taslak saklama/geri yükleme, güncel fiyat onayı, manuel fiyatlar, geçersiz kurtarma bağlantıları, oturum yenileme ve ilk açılış verileri yüklenirken işlem koruması.
 
@@ -75,3 +75,12 @@ Manuel modda mevcut motor kuralı korunur: girilen birim maliyet kullanılır ve
 `tests/sales-cost-visibility.test.cjs` altı yeni kontrol içerir: mağaza/merkez/yönetim görünürlüğü, çok adet için birim değer ve kuruşlar, manuel girdinin tek kalması ve müşteri görünümünün açılması, sıfır/eksik bilgi, değişen ürün/yükleme, pazarlık fiyatından bağımsız maliyet ve müşteri görünümünde iç bilgilerin bulunmaması. Müşteri görünümü ve kayıtlı yazdırma/WhatsApp regresyonlarıyla 26 hedefli kontrol geçti; 15 JavaScript kaynağı sözdizimi kontrolünden geçti.
 
 Bu düzeltme v11.9 yayın paketine eklendi. Kullanıcı 10 Eylül 2026'da v11.9 kodlarının, migration ve test dosyalarının mevcut herkese açık GitHub deposunda paylaşılmasını ve fiyatiq.com üzerinde yayımlanmasını onayladı. Yeni veritabanı migration'ı gerekmiyor. Hesaplama motoru, fiyat kaynağı, PH oranı, erişim rolleri ve müşteri çıktılarının alan listeleri değiştirilmedi.
+
+
+## v11.9.1 maliyetsiz üründe perakende fiyatı
+
+Efektif birim maliyeti bulunmayan üründe, fiyat listesinden geçerli perakende fiyatı geliyorsa sade görünümde ürünün maliyet alanının başında Perakende fiyatı etiketiyle gösterilir. Bu, bir adet için referans tutardır; maliyet, net maliyet veya otomatik satış fiyatı olarak kullanılmaz. Kullanıcı manuel satış fiyatı girdiyse bu tutar korunur; maliyet girilince normal maliyet görünümü devam eder.
+
+Adı ve maliyeti boş, yalnız perakende fiyatı olan sorgu yanıtı artık kaybolmaz; ürün kodu adı olarak kullanılır. Yeni sorguda perakende alanı yoksa eski değer temizlenir. Bekleyen/hatalı veri veya sıfır/bozuk perakende değeri gösterilmez.
+
+Üç yeni regresyon testi perakende-only yanıtı, birim/kuruş gösterimini, bilinmeyen maliyetin korunmasını, otomatik satışa aktarılmamasını, manuel satışın korunmasını ve eksilen perakende fiyatının temizlenmesini kapsar. Bu değişiklik veritabanı migration'ı gerektirmez.

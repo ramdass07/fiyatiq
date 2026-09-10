@@ -58,3 +58,31 @@ test('customer presentation contains sale prices while the store retains its int
  assert.doesNotMatch(customer.textContent,/maliyet|BİP|12\.345|2\.345|10\.000,55/i);assert.equal(customer.querySelector('.sale-cost-breakdown'),null);
  h.run('fqCloseCustomerView()');assert.equal(field(h,'net'),'10.000,55 ₺');
 });
+
+test('a retail-only price response remains usable and shows the unit list price without inventing cost or sale amounts',async t=>{
+ const h=setup(t);h.run('quoteRows[0].adet=2;quoteRows[0].toptan=null;quoteRows[0].etiket=null');
+ h.w.__sb.rpc=async()=>({data:[{urun_adi:null,toptan_fiyat:null,nakit_fiyat:'28450.75',bip_tutar:0}],error:null});
+ await h.run('refetch(quoteRows[0])');
+ assert.equal(h.run('quoteRows[0].ad'),'TEST123');assert.equal(field(h,'retail'),'28.450,75 ₺');
+ assert.equal(field(h,'net'),'—');assert.equal(h.run('quoteRows[0].etToptan'),null);
+ assert.equal(h.run('quoteRows[0].manuelFiyat'),null);assert.equal(h.run('lastTot.tMaliyet'),0);assert.equal(h.run('lastTot.finalNakit'),0);
+ assert.match(h.w.document.querySelector('.sale-cost-note').textContent,/Maliyet girilmeden kâr hesaplanamaz/);
+ h.run('quoteRows[0].manuelFiyat=25000;renderRows()');assert.equal(field(h,'retail'),'28.450,75 ₺');assert.equal(h.run('lastTot.finalNakit'),50000);
+});
+
+test('a retail reference disappears when cost is supplied, data is pending or the retail value is unavailable',t=>{
+ const h=setup(t),retail=()=>h.w.document.querySelector('[data-cost="retail"]');
+ assert.equal(retail(),null);h.run('quoteRows[0].toptan=null;renderRows()');assert.equal(field(h,'retail'),'14.000,00 ₺');
+ h.run('quoteRows[0].isET=true;quoteRows[0].etToptan=9000;renderRows()');assert.equal(retail(),null);assert.equal(field(h,'net'),'9.000,00 ₺');
+ h.run("quoteRows[0].etToptan=null;quoteRows[0].veriHata='Ürün verisi yükleniyor';renderRows()");assert.equal(retail(),null);
+ for(const value of [null,undefined,'',0,-1,NaN,Infinity,true,{},'geçersiz']){h.w.__retail=value;h.run('quoteRows[0].veriHata=null;quoteRows[0].etiket=__retail;renderRows()');assert.equal(retail(),null);}
+});
+
+test('a refreshed missing retail field clears the earlier reference and leaves a manually entered sale intact',async t=>{
+ const h=setup(t);h.run('quoteRows[0].isET=true;quoteRows[0].toptan=null;quoteRows[0].etToptan=null;quoteRows[0].manuelFiyat=12000;renderRows()');
+ assert.equal(field(h,'retail'),'14.000,00 ₺');
+ h.w.__sb.rpc=async()=>({data:[{urun_adi:'Test ürün',toptan_fiyat:null}],error:null});
+ await h.run('refetch(quoteRows[0])');
+ assert.equal(h.run('quoteRows[0].etiket'),null);assert.equal(h.w.document.querySelector('[data-cost="retail"]'),null);
+ assert.equal(h.run('quoteRows[0].manuelFiyat'),12000);assert.equal(h.run('lastTot.finalNakit'),12000);
+});

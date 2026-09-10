@@ -300,6 +300,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
 .sale-cost-breakdown dl{margin:4px 0 0}.sale-cost-breakdown dl>div{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 0;font-size:12px}
 .sale-cost-breakdown dt{color:var(--mut);white-space:normal}.sale-cost-breakdown dd{margin:0;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:650}
 .sale-cost-breakdown .sale-cost-net{border-top:1px solid var(--line);margin-top:3px;padding-top:5px}.sale-cost-net dt,.sale-cost-net dd{color:var(--acc);font-weight:750}
+.sale-cost-breakdown .sale-cost-retail dt,.sale-cost-breakdown .sale-cost-retail dd{color:var(--warn);font-weight:750}
 .sale-cost-breakdown input{width:110px!important;max-width:100%}
 #grid td input{min-height:30px;padding:5px 7px;border-radius:5px;font-size:14px;box-sizing:border-box}
 #grid td:nth-child(3) input{width:54px!important}
@@ -1541,16 +1542,19 @@ function gunFark(d){ if(!d) return null; const gun=Math.round((new Date(_bugun()
 function fmtTarih(d){ if(!d) return ''; const p=(''+d).split('-'); return p.length===3? p[2]+'.'+p[1]+'.'+p[0].slice(2) : (''+d); }
 function karBadge(p){ if(p==null||isNaN(p)) return '<span class="mut">—</span>'; if(p>-0.005&&p<0.005) p=0; if(p<0) return '<span class="blink">ZARAR '+p.toFixed(2)+'%</span>'; const c=p<3?'bad':p<8?'warn':'ok'; return '<span class="'+c+'">'+p.toFixed(2)+'%</span>'; }
 function calcParts(r,kar,komis){ return FiyatIQCore.calcParts(r,kar,komis,nakitHedefi(r)); }
+function retailPriceValue(value){return (typeof value==='number'||typeof value==='string')&&Number.isFinite(+value)&&+value>0?+value:null;}
 function saleCostBreakdownHTML(r,p,manualInput){
   if(!basitMod||!r.kod)return '';
   const pending=!!r.veriHata||!!fqPricingError||!fqDataReady;
   const known=!pending&&Number.isFinite(p.unitToptan)&&p.unitToptan>0;
   const money=n=>Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
+  const retail=retailPriceValue(r.etiket),showRetail=!pending&&!known&&retail!==null;
+  const retailHTML=showRetail?`<div class="sale-cost-retail"><dt>Perakende fiyatı</dt><dd data-cost="retail">${money(retail)}</dd></div>`:'';
   const cost=pending?'—':r.isET?manualInput:known?money(p.unitToptan):'Girilmedi';
   const bip=pending?'—':r.isET?'Uygulanmıyor':known&&Number.isFinite(p.unitBip)?money(p.unitBip):'—';
   const net=known&&Number.isFinite(p.unitBipli)?money(p.unitBipli):'—';
-  const note=pending?'Fiyat bilgisi doğrulanamadı.':r.isET?'Manuel maliyet kullanılır; BİP ayrıca düşülmez.':'Net maliyet = maliyet − BİP. Hakediş ayrıca hesaplanır.';
-  return `<div class="sale-cost-breakdown" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl><div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip">${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note">${note}</span></div>`;
+  const note=pending?'Fiyat bilgisi doğrulanamadı.':showRetail?'Perakende fiyatı listeden alınmıştır. Maliyet girilmeden kâr hesaplanamaz.':r.isET?'Manuel maliyet kullanılır; BİP ayrıca düşülmez.':'Net maliyet = maliyet − BİP. Hakediş ayrıca hesaplanır.';
+  return `<div class="sale-cost-breakdown" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl>${retailHTML}<div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip">${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note">${note}</span></div>`;
 }
 function renderRows(){
   for(const r of quoteRows){try{r.adet=FiyatIQCore.quantity(r.adet);}catch(e){r.adet=1;alert(e.message);}}
@@ -1877,8 +1881,8 @@ async function refetch(r){
   const pr=primliMap[(r.kod||"").toUpperCase()]; // primli ürün mü?
   r.primliFiyat = (pr && pr.fiyat) ? pr.fiyat : null; // belirlenen primli satış fiyatı (varsayılan peşin)
   { const kf=kampFiyatMap[(r.kod||"").toUpperCase()]; r.kampFiyat = kf ? kf.fiyat : null; } // kısa süreli kampanya fiyatı (primliyi ezer)
-  if(row && (row.urun_adi || row.toptan_fiyat!=null)){
-    r.ad=row.urun_adi||r.kod; r.toptan=toptanGoster(row.toptan_fiyat,r.kod); r.bip=row.bip_tutar||0; r.etiket=row.nakit_fiyat; r.net_stok=row.net_stok;
+  if(row && (row.urun_adi || row.toptan_fiyat!=null || retailPriceValue(row.nakit_fiyat)!==null)){
+    r.ad=row.urun_adi||r.kod; r.toptan=toptanGoster(row.toptan_fiyat,r.kod); r.bip=row.bip_tutar||0; r.etiket=retailPriceValue(row.nakit_fiyat); r.net_stok=row.net_stok;
     if(row.toptan_fiyat!=null) r.isET=false;
     else if(!(+r.etToptan>0)) r.isET=true; // üründe TOPTAN YOK → otomatik Manuel moda geç, maliyet elle girilsin
   } else { r.ad = pr ? r.kod : "— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; } // primli ama listede yoksa: kodu göster, manuel toptan
@@ -3814,7 +3818,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="10 Eyl 2026 · aylık satış raporu ve teklif geçmişi v11.9";
+const FQ_SURUM="10 Eyl 2026 · maliyetsiz üründe perakende fiyatı v11.9.1";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
