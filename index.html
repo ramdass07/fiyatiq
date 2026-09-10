@@ -368,7 +368,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
  #customerDialog #siparisBilgiCard input{width:100%!important}.sale-actions button{flex:1;min-width:130px}
 }
 
-</style></head>
+</style><link rel="stylesheet" href="css/mobil-satis.css"></head>
 <body class="brand-siemens">
 
 <div id="cfgWarn">⚠️ Supabase bilgileri girilmemiş.</div>
@@ -615,6 +615,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
       <button data-b="siemens" class="on" onclick="setBrand('siemens')">Siemens</button>
       <button data-b="bosch" onclick="setBrand('bosch')">Bosch</button>
     </div>
+    <details id="fqHeaderMenu" open><summary>Menü</summary><div class="fq-header-menu-items">
     <button id="adminBtn" class="ghost sm" style="display:none" onclick="toggleAdmin()">⚙ Yönetim</button>
     <button id="yardimBtn" class="ghost sm" onclick="yardimAc()" title="Nasıl kullanılır">❓ Nasıl kullanılır</button>
     <span class="mut" id="fqSurum" title="Yüklü sürüm — eski sürümde çalışıyorsan altta 🔄 yenile şeridi çıkar" style="font-size:10px;align-self:center"></span>
@@ -622,6 +623,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
     <div class="grow"></div>
     <span id="who" class="mut"></span>
     <button class="ghost sm" onclick="signOut()">Çıkış</button>
+    </div></details>
   </header>
 
   <main id="bayiView">
@@ -648,10 +650,11 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
     </details></section>
     <div class="card" id="productsCard">
       <div class="sale-heading"><h2>Satış teklifi</h2><div class="sale-tools">
+        <details id="fqSaleTools" open><summary>Teklif işlemleri</summary><div class="fq-sale-tool-items">
         <button class="ghost sm" onclick="openCustomerDialog('bilgi')">Müşteri bilgileri</button>
         <button class="ghost sm" id="gorunumBtn" onclick="toggleGorunum()">Detaylı görünüm</button>
-        <button class="ghost sm" onclick="fqShowCustomerView()">Müşteriye göster</button><button class="ghost sm" onclick="fqOpenMyQuotes(true)">Bugün aranacaklar</button><button class="ghost sm" onclick="fqOpenDrafts()">Taslaklar</button><button class="sm" onclick="fqRequestNew()">+ Yeni teklif</button>
-        <button class="sm" onclick="addRow(true)">+ Ürün satırı</button></div></div>
+        <button class="ghost sm" onclick="fqShowCustomerView()">Müşteriye göster</button><button class="ghost sm" onclick="fqOpenMyQuotes(true)">Bugün aranacaklar</button><button class="ghost sm" onclick="fqOpenDrafts()">Taslaklar</button></div></details><button class="sm" id="fqNewQuote" onclick="fqRequestNew()">+ Yeni teklif</button>
+        <button class="sm" id="fqAddProduct" onclick="addRow(true)">+ Ürün satırı</button></div></div>
       <p id="fqDraftStatus" class="mut" role="status" style="font-size:13px"></p>
       <div id="fqReviewBox" class="msg warn" hidden>Geri yüklenen teklif güncel fiyatlarla hesaplandı. Banka, kampanya ve toplamları kontrol et. <button class="ghost sm" onclick="fqConfirmReview()">Güncel fiyatları kontrol ettim</button></div>
       <p class="sale-hint" id="salePriceHint">Fiyatlar satır toplamıdır; uygulanan hakediş ve varsa toplam pazarlık fiyatı dahildir. Tutarlar TL.</p>
@@ -684,10 +687,10 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
     </details>
     
     <div class="row sale-actions" style="justify-content:flex-end">
-      <button class="quote-action" style="background:#e2e8f0;color:#0f172a" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
-      <button class="quote-action" style="background:#e2e8f0;color:#0f172a" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
-      <button class="quote-action" style="background:#22c55e;color:#06200f" onclick="shareWhatsApp()">WhatsApp</button>
-      <button class="quote-action" onclick="saveQuote()">Teklifi Kaydet</button>
+      <button class="quote-action fq-print-action" style="background:#e2e8f0;color:#0f172a" onclick="printDoc('teklif')">🖨 Teklif Yazdır</button>
+      <button class="quote-action fq-print-action" style="background:#e2e8f0;color:#0f172a" onclick="printDoc('siparis')">📋 Sipariş Formu</button>
+      <button class="quote-action" id="fqShareQuote" style="background:#22c55e;color:#06200f" onclick="shareWhatsApp()">WhatsApp</button>
+      <button class="quote-action" id="fqSaveQuote" onclick="saveQuote()">Teklifi Kaydet</button>
       <span id="saveMsg" class="mut" style="align-self:center"></span>
     </div>
     </section>
@@ -1014,7 +1017,37 @@ const SUPABASE_ANON_KEY = "sb_publishable_Hq44fpVzfZfTvcPQZL-5xw_8kmLRl19";
 
 let fqEpoch=0, fqSaving=null, fqPricingError="", fqDataReady=false;
 let sb, brand="siemens", quoteRows=[], appReady=false, basitMod=true, aktifDonem=null, primliMap={};
-function applyGorunum(){ const g=$("grid"); if(g) g.classList.toggle("basit",basitMod); const w=$("salesWorkspace"); if(w) w.classList.toggle("simple-sale",basitMod); const hint=$("salePriceHint");if(hint)hint.textContent=basitMod?"Fiyatlar satır toplamıdır; uygulanan hakediş ve varsa toplam pazarlık fiyatı dahildir. Tutarlar TL.":"Detaylı tabloda satış fiyatları hakediş öncesidir. Kampanya sonrası fiyatlar Ödeme ve toplam bölümünde ve Net fiyat dökümündedir."; const b=$("gorunumBtn"); if(b) b.textContent=basitMod?"Detaylı görünüm":"Sade görünüm"; }
+let fqMobileLayout=null, fqMobileBlurTarget=null;
+function fqIsMobileSales(){ return typeof window.matchMedia==='function'&&window.matchMedia('(max-width: 700px)').matches; }
+function fqSimpleSale(){ return basitMod||fqIsMobileSales(); }
+function applyGorunum(){
+  const mobile=fqIsMobileSales(),simple=fqSimpleSale();
+  const g=$("grid"); if(g)g.classList.toggle("basit",simple);
+  const w=$("salesWorkspace"); if(w)w.classList.toggle("simple-sale",simple);
+  const hint=$("salePriceHint");if(hint)hint.textContent=mobile?"Satış fiyatları satır toplamıdır; hakediş ve pazarlık dahildir. Maliyetler birim tutardır. Net maliyet = maliyet − BİP; hakediş ayrıca hesaplanır.":simple?"Fiyatlar satır toplamıdır; uygulanan hakediş ve varsa toplam pazarlık fiyatı dahildir. Tutarlar TL.":"Detaylı tabloda satış fiyatları hakediş öncesidir. Kampanya sonrası fiyatlar Ödeme ve toplam bölümünde ve Net fiyat dökümündedir.";
+  const b=$("gorunumBtn");if(b)b.textContent=simple?"Detaylı görünüm":"Sade görünüm";
+  if(fqMobileLayout!==mobile){
+    for(const id of ['fqHeaderMenu','fqSaleTools']){const el=$(id);if(el)el.open=!mobile;}
+    fqMobileLayout=mobile;
+  }
+}
+function fqMobileLayoutChanged(){
+  const active=document.activeElement;
+  // Keep native change/blur handlers and unfinished input intact during rotation.
+  if(active&&active.matches('input,select,textarea')&&$("salesWorkspace")?.contains(active)){
+    if(fqMobileBlurTarget!==active){
+      fqMobileBlurTarget=active;
+      active.addEventListener('blur',()=>{fqMobileBlurTarget=null;queueMicrotask(fqMobileLayoutChanged);},{once:true});
+    }
+    return;
+  }
+  applyGorunum();renderRows();
+}
+if(typeof window.matchMedia==='function'){
+  const media=window.matchMedia('(max-width: 700px)');
+  if(media.addEventListener)media.addEventListener('change',fqMobileLayoutChanged);
+  else if(media.addListener)media.addListener(fqMobileLayoutChanged);
+}
 function toggleGorunum(){ basitMod=!basitMod; try{localStorage.setItem("fq_sade_v10",basitMod?"1":"0");}catch(e){} applyGorunum(); renderRows(); }
 let kampAcik=true;
 function toggleKampPanel(){ kampAcik=!kampAcik; const l=$("kampList"); if(l) l.style.display=kampAcik?"":"none"; const a=$("kampArrow"); if(a) a.textContent=kampAcik?"▼":"▶"; }
@@ -1457,7 +1490,11 @@ async function bayiStokYukle(){
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
 function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,ikiliEsIdx:null,nakitSecili:false,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,stockFreshness:null,netStok:null}; }
-function addRow(focus=false){ quoteRows.push(bosSatir()); renderRows(); if(focus)focusCodeRow(quoteRows.length-1); }
+function addRow(focus=false){
+  const empty=fqIsMobileSales()?quoteRows.findIndex(r=>!r.kod):-1;
+  if(empty>=0){if(focus)focusCodeRow(empty);return;}
+  quoteRows.push(bosSatir());renderRows();if(focus)focusCodeRow(quoteRows.length-1);
+}
 function focusCodeRow(i){const e=document.querySelectorAll('#rows input[placeholder="model kodu"]')[i];if(e)e.focus();}
 async function codeEnter(i,value){await onCode(i,value);if(!quoteRows[i]||quoteRows[i].veriHata)return;if(i===quoteRows.length-1)quoteRows.push(bosSatir());renderRows();focusCodeRow(i+1);}
 function delRow(i){ quoteRows.splice(i,1); renderRows(); }
@@ -1544,7 +1581,7 @@ function karBadge(p){ if(p==null||isNaN(p)) return '<span class="mut">—</span>
 function calcParts(r,kar,komis){ return FiyatIQCore.calcParts(r,kar,komis,nakitHedefi(r)); }
 function retailPriceValue(value){return (typeof value==='number'||typeof value==='string')&&Number.isFinite(+value)&&+value>0?+value:null;}
 function saleCostBreakdownHTML(r,p,manualInput){
-  if(!basitMod||!r.kod)return '';
+  if(!fqSimpleSale()||!r.kod)return '';
   const pending=!!r.veriHata||!!fqPricingError||!fqDataReady;
   const known=!pending&&Number.isFinite(p.unitToptan)&&p.unitToptan>0;
   const money=n=>Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
@@ -1554,9 +1591,11 @@ function saleCostBreakdownHTML(r,p,manualInput){
   const bip=pending?'—':r.isET?'Uygulanmıyor':known&&Number.isFinite(p.unitBip)?money(p.unitBip):'—';
   const net=known&&Number.isFinite(p.unitBipli)?money(p.unitBipli):'—';
   const note=pending?'Fiyat bilgisi doğrulanamadı.':showRetail?'Perakende fiyatı listeden alınmıştır. Maliyet girilmeden kâr hesaplanamaz.':r.isET?'Manuel maliyet kullanılır; BİP ayrıca düşülmez.':'Net maliyet = maliyet − BİP. Hakediş ayrıca hesaplanır.';
-  return `<div class="sale-cost-breakdown" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl>${retailHTML}<div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip">${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note">${note}</span></div>`;
+  return `<div class="sale-cost-breakdown${r.isET?' is-manual':''}" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl>${retailHTML}<div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip">${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note${!pending&&!showRetail&&!r.isET?' is-default':''}">${note}</span></div>`;
 }
 function renderRows(){
+  applyGorunum();
+  if(fqMobileBlurTarget&&!fqMobileBlurTarget.isConnected)fqMobileBlurTarget=null;
   for(const r of quoteRows){try{r.adet=FiyatIQCore.quantity(r.adet);}catch(e){r.adet=1;alert(e.message);}}
   const tb=$("rows"); if(!tb) return;
   ikiliUygula();   // ikili kampanya: sepetteki eşleşmeleri bul, payları dağıt, eksik eşi işaretle
@@ -1586,12 +1625,14 @@ function renderRows(){
   const apc=$("altPanelCard"); if(apc) apc.style.display="";
   document.querySelectorAll('.quote-action').forEach(b=>{b.disabled=!quoteRows.some(r=>r.kod);});
   const kar=+(($("karOrani")||{}).value)||0, komis=komisOran||0;
+  // Validate all row calculations before replacing the visible product list.
+  const rowParts=quoteRows.map(r=>calcParts(r,kar,komis));
   tb.innerHTML="";
   let tMaliyet=0,tBip=0,tBipli=0,tAdet=0,tPer=0; const uyStokYok=[], uyKritik=[], uyZararSatir=[];
   // Maliyeti OLMAYAN ürünler (FL'de toptan yok / kod tanınmadı, Manuel toptan da girilmemiş) — kâr hesabı bunlarsız YANILTICI olur
   const uyMaliyetsiz=quoteRows.filter(r=>r.kod && !(r.isET?(+r.etToptan>0):(+r.toptan>0))).map(r=>r.kod);
   quoteRows.forEach((r,i)=>{
-    const p=calcParts(r,kar,komis);
+    const p=rowParts[i];
     r.nakit=p.unitNakit; r.taksit=p.unitTaksit; r.maliyet=p.unitToptan; r.kar=p.karPct;
     const maliyetL=p.unitToptan*p.adet, bipL=p.unitBip*p.adet, nakitL=p.unitNakit*p.adet, taksitL=p.unitTaksit*p.adet;
     if(r.isET && +r.etToptan>0 && r.ad==="— bulunamadı —") r.ad=r.kod; // elle maliyet girilince kod adıyla geçerli olur
@@ -1616,20 +1657,21 @@ function renderRows(){
       ? `<button class="ghost sm" style="${_nSec?'background:#16a34a;border-color:#16a34a;color:#fff;font-weight:800':'border-color:#16a34a;color:#22c55e'}" title="${_nSec?'Nakit fiyatı UYGULANDI ('+fmt(_nakitHedef)+' ₺). Geri almak için tekrar bas.':'Nakit/havale fiyatını uygula ('+fmt(_nakitHedef)+' ₺)'}${r.ikiliEsIdx!=null?' — ikili kampanyada iki satıra birlikte uygulanır':''}" onclick="nakitUygula(${i})">💵 Nakit${_nSec?' ✓':''}</button> `
       : "";
     const tr=document.createElement("tr");
+    if(!r.kod){tr.classList.add('fq-empty-row');if(i!==quoteRows.findIndex(row=>!row.kod))tr.classList.add('fq-spare-row');}
     tr.innerHTML=`
       <td><input data-fq-row="${i}" data-fq-field="kod" value="${esc(r.kod)}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();codeBlur(${i},this.value)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();codeEnter(${i},this.value);}"></td>
       <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${saleCostBreakdownHTML(r,p,maliyetCell)}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" min="1" step="1" data-fq-row="${i}" data-fq-field="adet" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
-      <td class="num">${basitMod&&r.isET?fmt(maliyetL):maliyetCell}</td>
+      <td class="num">${fqSimpleSale()&&r.isET?fmt(maliyetL):maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
       <td class="num" title="Maliyet − BİP">${(valid&&Number.isFinite(p.unitBipli))?fmt(p.unitBipli*p.adet):'<span class="mut">—</span>'}</td>
       <td class="num" title="BSH resmi perakende (etiket) fiyatı">${(+r.etiket>0)?fmt((+r.etiket)*p.adet):'<span class="mut">—</span>'}</td>
       <td class="num"><span class="raw-price">${pesinCell}</span><strong class="net-price" id="saleP${i}">—</strong>${r.isET?`<span class="manual-entry">${pesinCell}</span>`:""}</td>
       <td class="num"><span class="raw-price">${taksitCell}</span><strong class="net-price" id="saleT${i}">—</strong>${r.isET?`<span class="manual-entry">${taksitCell}</span>`:""}</td>
       <td class="num" style="font-size:12px;line-height:1.3">${karCell}</td>
-      <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
+      <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num" data-label="${esc(depoAdi())}">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
       <td style="white-space:nowrap">${nakitBtn}<button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
@@ -3818,7 +3860,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="10 Eyl 2026 · maliyetsiz üründe perakende fiyatı v11.9.1";
+const FQ_SURUM="10 Eyl 2026 · mobil satış düzeni v11.9.2";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====

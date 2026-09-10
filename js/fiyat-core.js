@@ -52,7 +52,8 @@ function money(v){if(v==null||v==='')return 0;if(typeof v==='number'){if(!Number
  const n=Number(s);if(!Number.isFinite(n)||n<0)throw Error('Geçersiz tutar.');return n;}
 function businessDate(date=new Date()){const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);const get=t=>p.find(x=>x.type===t).value;return get('year')+'-'+get('month')+'-'+get('day');}
 function campaignActive(k,day=businessDate()){const start=k.baslangic_tarihi||k.baslangic;const end=k.bitis_tarihi||k.bitis;return k.aktif!==false&&(!start||String(start).slice(0,10)<=day)&&(!end||String(end).slice(0,10)>=day);}
-function calcParts(r,kar,komis,nakit=null){komis=commission(komis);const adet=quantity(r.adet);kar=Number(kar);if(!Number.isFinite(kar)||kar<0)throw Error('Kâr oranı geçersiz.');
+// A signed target is intentional: below-cost sales remain available and the UI shows their loss.
+function calcParts(r,kar,komis,nakit=null){komis=commission(komis);const adet=quantity(r.adet);kar=Number(kar);if(!Number.isFinite(kar))throw Error('Kâr oranı geçersiz.');
  const unitToptan=r.isET?(+r.etToptan||0):(+r.toptan||0),unitBip=r.isET?0:(+r.bip||0),unitBipli=unitToptan-unitBip;
  const manuelP=r.isET&&+r.manuelFiyat>0,manuelT=r.isET&&+r.manuelTaksit>0;
  const cash=r.nakitSecili&&nakit>0?nakit:null;
@@ -113,3 +114,4 @@ function calculateCampaigns(applied,rows,options={}){const empty={toplamHak:0,to
  return {toplamHak:best.hak,toplamInd:best.ind,dokum,dagilim,bosta:Object.entries(leftovers).map(([k,n])=>n>1?k+'×'+n:k),optimal:!capped&&!exhausted,uyari:capped||exhausted?'Hesap sınırına ulaşıldı; geçerli bir dağıtım gösteriliyor, en yüksek tutar garanti edilmez.':''};}
 return {isBoschSoloHob,uniqueCampaigns,septemberPolicy,katNorm,kategoriOf,quantity,commission,money,businessDate,campaignActive,calcParts,applyPairs,calculateCampaigns};
 });
+
