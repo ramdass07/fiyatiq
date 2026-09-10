@@ -84,3 +84,11 @@ Efektif birim maliyeti bulunmayan üründe, fiyat listesinden geçerli perakende
 Adı ve maliyeti boş, yalnız perakende fiyatı olan sorgu yanıtı artık kaybolmaz; ürün kodu adı olarak kullanılır. Yeni sorguda perakende alanı yoksa eski değer temizlenir. Bekleyen/hatalı veri veya sıfır/bozuk perakende değeri gösterilmez.
 
 Üç yeni regresyon testi perakende-only yanıtı, birim/kuruş gösterimini, bilinmeyen maliyetin korunmasını, otomatik satışa aktarılmamasını, manuel satışın korunmasını ve eksilen perakende fiyatının temizlenmesini kapsar. Bu değişiklik veritabanı migration'ı gerektirmez.
+
+## v11.9.2 mobil satış ve negatif kâr düzeltmesi
+
+700px ve altındaki ekranlarda satış görünümü ürün kartları kullanır; masaüstündeki sade/detaylı görünüm tercihi korunur. Menü ve teklif işlemleri açılır bölümlere taşınır. Maliyet, BİP, net maliyet ve gerektiğinde perakende referansı görünür kalır. Ek boş satırlar telefonda gösterilmez, ürün ekleme mevcut boş girdiyi kullanır. Döndürme sırasında odaklanmış alanın düzenlemesi kesilmez. CSS dosyası yayın izin listesine eklenmiştir.
+
+Negatif hedef kâr motor tarafından reddediliyordu; tablo hesaplama öncesinde temizlendiği için kod ve ürün adı kayboluyordu. Sonlu negatif oranlar artık hesaplanır, zarar uyarıları korunur. Satır hesaplamaları görünür tablo temizlenmeden doğrulanır. Bundle olmadan iki ürünle -5% senaryosu, fiyatlar, zarar göstergesi, taslak ve kayıt doğrulanır.
+
+`mobile-sales.test.cjs` mobil/masaüstü geçişi, tek manuel maliyet girdisi, perakende görünürlüğü, boş satır kullanımı ve odak korunmasını; `negative-profit-layout.test.cjs` negatif oranları ve kaydı kapsar. Gerçek telefon tarayıcısında görsel kontrol yapılmadı: yerel önizleme adresi bulut tarayıcısının URL politikası tarafından engellendi. Veritabanı migration'ı yoktur.

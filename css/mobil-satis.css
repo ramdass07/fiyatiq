@@ -1,0 +1,222 @@
+/* Mobile sales layout. Keep the existing desktop table and calculations intact. */
+@media screen and (min-width: 701px) {
+  #fqHeaderMenu,
+  #fqHeaderMenu > .fq-header-menu-items,
+  #fqSaleTools,
+  #fqSaleTools > .fq-sale-tool-items { display: contents; }
+  #fqHeaderMenu::details-content,
+  #fqSaleTools::details-content { display: contents; }
+  #fqHeaderMenu > summary,
+  #fqSaleTools > summary { display: none; }
+}
+
+@media screen and (max-width: 700px) {
+  header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px;
+    position: static;
+    align-items: center;
+  }
+  header .brand { font-size: 22px; }
+  header > .grow { display: none; }
+  header > .seg { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  header .seg button { flex: 1; min-height: 44px; padding: 9px 12px; font-size: 14px; }
+  #fqHeaderMenu { grid-column: 2; grid-row: 1; }
+  #fqHeaderMenu[open] { display: contents; }
+  #fqHeaderMenu[open]::details-content { display: contents; }
+  #fqHeaderMenu > summary { grid-column: 2; grid-row: 1; }
+  #fqHeaderMenu > .fq-header-menu-items {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  #fqHeaderMenu:not([open]) > .fq-header-menu-items { display: none; }
+  #fqHeaderMenu button { min-width: 0; min-height: 44px; padding: 9px 8px; white-space: normal; }
+  #fqHeaderMenu #yardimBtn { font-size: 13px; }
+  #fqHeaderMenu #yardimBtn::before { content: none; }
+  #fqHeaderMenu #who,
+  #fqHeaderMenu #fqSurum {
+    grid-column: 1 / -1;
+    order: 1;
+    margin: 0;
+    max-width: none;
+    font-size: 12px;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
+  #fqHeaderMenu .grow { display: none; }
+  #fqHeaderMenu > summary,
+  #fqSaleTools > summary,
+  #quickStock > summary,
+  #manualPriceDetails > summary,
+  #netDokumCard > summary {
+    min-height: 44px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 20px;
+  }
+  #fqHeaderMenu > summary,
+  #fqSaleTools > summary { background: var(--field); border: 1px solid var(--line); }
+
+  #bayiView { padding: 10px 8px 24px; }
+  #salesWorkspace,
+  #salesWorkspace:not(.simple-sale) { gap: 10px; }
+  #salesWorkspace > .card { padding: 12px; border-radius: 12px; }
+  #saleControls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  #saleControls > .fld { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+  #saleControls > .fld:first-child { grid-column: 1; grid-row: 2; }
+  #saleControls > .fld:nth-child(2) { grid-column: 1 / -1; grid-row: 1; }
+  #saleControls > .fld:nth-child(3) { grid-column: 2; grid-row: 2; }
+  #saleControls #elleKomFld { grid-column: 1 / -1; grid-row: auto; }
+  #saleControls label { font-size: 12px; }
+  #saleControls input,
+  #saleControls select,
+  #saleControls #banka,
+  #saleControls #taksit,
+  #saleControls #karOrani {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 8px;
+  }
+  #saleControls #ticariUyari { max-width: none !important; }
+  #saleControls #elleKomFld > span { display: grid !important; grid-template-columns: 2fr 1fr; min-width: 0; }
+  #saleControls #quickStock { grid-column: 1 / -1; min-width: 0; width: 100%; margin: 0; padding: 0; }
+  #quickStock[open] > .row { padding: 0 10px; margin-top: 0; }
+  #quickStock #stokSorguInput { width: 100% !important; flex: 1 1 100%; }
+  #quickStock .row > button { width: 100%; min-height: 44px; }
+  #quickStock #stokOneri { min-width: 0 !important; width: 100%; max-width: 100%; }
+  #stokSorguSonuc { padding: 0 10px; min-width: 0; }
+  #stokSorguSonuc table { max-width: 100%; }
+  #stokSorguSonuc > div { max-width: 100%; overflow-wrap: anywhere; }
+
+  #productsCard > .sale-heading { display: block; margin-bottom: 8px; }
+  #productsCard > .sale-heading h2 { font-size: 17px; margin: 0 0 10px; }
+  #productsCard .sale-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #productsCard .sale-tools button { min-width: 0; min-height: 44px; padding: 9px; font-size: 13px; }
+  #fqAddProduct { grid-column: 1; grid-row: 1; }
+  #fqNewQuote { grid-column: 2; grid-row: 1; }
+  #fqSaleTools { grid-column: 1 / -1; }
+  #fqSaleTools > .fq-sale-tool-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 8px; }
+  #fqSaleTools:not([open]) > .fq-sale-tool-items { display: none; }
+  #fqSaleTools #gorunumBtn { display: none; }
+  #fqDraftStatus { margin: 8px 0; font-size: 11px !important; line-height: 1.4; overflow-wrap: anywhere; }
+  #fqDraftStatus:empty { display: none; }
+  #salePriceHint { margin: 8px 0 12px; font-size: 11px; line-height: 1.5; }
+
+  #salesWorkspace.simple-sale #gridWrap { border: 0; border-radius: 0; background: none; padding: 0; margin: 0; max-height: none; min-height: 0; overflow: visible; }
+  #salesWorkspace.simple-sale #grid { display: block; min-width: 0; width: 100%; overflow: visible; }
+  #salesWorkspace.simple-sale #grid tbody { display: grid; gap: 12px; width: 100%; }
+  #salesWorkspace.simple-sale #grid thead,
+  #salesWorkspace.simple-sale #grid tfoot { display: none; }
+  #salesWorkspace.simple-sale #grid tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px 8px;
+    padding: 12px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(10, 16, 29, .4);
+    min-width: 0;
+  }
+  #salesWorkspace.simple-sale #grid td { min-width: 0 !important; max-width: none !important; width: auto; padding: 0; border: 0; background: none; text-align: left; white-space: normal !important; }
+  #salesWorkspace.simple-sale #grid td:nth-child(1) { grid-column: 1 / 5; grid-row: 1; }
+  #salesWorkspace.simple-sale #grid td:nth-child(3) { grid-column: 5 / 7; grid-row: 1; }
+  #salesWorkspace.simple-sale #grid td:nth-child(1)::before,
+  #salesWorkspace.simple-sale #grid td:nth-child(3)::before { display: block; margin-bottom: 5px; color: var(--mut); font-size: 11px; }
+  #salesWorkspace.simple-sale #grid td:nth-child(1)::before { content: 'Ürün kodu'; }
+  #salesWorkspace.simple-sale #grid td:nth-child(3)::before { content: 'Adet'; }
+  #salesWorkspace.simple-sale #grid td input { min-width: 0; max-width: 100%; min-height: 44px; font-size: 16px; padding: 10px 8px; border-radius: 8px; }
+  #salesWorkspace.simple-sale #grid td:nth-child(1) input,
+  #salesWorkspace.simple-sale #grid td:nth-child(3) input { width: 100% !important; }
+  #salesWorkspace.simple-sale #grid td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; line-height: 1.45; overflow-wrap: anywhere; }
+  #salesWorkspace.simple-sale .product-name { max-width: none; overflow: visible; white-space: normal; text-overflow: clip; font-size: 14px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+  #salesWorkspace.simple-sale #grid td:nth-child(8) { grid-column: 1 / 4; grid-row: 3; }
+  #salesWorkspace.simple-sale #grid td:nth-child(9) { grid-column: 4 / 7; grid-row: 3; }
+  #salesWorkspace.simple-sale #grid td:nth-child(8),
+  #salesWorkspace.simple-sale #grid td:nth-child(9) { padding: 10px 8px; background: var(--field); border-radius: 8px; overflow-wrap: anywhere; }
+  #salesWorkspace.simple-sale #grid td:nth-child(8)::before,
+  #salesWorkspace.simple-sale #grid td:nth-child(9)::before { display: block; margin-bottom: 4px; font-size: 11px; color: var(--mut); }
+  #salesWorkspace.simple-sale .net-price { font-size: clamp(16px, 4.6vw, 21px); line-height: 1.3; font-variant-numeric: tabular-nums; }
+  #salesWorkspace.simple-sale .manual-entry input { width: 100% !important; }
+  #salesWorkspace.simple-sale #grid td:nth-child(11) { grid-column: 1 / 3; grid-row: 4; }
+  #salesWorkspace.simple-sale #grid td:nth-child(12) { grid-column: 3 / 5; grid-row: 4; }
+  #salesWorkspace.simple-sale #grid td:nth-child(13) { grid-column: 5 / 7; grid-row: 4; }
+  #salesWorkspace.simple-sale #grid td:nth-child(n+11):nth-child(-n+13) { display: block !important; padding: 8px 4px; background: rgba(148, 163, 184, .06); text-align: center; font-size: 13px; overflow-wrap: anywhere; }
+  #salesWorkspace.simple-sale #grid td:nth-child(n+11):nth-child(-n+13)::before { display: block; margin-bottom: 4px; font-size: 11px; line-height: 1.3; }
+  #salesWorkspace.simple-sale #grid td:nth-child(13)[data-label]::before { content: attr(data-label); }
+  #salesWorkspace.simple-sale #grid td:last-child { grid-column: 1 / -1; grid-row: 5; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; white-space: normal !important; }
+  #salesWorkspace.simple-sale #grid td:last-child button { min-width: 44px; min-height: 44px; padding: 10px 12px; font-size: 12px; }
+  #salesWorkspace.simple-sale #grid tbody > tr[hidden],
+  #salesWorkspace.simple-sale #grid tbody > tr.fq-spare-row { display: none !important; }
+  #salesWorkspace.simple-sale #grid tr.fq-empty-row > td:not(:first-child):not(:nth-child(3)) { display: none !important; }
+
+  #salesWorkspace.simple-sale .sale-cost-breakdown { padding: 8px; margin: 10px 0 8px; border-radius: 8px; }
+  #salesWorkspace.simple-sale .sale-cost-breakdown dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+  #salesWorkspace.simple-sale .sale-cost-breakdown dl > div { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
+  #salesWorkspace.simple-sale .sale-cost-breakdown dt { font-size: 10px; line-height: 1.4; margin-bottom: 3px; }
+  #salesWorkspace.simple-sale .sale-cost-breakdown dd { margin: 0; font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+  #salesWorkspace.simple-sale .sale-cost-breakdown .sale-cost-retail { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  #salesWorkspace.simple-sale .sale-cost-retail dt { font-size: 12px; }
+  #salesWorkspace.simple-sale .sale-cost-retail dd { font-size: 16px; }
+  #salesWorkspace.simple-sale .sale-cost-breakdown.is-manual dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #salesWorkspace.simple-sale .sale-cost-breakdown.is-manual dl > div:has(input) { grid-column: 1 / -1; }
+  #salesWorkspace.simple-sale .sale-cost-breakdown input { width: 100% !important; }
+  #salesWorkspace.simple-sale .sale-cost-note { margin-top: 8px; }
+  #salesWorkspace.simple-sale .sale-cost-note.is-default { display: none; }
+  #salesWorkspace.simple-sale .stock-summary { margin-top: 4px; font-size: 11px; line-height: 1.45; }
+
+  #salesWorkspace #altPanelCard { position: static; top: auto; bottom: auto; z-index: auto; padding: 14px 12px; border-radius: 12px; }
+  #salesWorkspace #altPanelCard > h2 { display: block; margin: 0 0 12px; font-size: 16px; }
+  #salesWorkspace .payment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px !important; }
+  #salesWorkspace .payment-grid > .fld { grid-area: auto; min-width: 0; gap: 5px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  #salesWorkspace .payment-grid label { font-size: 11px; line-height: 1.4; white-space: normal; }
+  #salesWorkspace .payment-grid .big,
+  #salesWorkspace .support-metric b { font-size: clamp(18px, 5.5vw, 23px); overflow-wrap: anywhere; }
+  #salesWorkspace .payment-grid #karPct { font-size: 20px; }
+  #manualPriceDetails { float: none; width: 100%; margin: 12px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; }
+  #manualPriceDetails[open] { border-top: 1px solid var(--line); }
+  #manuelToplamRow { padding: 0 10px 10px !important; margin-top: 0 !important; border-top: 0 !important; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #manuelToplamRow > .fld { min-width: 0; }
+  #manuelToplamRow label { font-size: 11px; }
+  #manuelToplamRow input { max-width: none; min-width: 0; min-height: 44px; font-size: 16px; }
+  #manuelToplamRow > button,
+  #manuelToplamRow > #mtNot { grid-column: 1 / -1; min-height: 44px; }
+  #manuelToplamRow > #mtNot:empty { display: none; }
+  #altPanelCard .sale-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  #altPanelCard .sale-actions button { width: 100%; min-width: 0; min-height: 44px; padding: 10px 6px; font-size: 12px; white-space: normal; }
+  #fqSaveQuote { grid-column: 1; grid-row: 1; }
+  #fqShareQuote { grid-column: 2; grid-row: 1; }
+  #altPanelCard .sale-actions .fq-print-action { background: transparent !important; color: var(--mut) !important; border: 1px solid var(--line); box-shadow: none; }
+  #altPanelCard .sale-actions #saveMsg { grid-column: 1 / -1; overflow-wrap: anywhere; }
+
+  #salesWorkspace #kampPanel { padding: 8px 12px; }
+  #kampPanel h2 { min-height: 44px; align-items: center; font-size: 14px; }
+  #kampList { max-height: none; }
+  #kampPanel .campaign-choice { gap: 10px; padding: 10px 0; align-items: center; }
+  #kampPanel .campaign-choice > div { min-width: 0; gap: 4px; }
+  #kampPanel .campaign-choice b { font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+  #kampPanel .campaign-choice button { min-height: 44px; }
+  #uyariKutu .uyari-kritik { flex-wrap: wrap; }
+  #uyariKutu .uyari-kritik > span { min-width: 0; overflow-wrap: anywhere; }
+  #netDokumCard { padding: 0 10px 8px; }
+  #netDokumCard button { min-height: 44px; white-space: normal; }
+  #customerDialog { width: calc(100% - 16px); max-height: 90dvh; padding: 14px; }
+  #customerDialog .sale-heading h2 { font-size: 16px; }
+  #customerDialog input,
+  #customerDialog select,
+  #customerDialog button { min-height: 44px; }
+  #customerDialog .customer-actions { flex-wrap: wrap; }
+  #customerDialog #siparisBilgiCard h2 { flex-wrap: wrap; line-height: 1.4; }
+}
