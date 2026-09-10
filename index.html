@@ -1729,11 +1729,19 @@ function renderKampanyaPanel(){
   let dagApp={toplamHak:0,toplamInd:0}; try{ dagApp=hesaplaHakedis(applied, vrows); }catch(e){}
   const indT=dagApp.toplamInd;
   const hakT=dagApp.toplamHak;
+  const plan=hesaplaHakedis(all,vrows);
+  const planIds=new Set(plan.dokum.map(d=>d.kampanyaId));
+  const samePlan=planIds.size===secilenKampanya.size&&[...planIds].every(id=>secilenKampanya.has(id));
   const birimAdi=k=>{ const t=bundleTuru(k); return t==='ikili'?'çift':(t==='ankastre'?'set':(t==='xl'?'adet':'kez')); };
-  list.innerHTML=all.map(k=>{
-    const on=secilenKampanya.has(k.id),pv=hesaplaHakedis([k],vrows);
-    return `<div class="campaign-choice"><div><b>${esc(k.ad)}</b><div class="mut">Tek başına ${fmt(pv.toplamHak)} ₺ hakediş · ${pv.dokum.length} ${birimAdi(k)}</div></div><button class="${on?'':'ghost '}sm" aria-pressed="${on}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button></div>`;
-  }).join('')+`<p class="sale-hint">Aynı ürün iki kampanyada sayılmaz. Birlikte geçerli hakediş: <b>${fmt(hakT)} ₺</b>. Satıştan önce DİVA teyidi alın.</p>`;
+  const onerilen=plan.toplamHak>0&&!samePlan?`<div class="campaign-choice"><div><b>Birlikte uygulanabilir: ${fmt(plan.toplamHak)} ₺ hakediş</b><div class="mut">Ürünler kampanyalar arasında paylaştırıldı.</div></div><button class="sm" onclick="uygunKampanyalariUygula()">Önerilenleri uygula</button></div>`:'';
+  list.innerHTML=onerilen+all.map(k=>{
+    const on=secilenKampanya.has(k.id);
+    const ortak=(on?dagApp:plan).dokum.filter(d=>d.kampanyaId===k.id);
+    const pv=ortak.length?{toplamHak:ortak.reduce((s,d)=>s+d.hak,0),dokum:ortak}:hesaplaHakedis([k],vrows);
+    const etiket=on?'Uygulanan':ortak.length?'Önerilen dağılım':'Alternatif · tek başına';
+    const urunler=ortak.map(d=>d.aciklama.replace((k.ad||'Kampanya')+': ','')).join(' / ');
+    return `<div class="campaign-choice"><div><b>${esc(k.ad)}</b><div class="mut">${etiket}: ${fmt(pv.toplamHak)} ₺ hakediş · ${pv.dokum.length} ${birimAdi(k)}${urunler?' · '+esc(urunler):''}</div></div><button class="${on?'':'ghost '}sm" aria-pressed="${on}" onclick="toggleKampanya('${k.id}')">${on?'✓ Uygulandı':'Uygula'}</button></div>`;
+  }).join('')+`<p class="sale-hint">Aynı ürün iki kampanyada sayılmaz. Uygulanan toplam hakediş: <b>${fmt(hakT)} ₺</b>. Satıştan önce DİVA teyidi alın.</p>`;
   setHeader();
 }
 // 🤝 İkili kampanya fiyatı BUNDLE DESTEĞİ DÜŞÜLEREK belirlenir. Aynı sepette bundle/hakediş
@@ -1744,6 +1752,7 @@ function isBundleKamp(k){ return ['all','all+any','any2','xl','xxl','xl+xxl'].in
 // Kampanyanın bundle türü: xl (tek tek dolap), ankastre (fırın+ocak+davlumbaz seti), ikili (2 farklı beyaz eşya), diger
 function bundleTuru(k){
   const mt=k&&k.match_type;
+  if(mt==='all'&&(k.kategoriler||[]).map(katNorm).sort().join(',')==='CAMASIR,KURUTMA')return 'ikili';
   if(['xl','xxl','xl+xxl'].includes(mt)) return 'xl';
   if(mt==='any2') return 'ikili';
   if(mt==='all'){ const cats=(k.kategoriler||[]).map(katNorm).filter(Boolean); const ank=new Set(['FIRIN','OCAK','DAVLUMBAZ','ANKASTRE']); if(cats.length&&cats.every(c=>ank.has(c))) return 'ankastre'; }
@@ -1766,6 +1775,13 @@ function dokumHTML(dag){
   </div>`;
 }
 // Yalnız sepete uygun kampanyalar seçilebilir; uyumsuz bundle seçimleri birlikte tutulmaz.
+function uygunKampanyalariUygula(){
+  if(ikiliAktifMi())return;
+  const rows=quoteRows.filter(r=>r.kod&&r.ad!=="— bulunamadı —"&&(r.isET?(+r.etToptan>0):(+r.toptan>0)));
+  const plan=hesaplaHakedis(matchKampanyalar(),rows);
+  secilenKampanya=new Set(plan.dokum.map(d=>d.kampanyaId));
+  renderRows();
+}
 function toggleKampanya(id){
   if(secilenKampanya.has(id)) secilenKampanya.delete(id);
   else {
@@ -3661,7 +3677,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="9 Eyl 2026 · tek ekran v11.1";
+const FQ_SURUM="10 Eyl 2026 · tek ekran v11.2";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
