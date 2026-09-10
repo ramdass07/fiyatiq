@@ -3,12 +3,13 @@ const {harness}=require('./harness.cjs');
 const row=(id,extra={})=>({id:String(id),no:'FQ-'+id,tarih:'2026-09-10T21:30:00.000Z',magaza:'Test mağaza',personel:'Satıcı',musteri:'Müşteri',tel:'5551112233',marka:'bosch',toplam:1000,durum:'teklif',urunler:'TEST1',gercek_satis_tutari:null,satis_odeme_sekli:null,satis_banka:null,satis_taksit_sayisi:null,satis_tarihi:null,...extra});
 const summary=(extra={})=>({quote_count:1201,cash_total:1201000,average_cash:1000,sold_count:12,sold_cash_total:12000,conversion_rate:12/1201*100,actual_sale_count:10,actual_sale_total:11000,missing_actual_count:2,...extra});
 const report=(rows=[],extra={})=>({rows,total_count:rows.length,summary:summary(),stores:['Test mağaza'],report_revision:'revision-a',...extra});
+const saleReport=(rows=[],extra={})=>({rows,total_count:rows.length,summary:{sale_count:rows.length,actual_sale_total:0,average_actual_sale:0},stores:['Test mağaza'],undated_sales_count:0,report_revision:'sales-revision-a',...extra});
 function setup(t){
  const h=harness(t);if(h.run("typeof fqAdminReport==='undefined'"))h.run(fs.readFileSync(path.join(__dirname,'../js/yonetim-raporu.js'),'utf8'));h.run("profil.rol='admin'");
  const calls=[],writes=[],sheets=[];
  h.w.__sb.rpc=async(name,args)=>{calls.push({name,args});return {data:report(),error:null};};
  h.w.XLSX={utils:{book_new:()=>({}),aoa_to_sheet:data=>{sheets.push(data);return {};},book_append_sheet:()=>{}},writeFile:(workbook,name)=>writes.push({workbook,name})};
- return {...h,rpcCalls:calls,writes,sheets,respondRPC:fn=>{h.w.__sb.rpc=async(name,args)=>{calls.push({name,args});return fn(args,calls.length);};}};
+ return {...h,rpcCalls:calls,writes,sheets,respondRPC:fn=>{h.w.__sb.rpc=async(name,args)=>{calls.push({name,args});return fn(args,calls.length,name);};}};
 }
 const plain=value=>JSON.parse(JSON.stringify(value));
 
@@ -82,4 +83,55 @@ test('duplicate export clicks issue one request, and logout clears export state 
  const h=setup(t);let release;h.respondRPC(()=>new Promise(resolve=>{release=resolve;}));const pending=h.run('fqExportAdminQuotes()');await h.run('fqExportAdminQuotes()');assert.equal(h.rpcCalls.length,1);
  h.run("fqResetAdminReport();authUid=null");release({data:report([row('private')]),error:null});await pending;
  assert.equal(h.writes.length,0);assert.equal(h.run('fqAdminReport.exporting'),false);assert.equal(h.run("$('tekliflerMsg').textContent"),'');
+});
+
+test('sales mode defaults to the Istanbul month and uses only the sales RPC filters',async t=>{
+ const h=setup(t);h.run("Date=class extends Date{constructor(...args){super(...(args.length?args:['2026-08-31T21:30:00Z']));}}; $('tfAra').value=' Müşteri ';$('tfDurum').value='kaybedildi';$('tfBas').value='2026-08-01';$('tfBit').value='2026-08-31'");
+ h.respondRPC(()=>({data:saleReport([row('sold',{tarih:'2026-08-10T10:00:00Z',durum:'satildi',satis_tarihi:'2026-09-01',gercek_satis_tutari:1000.55,satis_odeme_sekli:'kart'})],{summary:{sale_count:1,actual_sale_total:1000.55,average_actual_sale:1000.55},undated_sales_count:4}),error:null}));
+ await h.run("fqAdminReportMode('sales')");
+ assert.deepEqual(plain(h.rpcCalls[0]),{name:'fq_satis_raporu',args:{p_ara:'Müşteri',p_baslangic:'2026-09-01',p_bitis:'2026-09-30',p_magaza:null,p_page:0,p_page_size:50}});
+ assert.equal(h.run("$('fqAdminMode').value"),'sales');assert.equal(h.run("$('tfDurum').disabled"),true);assert.equal(h.run("$('tfDurum').closest('.fld').hidden"),true);
+ assert.equal(h.w.document.querySelector('label[for="tfBas"]').textContent,'Satış başlangıç tarihi');assert.equal(h.w.document.querySelector('#gridWrap2 th:nth-child(2)').textContent,'Satış tarihi');
+ assert.equal(h.w.document.querySelector('#tekliflerList td:nth-child(2)').textContent,'01.09.2026');assert.match(h.run("$('tfOzet').textContent"),/1\.000,55 ₺/);assert.doesNotMatch(h.run("$('tfOzet').textContent"),/Dönüşüm|Peşin teklif/);
+ assert.match(h.run("$('fqAdminUndatedNote').textContent"),/4 “Satıldı”/);assert.match(h.run("$('fqAdminUndatedNote').textContent"),/tüm dönemlerdeki.*seçili ayın satış sayısı değildir/s);assert.equal(h.run("$('fqAdminUndatedNote').hidden"),false);assert.match(h.run("$('fqAdminPage').textContent"),/1 satış/);
+});
+test('each report mode preserves its own filters and monthly shortcuts handle year and leap boundaries',async t=>{
+ const h=setup(t);h.run("Date=class extends Date{constructor(...args){super(...(args.length?args:['2026-01-10T12:00:00Z']));}}; $('tfAra').value='Teklif müşterisi';$('tfDurum').value='kaybedildi';$('tfBas').value='2025-08-01';$('tfBit').value='2025-08-31';fqAdminReportStores(['Teklif mağazası']);$('tfMagaza').value='Teklif mağazası'");
+ h.respondRPC((args,call,name)=>({data:name==='fq_satis_raporu'?saleReport():report(),error:null}));await h.run("fqAdminReportMode('sales')");
+ h.run("$('tfAra').value='Satış müşterisi'");await h.run('fqAdminReportMonth(-1)');assert.equal(h.rpcCalls.at(-1).args.p_baslangic,'2025-12-01');assert.equal(h.rpcCalls.at(-1).args.p_bitis,'2025-12-31');
+ await h.run("fqAdminReportMode('quotes')");assert.deepEqual(plain(h.run('fqAdminReportFilters()')),{p_ara:'Teklif müşterisi',p_baslangic:'2025-08-01',p_bitis:'2025-08-31',p_magaza:'Teklif mağazası',p_durum:'kaybedildi'});assert.equal(h.run("$('tfDurum').disabled"),false);assert.equal(h.run("$('fqAdminMonths').hidden"),true);
+ await h.run("fqAdminReportMode('sales')");assert.equal(h.rpcCalls.at(-1).args.p_ara,'Satış müşterisi');assert.equal(h.rpcCalls.at(-1).args.p_baslangic,'2025-12-01');assert.equal(h.run("$('tfDurum').value"),'');
+ assert.deepEqual(plain(h.run("fqAdminReportMonthDates(-1,new Date('2024-03-01T00:00:00Z'))")),{p_baslangic:'2024-02-01',p_bitis:'2024-02-29'});
+ await h.run('fqAdminReportMonth(0)');assert.equal(h.rpcCalls.at(-1).args.p_baslangic,'2026-01-01');await h.run('fqAdminReportReset()');assert.equal(h.rpcCalls.at(-1).args.p_ara,'');assert.equal(h.rpcCalls.at(-1).args.p_magaza,null);assert.equal(h.rpcCalls.at(-1).args.p_baslangic,'2026-01-01');
+});
+test('mode changes discard old quote responses even after returning to the original mode',async t=>{
+ const h=setup(t);let release;h.respondRPC(()=>new Promise(resolve=>{release=resolve;}));const pending=h.run('fqLoadAdminQuotes()');
+ h.respondRPC((args,call,name)=>({data:name==='fq_satis_raporu'?saleReport([row('sale',{durum:'satildi',satis_tarihi:'2026-09-10'})]):report([row('fresh')]),error:null}));
+ await h.run("fqAdminReportMode('sales')");await h.run("fqAdminReportMode('quotes')");release({data:report([row('stale',{musteri:'Eski müşteri'})]),error:null});await pending;
+ assert.match(h.run("$('tekliflerList').textContent"),/FQ-fresh/);assert.doesNotMatch(h.run("$('tekliflerList').textContent"),/Eski müşteri|FQ-sale/);assert.equal(h.run('fqAdminReport.loading'),false);
+});
+test('sales export retrieves all matches with sale dates and cross-period missing-date context',async t=>{
+ const h=setup(t),records=Array.from({length:1001},(_,i)=>row(i,{tarih:'2026-08-10T10:00:00Z',durum:'satildi',gercek_satis_tutari:i===0?0:1234.56,satis_odeme_sekli:'nakit',satis_tarihi:'2026-09-05',musteri:i===0?'=FORMULA()':'Müşteri'}));
+ h.respondRPC(args=>({data:saleReport(records.slice(args.p_page*args.p_page_size,(args.p_page+1)*args.p_page_size),{total_count:1001,summary:{sale_count:1001,actual_sale_total:1234560,average_actual_sale:1234560/1001},undated_sales_count:3}),error:null}));await h.run("fqAdminReportMode('sales')");h.rpcCalls.length=0;
+ h.run("$('tfBas').value='2026-09-01';$('tfBit').value='2026-09-30';$('tfDurum').value='kaybedildi'");await h.run('fqExportAdminQuotes()');
+ assert.deepEqual(h.rpcCalls.map(call=>call.args.p_page),[0,1,2,0]);assert.ok(h.rpcCalls.every(call=>call.name==='fq_satis_raporu'&&call.args.p_page_size===500&&!Object.hasOwn(call.args,'p_durum')));assert.equal(h.writes.length,1);assert.match(h.writes[0].name,/^Gerceklesen_Satislar_/);
+ const table=h.sheets[0],context=h.sheets[1];assert.equal(table.length,1002);assert.equal(table[0][1],'Satış tarihi');assert.equal(table[1][1],'05.09.2026');assert.equal(table[0][14],'Teklif tarihi (Türkiye)');assert.match(table[1][14],/10\.08\.2026/);assert.equal(table[1][4],"'=FORMULA()");assert.equal(table[1][10],0);assert.equal(table[2][10],1234.56);
+ assert.ok(context.some(r=>r[0]==='Satış tarihi eksik veya geçersiz kayıt'&&r[1]===3));assert.ok(context.some(r=>String(r[1]).includes('Tüm dönemlerdeki')));assert.ok(context.some(r=>r[0]==='Tablodaki durum'&&r[1]==='Satıldı'));assert.ok(!context.some(r=>String(r[0]).includes('Dönüşüm')));assert.match(h.run("$('tekliflerMsg').textContent"),/1001 satış Excel dosyasına aktarıldı/);
+});
+test('switching report modes cancels a pending export without stale status or a file',async t=>{
+ const h=setup(t);let release;h.respondRPC(()=>new Promise(resolve=>{release=resolve;}));const pending=h.run('fqExportAdminQuotes()');
+ h.respondRPC(()=>({data:saleReport([row('fresh',{durum:'satildi',satis_tarihi:'2026-09-10'})]),error:null}));await h.run("fqAdminReportMode('sales')");assert.equal(h.run('fqAdminReport.exporting'),false);
+ release({data:report([row('private')]),error:null});await pending;assert.equal(h.writes.length,0);assert.equal(h.run("$('tekliflerMsg').textContent"),'');assert.match(h.run("$('tekliflerList').textContent"),/FQ-fresh/);assert.equal(h.run("$('fqAdminExport').disabled"),false);
+});
+test('sales view rejects incomplete summaries, shows confirmed zero amounts, and clears undated notes on errors',async t=>{
+ const h=setup(t);h.respondRPC(()=>({data:saleReport([row('zero',{durum:'satildi',gercek_satis_tutari:0,satis_tarihi:'2026-09-10',satis_odeme_sekli:'nakit'})],{undated_sales_count:7}),error:null}));await h.run("fqAdminReportMode('sales')");
+ assert.match(h.run("$('tfOzet').textContent"),/Gerçekleşen satış toplamı0 ₺/);assert.equal(h.w.document.querySelector('#tekliflerList td:nth-child(8)').textContent,'0 ₺');
+ h.respondRPC(()=>({data:saleReport([],{undated_sales_count:null}),error:null}));await h.run('fqLoadAdminQuotes()');assert.match(h.run("$('tekliflerMsg').textContent"),/Satış tarihi eksik kayıtların sayısı alınamadı/);assert.equal(h.run("$('fqAdminUndatedNote').textContent"),'');assert.equal(h.run("$('fqAdminUndatedNote').hidden"),true);assert.equal(h.run("$('tfOzet').textContent"),'');
+ h.respondRPC(()=>({data:saleReport([],{summary:{sale_count:0,actual_sale_total:0}}),error:null}));await h.run('fqExportAdminQuotes()');assert.equal(h.writes.length,0);assert.match(h.run("$('tekliflerMsg').textContent"),/Rapor özeti eksik/);
+});
+test('sales exports reject a concurrent revision change and role changes hide delayed results',async t=>{
+ const h=setup(t);h.respondRPC(()=>({data:saleReport([row('one',{durum:'satildi',satis_tarihi:'2026-09-10'})]),error:null}));await h.run("fqAdminReportMode('sales')");h.rpcCalls.length=0;
+ h.respondRPC((args,call)=>({data:saleReport([row('one',{durum:'satildi',satis_tarihi:'2026-09-10'})],{report_revision:call===1?'revision-a':'revision-b'}),error:null}));await h.run('fqExportAdminQuotes()');assert.equal(h.writes.length,0);assert.match(h.run("$('tekliflerMsg').textContent"),/Aktarım sırasında satışlar değişti/);
+ let release;h.respondRPC(()=>new Promise(resolve=>{release=resolve;}));const pending=h.run('fqLoadAdminQuotes()');h.run("profil.rol='bayi'");release({data:saleReport([row('private')]),error:null});await pending;assert.doesNotMatch(h.run("$('tekliflerList').textContent"),/private/);
+ h.run('fqResetAdminReport()');assert.equal(h.run('fqAdminReport.mode'),'quotes');assert.deepEqual(plain(h.run('fqAdminReport.filters')),{quotes:null,sales:null});assert.equal(h.run("$('fqAdminMode').value"),'quotes');assert.equal(h.run("$('fqAdminUndatedNote').textContent"),'');
 });

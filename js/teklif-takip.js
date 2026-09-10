@@ -29,7 +29,7 @@ document.body.insertAdjacentHTML('beforeend',`<dialog id="fqFollowupDialog" clas
  <label>Taksit sayısı · isteğe bağlı<input id="fqSaleInstallments" type="number" min="1" max="60" step="1" placeholder="Örn. 6"></label></div></section>
  <p id="fqSaleClearingWarning" class="fq-follow-wide fq-call-due" hidden>Durumu Satıldı dışına alıp kaydettiğinde gerçekleşen satış tutarı, ödeme bilgileri ve satış tarihi silinir. Teklif fiyatları korunur.</p>
  </div><p class="mut">Bu notlar mağaza içindir; müşteri çıktısına eklenmez. Takip eden kişi alanı bir erişim yetkisi vermez.</p></fieldset>
- <div class="fq-actions"><button class="ghost" id="fqFollowReload" onclick="fqReloadFollowup()">Yeniden yükle</button><button id="fqFollowSave" onclick="fqSaveFollowup()" disabled>Takibi kaydet</button></div>
+ <div class="fq-actions"><button type="button" class="ghost" id="fqFollowHistory" data-quote="" onclick="fqOpenQuoteHistory(this.dataset.quote)" disabled>Geçmiş</button><button class="ghost" id="fqFollowReload" onclick="fqReloadFollowup()">Yeniden yükle</button><button id="fqFollowSave" onclick="fqSaveFollowup()" disabled>Takibi kaydet</button></div>
  </dialog>`);
 
 function fqTurkeyInput(value){if(!value)return '';const date=new Date(value);if(!Number.isFinite(date.getTime()))return '';const parts=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);const get=type=>parts.find(x=>x.type===type).value;return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;}
@@ -92,7 +92,7 @@ function fqFillFollowup(t,desired){
  $('fqFollowStatus').value=t.durum||'teklif';$('fqFollowAssignee').value=t.takip_sorumlusu||'';$('fqFollowDate').value=fqTurkeyInput(t.sonraki_arama);$('fqFollowNote').value=t.takip_notu||'';$('fqFollowLoss').value=t.kayip_nedeni||'';
  fqFillSale(t);
  fqFollowup.baseline=fqFollowupRaw();if(Object.hasOwn(DURUM_AD,desired))$('fqFollowStatus').value=desired;
- fqFollowStatusChanged();$('fqFollowForm').disabled=false;$('fqFollowSave').disabled=false;
+ fqFollowStatusChanged();$('fqFollowForm').disabled=false;$('fqFollowSave').disabled=false;$('fqFollowHistory').disabled=false;$('fqFollowHistory').dataset.quote=t.id;
  $('fqFollowMessage').textContent=t.takip_guncellendi_at?'Son güncelleme: '+new Date(t.takip_guncellendi_at).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' · Türkiye saati':'';
 }
 async function fqOpenFollowup(id,desired){
@@ -100,12 +100,12 @@ async function fqOpenFollowup(id,desired){
  if(fqFollowupDirty()&&!confirm('Kaydedilmemiş takip değişiklikleri bırakılsın mı?'))return;
  const user=authUid,epoch=fqEpoch,request=++fqFollowup.request,dialog=$('fqFollowupDialog');fqFollowup.record=null;fqFollowup.baseline='';
  const current=()=>request===fqFollowup.request&&epoch===fqEpoch&&user===authUid&&dialog.open;
- $('fqFollowForm').disabled=true;$('fqFollowSave').disabled=true;$('fqFollowCustomer').textContent='';for(const field of ['fqFollowAssignee','fqFollowDate','fqFollowNote','fqFollowLoss'])$(field).value='';fqClearSale();$('fqFollowStatus').value='teklif';fqFollowStatusChanged();$('fqFollowMessage').textContent='Takip bilgileri yükleniyor…';if(!dialog.open)dialog.showModal();
+ $('fqFollowForm').disabled=true;$('fqFollowSave').disabled=true;$('fqFollowHistory').disabled=true;$('fqFollowHistory').dataset.quote='';$('fqFollowCustomer').textContent='';for(const field of ['fqFollowAssignee','fqFollowDate','fqFollowNote','fqFollowLoss'])$(field).value='';fqClearSale();$('fqFollowStatus').value='teklif';fqFollowStatusChanged();$('fqFollowMessage').textContent='Takip bilgileri yükleniyor…';if(!dialog.open)dialog.showModal();
  try{let q=sb.from('teklifler').select(FQ_FOLLOW_FIELDS).eq('id',id);if(!isEditor())q=q.eq('bayi_id',user);
  const {data,error}=await q.single();if(!current())return;if(error||!data)throw Error('missing');fqFillFollowup(data,desired);
  }catch(e){if(current())$('fqFollowMessage').textContent='Takip açılamadı. Bağlantını ve erişimini kontrol edip tekrar aç.';}
 }
-function fqResetFollowup(){fqFollowup.request++;fqFollowup.record=null;fqFollowup.baseline='';for(const id of ['fqFollowAssignee','fqFollowDate','fqFollowNote','fqFollowLoss'])$(id).value='';fqClearSale();$('fqFollowStatus').value='teklif';$('fqFollowCustomer').textContent='';$('fqFollowMessage').textContent='';$('fqFollowForm').disabled=true;$('fqFollowSave').disabled=true;if($('fqFollowupDialog').open)$('fqFollowupDialog').close();}
+function fqResetFollowup(){fqFollowup.request++;fqFollowup.record=null;fqFollowup.baseline='';for(const id of ['fqFollowAssignee','fqFollowDate','fqFollowNote','fqFollowLoss'])$(id).value='';fqClearSale();$('fqFollowStatus').value='teklif';$('fqFollowCustomer').textContent='';$('fqFollowMessage').textContent='';$('fqFollowForm').disabled=true;$('fqFollowSave').disabled=true;$('fqFollowHistory').disabled=true;$('fqFollowHistory').dataset.quote='';if($('fqFollowupDialog').open)$('fqFollowupDialog').close();}
 function fqCloseFollowup(){if(fqFollowup.saving){alert('Kaydın tamamlanmasını bekle.');return;}if(fqFollowupDirty()&&!confirm('Kaydedilmemiş takip değişiklikleri bırakılsın mı?'))return;fqResetFollowup();}
 async function fqReloadFollowup(){if(fqFollowup.record)await fqOpenFollowup(fqFollowup.record.id);}
 async function fqSaveFollowup(){
