@@ -33,6 +33,7 @@ document.body.insertAdjacentHTML('beforeend',`
  <dialog id="fqMyQuotes" class="fq-dialog" aria-labelledby="fqMyQuotesTitle" onclose="fqFlow.listRequest++"><div class="sale-heading"><h2 id="fqMyQuotesTitle">Tekliflerim</h2><button class="ghost" onclick="$('fqMyQuotes').close()">Kapat</button></div>
  <p class="mut">Bu mağaza hesabıyla kaydedilen teklifler. İncele, kayıtlı fiyatları gösterir; yeni kopya güncel fiyatlarla hesaplanır.</p>
  <div class="row"><label for="myQuotesSearch">Müşteri / telefon / teklif no</label><input id="myQuotesSearch" style="width:280px" maxlength="100" onkeydown="if(event.key==='Enter')fqMySearch()"><button onclick="fqMySearch()">Ara</button></div>
+ <div class="row" style="margin-top:10px"><label for="fqMyStatus">Durum</label><select id="fqMyStatus" onchange="fqMySearch()"><option value="">Tüm durumlar</option><option value="teklif">Bekleyen teklif</option><option value="satildi">Satıldı</option><option value="kaybedildi">Kaybedildi</option></select><label for="fqMyFollow">Arama planı</label><select id="fqMyFollow" onchange="fqMySearch()"><option value="">Tümü</option><option value="due">Bugün ve gecikenler</option><option value="planned">İleriki aramalar</option><option value="none">Arama planı yok</option></select></div>
  <p id="fqMyMessage" role="status"></p><div id="fqMyList" class="fq-list"></div><div class="fq-actions"><button id="fqMyPrev" class="ghost" onclick="fqMyPage(-1)">Önceki</button><span id="fqMyPage"></span><button id="fqMyNext" class="ghost" onclick="fqMyPage(1)">Sonraki</button></div></dialog>
  <dialog id="fqDraftDialog" class="fq-dialog" aria-labelledby="fqDraftTitle"><div class="sale-heading"><h2 id="fqDraftTitle">Taslaklar</h2><button class="ghost" onclick="$('fqDraftDialog').close()">Kapat</button></div>
  <p>Bu tarayıcıda, bu mağaza hesabına ait son 7 günlük çalışmalar. Başka cihazda görünmez; tarayıcı verileri silinirse kaybolur. Kalıcı kayıt için Teklifi Kaydet kullan.</p>
@@ -209,7 +210,7 @@ async function fqRestoreInputs(d){
  }finally{fqFlow.restoring=false;fqFlow.busy=false;if(user===authUid){fqDraftSchedule();}}
 }
 
-async function fqOpenMyQuotes(){if(!authUid)return;fqFlow.page=0;$('myQuotesSearch').value='';if(!$('fqMyQuotes').open)$('fqMyQuotes').showModal();await fqLoadMyQuotes();}
+async function fqOpenMyQuotes(onlyCalls=false){if(!authUid)return;fqFlow.page=0;$('fqMyStatus').value=onlyCalls?'teklif':'';$('fqMyFollow').value=onlyCalls?'due':'';$('myQuotesSearch').value='';if(!$('fqMyQuotes').open)$('fqMyQuotes').showModal();await fqLoadMyQuotes();}
 function fqMySearch(){fqFlow.page=0;fqLoadMyQuotes();}
 function fqMyPage(delta){fqFlow.page=Math.max(0,fqFlow.page+delta);fqLoadMyQuotes();}
 async function fqLoadMyQuotes(){
@@ -217,12 +218,13 @@ async function fqLoadMyQuotes(){
  const current=()=>request===fqFlow.listRequest&&user===authUid&&$('fqMyQuotes').open;
  $('fqMyMessage').textContent='Teklifler yükleniyor…';$('fqMyList').innerHTML='';$('fqMyPrev').disabled=true;$('fqMyNext').disabled=true;
  try{
- let q=sb.from('teklifler').select('id,teklif_no,created_at,musteri_ad,musteri_tel,marka,toplam,durum',{count:'exact'}).eq('bayi_id',user);
+ let q=sb.from('teklifler').select('id,teklif_no,created_at,musteri_ad,musteri_tel,marka,toplam,durum,sonraki_arama,takip_sorumlusu',{count:'exact'}).eq('bayi_id',user);
+ q=fqFollowupFilters(q);if($('fqMyFollow').value&&$('fqMyFollow').value!=='none')q=q.order('sonraki_arama',{ascending:true});
  const term=$('myQuotesSearch').value.trim().replace(/[^\p{L}\p{N}\s+\-]/gu,' ').trim();
  if(term)q=q.or(`musteri_ad.ilike.%${term}%,musteri_tel.ilike.%${term}%,teklif_no.ilike.%${term}%`);
  const {data,error,count}=await q.order('created_at',{ascending:false}).order('id',{ascending:false}).range(page*20,page*20+19);if(!current())return;if(error)throw error;
  $('fqMyMessage').textContent=(count||0)+' teklif bulundu.';$('fqMyPage').textContent='Sayfa '+(page+1);$('fqMyPrev').disabled=page===0;$('fqMyNext').disabled=(page+1)*20>=(count||0);
- $('fqMyList').innerHTML=(data||[]).map(t=>`<article class="fq-item"><div class="row"><b>${esc(t.musteri_ad||'Müşteri')} · ${esc(t.teklif_no||'—')}</b><span>${esc(DURUM_AD[t.durum]||'Teklif')}</span></div><p>${esc(new Date(t.created_at).toLocaleString('tr-TR'))} · ${esc(markaAd(t.marka))} · Peşin ${fmt(t.toplam)} ₺</p><div class="fq-actions"><button class="ghost" data-quote="${esc(t.id)}" onclick="openTeklifDetay(this.dataset.quote)">İncele</button><button data-quote="${esc(t.id)}" onclick="fqCopyQuote(this.dataset.quote)">Güncel fiyatla yeni kopya</button></div></article>`).join('')||'<p>Aramana uyan teklif bulunamadı.</p>';
+ $('fqMyList').innerHTML=(data||[]).map(t=>`<article class="fq-item"><div class="row"><b>${esc(t.musteri_ad||'Müşteri')} · ${esc(t.teklif_no||'—')}</b><span>${esc(t.durum==='teklif'?'Bekleyen teklif':DURUM_AD[t.durum]||'Teklif')}</span></div><p>${esc(new Date(t.created_at).toLocaleString('tr-TR'))} · ${esc(markaAd(t.marka))} · Peşin ${fmt(t.toplam)} ₺</p>${fqCallText(t)}${t.takip_sorumlusu?`<p class="mut">Takip eden: ${esc(t.takip_sorumlusu)}</p>`:''}<div class="fq-actions"><button data-quote="${esc(t.id)}" onclick="fqOpenFollowup(this.dataset.quote)">Müşteri takibi</button><button class="ghost" data-quote="${esc(t.id)}" onclick="openTeklifDetay(this.dataset.quote)">İncele</button><button data-quote="${esc(t.id)}" onclick="fqCopyQuote(this.dataset.quote)">Güncel fiyatla yeni kopya</button></div></article>`).join('')||'<p>Aramana uyan teklif bulunamadı.</p>';
  }catch(e){if(current())$('fqMyMessage').textContent='Teklifler yüklenemedi. Bağlantını kontrol edip Ara düğmesiyle tekrar dene.';}
 }
 async function fqCopyQuote(id){

@@ -14,8 +14,9 @@ function harness(t){
  run(fs.readFileSync(path.join(root,'js/fiyat-core.js'),'utf8'));
  for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))if(m[1].trim())run(m[1].replace('window.addEventListener("DOMContentLoaded", init);',''));
  run(fs.readFileSync(path.join(root,'js/satis-workflow.js'),'utf8'));
+ run(fs.readFileSync(path.join(root,'js/teklif-takip.js'),'utf8'));
  const calls=[];let response={data:[],error:null,count:0};
- function query(table){const methods=[];const q={};for(const method of ['select','eq','or','order','range','limit','update','upsert','insert','delete'])q[method]=(...args)=>{methods.push([method,...args]);return q;};q.single=q.maybeSingle=()=>{calls.push({table,methods});return Promise.resolve(response);};q.then=(yes,no)=>{calls.push({table,methods});return Promise.resolve(response).then(yes,no);};return q;}
+ function query(table){const methods=[];const q={};for(const method of ['select','eq','or','order','range','limit','update','upsert','insert','delete','not','lt','gte','is'])q[method]=(...args)=>{methods.push([method,...args]);return q;};q.single=q.maybeSingle=()=>{calls.push({table,methods});return Promise.resolve(response);};q.then=(yes,no)=>{calls.push({table,methods});return Promise.resolve(response).then(yes,no);};return q;}
  w.__sb={from:query,auth:{getUser:async()=>({data:{user:{id:'user-a'}}}),signOut:async()=>({error:null}),resetPasswordForEmail:async(...args)=>{calls.push({reset:args});return {error:null};},updateUser:async(...args)=>{calls.push({password:args});return {data:{user:{id:'user-a'}},error:null};}}};
  run("sb=__sb;authUid='user-a';profil={rol:'bayi',bayi_sahibi:'central',marka_erisimi:['bosch','siemens'],abonelik_durumu:'aktif',magaza:'Test mağaza'};brand='bosch';fqDataReady=true;fqFlow.ready=true;$('banka').innerHTML='<option value=\"\">Peşin</option>';$('taksit').innerHTML='<option value=\"\">—</option>';quoteRows=Array.from({length:5},bosSatir);");
  t.after(()=>w.close());
