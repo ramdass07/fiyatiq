@@ -159,7 +159,8 @@ function fqClearWorkspace(){
  for(const id of ['mtPesin','mtTaksit'])$(id).value='';$('saveMsg').textContent='';fqFlow.review=false;$('fqReviewBox').hidden=true;
  renderRows();fqFlow.restoring=false;fqFlow.baseline=fqFingerprint(fqCapture());fqDraftStatus('Yeni teklif · müşteri bilgileri temizlendi.');
 }
-function fqRequestNew(){if(fqSaving||fqFlow.busy){alert('Devam eden işlemin bitmesini bekle.');return;}if(!fqHasWork()){fqClearWorkspace();return;}$('fqNewMessage').textContent='';$('fqNewDialog').showModal();}
+function fqCanStartWork(){if(fqFlow.ready&&fqDataReady)return true;alert('Fiyat verileri henüz hazır değil. Yüklemenin tamamlanmasını bekle; hata varsa sayfayı yenile.');return false;}
+function fqRequestNew(){if(!fqCanStartWork())return;if(fqSaving||fqFlow.busy){alert('Devam eden işlemin bitmesini bekle.');return;}if(!fqHasWork()){fqClearWorkspace();return;}$('fqNewMessage').textContent='';$('fqNewDialog').showModal();}
 function fqNewWithDraft(){if(!fqDraftFlush()){$('fqNewMessage').textContent='Taslak saklanamadı. Önce teklifi kaydet veya Vazgeç seçeneğini kullan.';return;}$('fqNewDialog').close();fqClearWorkspace();focusCodeRow(0);}
 function fqNewDiscard(){if(fqFlow.draftId)try{localStorage.removeItem(fqDraftKey());}catch(e){}$('fqNewDialog').close();fqClearWorkspace();focusCodeRow(0);}
 function fqSaved(fingerprint,customerKey){
@@ -174,6 +175,7 @@ function fqOpenDrafts(){
 }
 function fqDeleteDraft(id){if(!authUid||!confirm('Bu taslak silinsin mi? Kaydedilmiş teklifler etkilenmez.'))return;try{localStorage.removeItem(fqDraftKey(id));if(fqFlow.draftId===id){fqFlow.draftId=null;fqFlow.baseline=fqFingerprint(fqCapture());}fqOpenDrafts();}catch(e){$('fqDraftMessage').textContent='Taslak silinemedi.';}}
 async function fqRestoreDraft(id){
+ if(!fqCanStartWork())return;
  if(!authUid||fqFlow.busy||fqSaving)return;
  try{const d=JSON.parse(localStorage.getItem(fqDraftKey(id)));if(!fqValidDraft(d)||d.owner!==authUid||Date.now()-d.updatedAt>7*86400000)throw Error('invalid');
  if(fqHasWork()&&!confirm('Mevcut çalışma taslakta tutularak seçilen taslak açılsın mı?'))return;
@@ -224,6 +226,7 @@ async function fqLoadMyQuotes(){
  }catch(e){if(current())$('fqMyMessage').textContent='Teklifler yüklenemedi. Bağlantını kontrol edip Ara düğmesiyle tekrar dene.';}
 }
 async function fqCopyQuote(id){
+ if(!fqCanStartWork())return;
  if(fqFlow.busy||fqSaving||!authUid)return;
  const user=authUid,request=++fqFlow.listRequest;fqFlow.busy=true;
  try{const {data:t,error}=await sb.from('teklifler').select('id,bayi_id,marka,musteri_ad,musteri_tel,satirlar,toplam').eq('id',id).eq('bayi_id',user).single();

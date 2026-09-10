@@ -1211,6 +1211,7 @@ function applyBrandAccess(){
 }
 async function setBrand(b){
  if(!allowedBrands().includes(b)||b===brand)return;
+ if(!fqFlow.restoring&&!fqCanStartWork())return;
  if(!fqFlow.restoring){if(fqSaving||fqFlow.busy)return;if(fqHasWork()&&!confirm('Marka değiştirilsin mi? Mevcut çalışma taslakta tutulur; yeni markada boş teklif açılır.'))return;if(!fqDraftFlush())return;fqClearWorkspace();}
  hkExcelReset();brand=b;fqDataReady=false;fqPricingError="Marka verileri yükleniyor…";const epoch=++fqEpoch;secilenKampanya.clear();fqInvalidateCatalog();setManuelToplam('sifirla');
  primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};
@@ -3898,4 +3899,3 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSuru
 <script src="js/satis-workflow.js"></script>
 </body>
 </html>
-
