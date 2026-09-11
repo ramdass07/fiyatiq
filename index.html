@@ -1280,6 +1280,7 @@ function toggleAdmin(){
 // FL/kampanya/banka MERKEZDEN (admin/personel) yüklenir — ortak veridir.
 function applyAdminAccess(){
   const ed=isEditor();
+  if(typeof fqCatalogAccess==='function')fqCatalogAccess();
   ["aySonuCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
   // ⚡🤝 Hızlı + İkili kampanya: merkez personeli VE dış bayi girebilir (dış bayi kendi havuzuna).
   // Şube mağazalarım zaten Yönetim'e giremiyor, onlara ulaşmıyor.
@@ -2340,7 +2341,7 @@ async function printDoc(kind){
 async function fqReloadData(){const epoch=fqEpoch;for(const load of [loadAktifDonem,loadPrimli,loadBagimsizToptan,loadKampFiyat,loadHasarli,loadPhaseOut,loadIkili,loadAktifKampanyalar]){await load();if(epoch!==fqEpoch)return;}await Promise.all(quoteRows.filter(r=>r.kod).map(refetch));renderRows();}
 
 function fqLoadFail(e){fqPricingError='Veriler yüklenemedi: '+e.message;renderRows();}
-function fqInvalidateCatalog(){asKatalogCache=null;asKatalogMarka=null;}
+function fqInvalidateCatalog(){asKatalogCache=null;asKatalogMarka=null;if(typeof fqCatalogReset==='function')fqCatalogReset();}
 function fqResetSession(){if(typeof fqResetQuoteHistory==='function')fqResetQuoteHistory();if(typeof fqResetSavedOutputs==='function')fqResetSavedOutputs();if(typeof fqResetAdminReport==='function')fqResetAdminReport();if(typeof fqApprovalReset==='function')fqApprovalReset();if(typeof fqCloseCustomerView==='function')fqCloseCustomerView();fqResetFollowup();fqWorkflowEnd();hkExcelReset();closeTeklifDetay();const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
 async function fqApiHeaders(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Oturum süresi doldu.');return {'content-type':'application/json',Authorization:'Bearer '+session.access_token};}
 async function fqAtomic(operations){
@@ -3865,7 +3866,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="11 Eyl 2026 · ürün önerileri ve maliyet uyarısı v11.9.3";
+const FQ_SURUM="11 Eyl 2026 · eksik ürün bilgileri v11.10";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
@@ -3913,5 +3914,6 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSuru
 <script src="js/kayitli-teklif.js"></script>
 <script src="js/yonetim-raporu.js"></script>
 <script src="js/teklif-gecmisi.js"></script>
+<script src="js/eksik-urunler.js"></script>
 </body>
 </html>
