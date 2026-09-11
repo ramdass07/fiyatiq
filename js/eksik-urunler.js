@@ -113,8 +113,8 @@ async function fqCatalogOpen(){
 function fqCatalogMount(){
  const anchor=$('topluGuncelleme');if(!anchor||$('fqCatalogCard'))return;
  const card=document.createElement('section');card.className='card';card.id='fqCatalogCard';card.style.display='none';
- card.innerHTML='<h2>Eksik ürün bilgileri</h2><p class="mut">Seçili markanın katalog adlarını, maliyetlerini ve peşin perakende fiyatlarını kontrol edin.</p><button id="fqCatalogOpen" type="button">Eksik bilgileri incele</button>';
- anchor.insertAdjacentElement('afterend',card);
+ card.innerHTML='<h2><button id="fqCatalogHeadingOpen" class="ghost" type="button" aria-haspopup="dialog" aria-controls="fqCatalogDialog">Eksik ürün bilgileri <span aria-hidden="true">›</span></button></h2><p class="mut">Seçili markanın katalog adlarını, maliyetlerini ve peşin perakende fiyatlarını kontrol edin.</p><button id="fqCatalogOpen" type="button" aria-haspopup="dialog" aria-controls="fqCatalogDialog">Eksik bilgileri incele</button>';
+ anchor.insertAdjacentElement('beforebegin',card);
  const dialog=document.createElement('dialog');dialog.id='fqCatalogDialog';dialog.className='fq-dialog';dialog.setAttribute('aria-labelledby','fqCatalogTitle');
  dialog.innerHTML=`<div class="fq-catalog-head"><h2 id="fqCatalogTitle">Eksik ürün bilgileri</h2><button id="fqCatalogClose" class="ghost" type="button">Kapat</button></div>
  <p id="fqCatalogContext" class="mut"></p>
@@ -127,13 +127,15 @@ function fqCatalogMount(){
  <p class="mut fq-catalog-note">Fiyatları Aylık Veri Güncelleme veya ilgili fiyat yükleme alanından, katalog adlarını ürün adı sütunu içeren toptan listeyle güncelleyebilirsiniz. Ardından Yenile'ye basın. Bu liste bilgilendirme amaçlıdır; satışa engel koymaz.</p>`;
  document.body.append(dialog);
  const style=document.createElement('style');style.textContent=`
+ #fqCatalogCard h2{margin:0}#fqCatalogHeadingOpen{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:8px 0;text-align:left;font:inherit;border:0;border-radius:6px}#fqCatalogHeadingOpen:hover{color:var(--acc)}#fqCatalogHeadingOpen:focus-visible{outline:2px solid var(--acc);outline-offset:4px}#fqCatalogOpen{min-height:44px}
  #fqCatalogDialog{width:calc(100% - 24px);max-width:1080px;box-sizing:border-box}#fqCatalogDialog *{box-sizing:border-box}
  .fq-catalog-head,.fq-catalog-paging{display:flex;align-items:center;justify-content:space-between;gap:12px}.fq-catalog-head h2{margin:0}
  .fq-catalog-controls{display:flex;align-items:end;flex-wrap:wrap;gap:12px}.fq-catalog-controls label{display:flex;flex:1 1 190px;flex-direction:column;gap:6px}.fq-catalog-controls input,.fq-catalog-controls select{width:100%;min-width:0}
  .fq-catalog-scope{display:flex;align-items:center;gap:8px;margin:16px 0 8px}.fq-catalog-scope input{width:auto}.fq-catalog-note{font-size:12px;line-height:1.6}.fq-catalog-table{overflow-x:auto}.fq-catalog-table td{overflow-wrap:anywhere}.fq-catalog-paging{justify-content:flex-start;margin-top:14px}
  @media(max-width:700px){#fqCatalogDialog{padding:16px}.fq-catalog-controls label{flex-basis:100%}.fq-catalog-controls input,.fq-catalog-controls select,#fqCatalogDialog button{min-height:44px;font-size:16px}.fq-catalog-table table,.fq-catalog-table tbody{display:block}.fq-catalog-table thead{display:none}.fq-catalog-table tr{display:block;border:1px solid var(--line);border-radius:8px;margin:10px 0;padding:8px}.fq-catalog-table td{display:grid;grid-template-columns:115px minmax(0,1fr);gap:8px;padding:6px;border:0;white-space:normal}.fq-catalog-table td::before{content:attr(data-label);font-weight:600;color:var(--mut)}.fq-catalog-table{overflow:visible}}
  `;document.head.append(style);
- $('fqCatalogOpen').addEventListener('click',fqCatalogOpen);$('fqCatalogClose').addEventListener('click',()=>dialog.close());
+ for(const id of ['fqCatalogHeadingOpen','fqCatalogOpen'])$(id).addEventListener('click',fqCatalogOpen);
+ $('fqCatalogClose').addEventListener('click',()=>dialog.close());
  dialog.addEventListener('close',()=>{fqCatalogCheck.request++;fqCatalogCheck.loading=false;fqCatalogClear();$('fqCatalogRefresh').disabled=false;});
  $('fqCatalogRefresh').addEventListener('click',fqCatalogLoad);$('fqCatalogSource').addEventListener('change',fqCatalogLoad);
  for(const [id,event] of [['fqCatalogSearch','input'],['fqCatalogKind','change'],['fqCatalogCurrentOnly','change']])$(id).addEventListener(event,()=>{fqCatalogCheck.page=0;fqCatalogRender();});

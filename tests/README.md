@@ -1,8 +1,8 @@
-# FiyatIQ v11.10 doğrulama
+# FiyatIQ v11.10.1 doğrulama
 
 `npm ci`, `npm run check`, `npm test` ile çalıştırılır. Node 20 ve üzeri gerekir.
 
-201 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; otomatik testler canlı hesaba e-posta göndermez veya canlı veritabanına yazmaz. Ayrıca yapılan canlı tarayıcı kontrolünün kapsamı aşağıda ayrı açıklanır.
+202 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; otomatik testler canlı hesaba e-posta göndermez veya canlı veritabanına yazmaz. Ayrıca yapılan canlı tarayıcı kontrolünün kapsamı aşağıda ayrı açıklanır.
 
 Kapsam: müşteri değiştirirken eski teklifin korunması, yeni teklif numarası, hesap kapsamlı teklif arama, kayıt hataları, taslak saklama/geri yükleme, güncel fiyat onayı, manuel fiyatlar, geçersiz kurtarma bağlantıları, oturum yenileme ve ilk açılış verileri yüklenirken işlem koruması.
 
@@ -104,6 +104,12 @@ Yeni 2 satış entegrasyon testi Bosch ve Siemens için dört ürün, iki bundle
 191/191 test ve 15 JavaScript sözdizimi kontrolü geçti. Fiyat motoru ve veritabanı şeması değiştirilmedi.
 
 Kayıtlı teklif detayında h.karPct ödeme seçeneğinin kârını taşır; komisyonlu taksit kârına yanlışlıkla peşin deniyordu. Etiket kayıtlı komisyona göre düzeltilir; komisyon bilgisi belirsiz eski kayıtta nötr Kayıtlı kâr yazılır. Kayıtlı değerler değiştirilmez.
+
+## v11.10.1: eksik ürün bilgileri başlığına tıklama
+
+Canlı v11.10'da ayrı inceleme düğmesi çalışırken kart başlığı tıklanmıyordu; üst sürüm etiketi de aynı özellik adını taşıyordu. Kart artık Yönetim'de Aylık Veri Güncelleme'den önce görünür. Başlık, pencereyi açan gerçek bir düğmedir; klavye odağı, en az 44 px dokunma yüksekliği ve pencere ilişkisi vardır. Mevcut inceleme düğmesi de korunur. Üst sürüm etiketi yalnız tarih ve sürümü gösterir.
+
+Yeni etkileşim testi iki düğmeye de gerçek DOM tıklamasıyla pencerenin açılmasını, tek yükleme yapılmasını, sonucun gelmesini, kapatılmasını ve satış sepetinin korunmasını denetler. Telefon görünümü ayrıca doğrulanmış sayılmaz.
 
 ## v11.10: yönetimde eksik ürün bilgileri
 
