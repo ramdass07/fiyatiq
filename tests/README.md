@@ -1,8 +1,8 @@
-# FiyatIQ v11.9.1 doğrulama
+# FiyatIQ v11.9.3 doğrulama
 
 `npm ci`, `npm run check`, `npm test` ile çalıştırılır. Node 20 ve üzeri gerekir.
 
-170 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; canlı hesaba e-posta gönderilmez veya canlı veritabanına yazılmaz.
+191 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; otomatik testler canlı hesaba e-posta göndermez veya canlı veritabanına yazmaz. Ayrıca yapılan canlı tarayıcı kontrolünün kapsamı aşağıda ayrı açıklanır.
 
 Kapsam: müşteri değiştirirken eski teklifin korunması, yeni teklif numarası, hesap kapsamlı teklif arama, kayıt hataları, taslak saklama/geri yükleme, güncel fiyat onayı, manuel fiyatlar, geçersiz kurtarma bağlantıları, oturum yenileme ve ilk açılış verileri yüklenirken işlem koruması.
 
@@ -92,3 +92,15 @@ Adı ve maliyeti boş, yalnız perakende fiyatı olan sorgu yanıtı artık kayb
 Negatif hedef kâr motor tarafından reddediliyordu; tablo hesaplama öncesinde temizlendiği için kod ve ürün adı kayboluyordu. Sonlu negatif oranlar artık hesaplanır, zarar uyarıları korunur. Satır hesaplamaları görünür tablo temizlenmeden doğrulanır. Bundle olmadan iki ürünle -5% senaryosu, fiyatlar, zarar göstergesi, taslak ve kayıt doğrulanır.
 
 `mobile-sales.test.cjs` mobil/masaüstü geçişi, tek manuel maliyet girdisi, perakende görünürlüğü, boş satır kullanımı ve odak korunmasını; `negative-profit-layout.test.cjs` negatif oranları ve kaydı kapsar. Gerçek telefon tarayıcısında görsel kontrol yapılmadı: yerel önizleme adresi bulut tarayıcısının URL politikası tarafından engellendi. Veritabanı migration'ı yoktur.
+
+## v11.9.3: satış akışının birlikte doğrulanması ve öneri kutusu
+
+Ürün öneri kutusunun sabit en az 340px genişliği dar ekranın sağına taşabiliyordu. Genişlik ve yatay konum görünür ekran içinde 8px kenar boşluklarına sınırlandı. Masaüstü genişliği, belge kaydırması ve öneriden ürün seçimi korundu. Maliyet bulunmayan ürün uyarısı “MALİYET EKSİK” olarak düzeltildi; listede perakende fiyatı varken ürünün hiç bulunmadığını söylemez.
+
+Yeni 5 öneri kutusu testi 320/360/390/430px sınırlarını, sağ/sol kenarları, masaüstünü ve seçimi kapsar. Bunlar verilen DOM ölçüleriyle matematiksel yerleşim kontrolleridir; fiziksel telefon görsel testi değildir.
+
+Yeni 2 satış entegrasyon testi Bosch ve Siemens için dört ürün, iki bundle, -5% hedef kâr, manuel pazarlık, kayıt, müşteri görünümü, kayıtlı çıktılar ve güncel maliyetle yeni kopya akışını birlikte doğrular. Stoksuz/zararına satış engellenmez; eski teklif ve müşteri çıktılarının gizliliği korunur. Canlı hesaptaki ürün, bundle, eksi kâr, pazarlık, kayıt ve müşteri görünümü kontrolü de yapıldı; fiziksel yazdırma veya gerçek WhatsApp gönderimi yapılmadı.
+
+191/191 test ve 15 JavaScript sözdizimi kontrolü geçti. Fiyat motoru ve veritabanı şeması değiştirilmedi.
+
+Kayıtlı teklif detayında h.karPct ödeme seçeneğinin kârını taşır; komisyonlu taksit kârına yanlışlıkla peşin deniyordu. Etiket kayıtlı komisyona göre düzeltilir; komisyon bilgisi belirsiz eski kayıtta nötr Kayıtlı kâr yazılır. Kayıtlı değerler değiştirilmez.
