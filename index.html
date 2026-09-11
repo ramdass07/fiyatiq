@@ -478,7 +478,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
       <p>Ekranın ortasında büyük kırmızı uyarı varsa devam etmeden önce çöz:</p>
       <table>
         <tr><th style="width:30%">Uyarı</th><th>Anlamı ve ne yapmalısın</th></tr>
-        <tr><td><b>⛔ FİYATSIZ ÜRÜN</b></td><td>Bu dönem listesinde maliyeti yok, kâr hesabı yanlış çıkar. Maliyeti elle gir ya da mağaza sahibine sor.</td></tr>
+        <tr><td><b>⚠ MALİYET EKSİK</b></td><td>Ürünün maliyet bilgisi yok. Perakende fiyatı varsa gösterilir; kâr hesabı için manuel maliyeti gir ya da mağaza sahibine sor.</td></tr>
         <tr><td><b>⛔ STOKSUZ ÜRÜN</b></td><td>Hiçbir depoda yok. <b>Teyit almadan söz verme</b>; tedarik süresini öğren.</td></tr>
         <tr><td><b>⚠ KRİTİK STOK</b></td><td>Çok az kalmış; sen teklif verirken başkası satmış olabilir. Stok teyidi al.</td></tr>
         <tr><td><b>⛔ ZARAR SATIŞ</b></td><td>Teklif zararına. İndirim ve manuel fiyatı kontrol et; sahibinin onayı olmadan verme.</td></tr>
@@ -1763,7 +1763,7 @@ function renderUyarilar(stokYok, kritik, zararSatir, karPesinTot, hasValid, mali
   const box=$("uyariKutu"); if(!box) return;
   const parts=[];
   if(maliyetsiz&&maliyetsiz.length){
-    parts.push(`<div class="uyari-kritik"><span class="big-red">⛔ FİYATSIZ ÜRÜN</span><span><b>${maliyetsiz.join(", ")}</b> fiyat listesinde bulunamadı. Doğru kâr hesabı için satırdaki <b>toptan</b> alanına maliyeti girin.</span></div>`);
+    parts.push(`<div class="uyari-kritik"><span class="big-red">⚠ MALİYET EKSİK</span><span><b>${maliyetsiz.join(", ")}</b> için maliyet bilgisi yok. Perakende fiyatı varsa gösterilir. Kâr hesabı için satırdaki <b>Manuel maliyet</b> alanını doldurun.</span></div>`);
   }
   if(stokYok.length){
     parts.push(`<div class="uyari-kritik"><span class="big-red">⛔ STOKSUZ ÜRÜN</span><span><b>${stokYok.join(", ")}</b> hiçbir depoda yok — satmadan önce stok/tedarik teyidi al.</span></div>`);
@@ -1907,7 +1907,10 @@ async function showAC(i,val,el){const ac=$("ac"),q=String(val||"").trim(),epoch=
  if(epoch!==fqEpoch||!el.isConnected||document.activeElement!==el||!quoteRows[i]||quoteRows[i].kod!==String(val).toUpperCase())return;
  if(error||!data||!data.length){ac.classList.remove('show');return;}acRow=i;ac.replaceChildren();
  for(const p of data){const div=document.createElement('div');div.className='ac-item';const code=document.createElement('span');code.className='ac-code';code.textContent=p.model_kodu;const name=document.createElement('span');name.className='ac-name';name.textContent=p.urun_adi||'';div.append(code,name);div.onmousedown=()=>pickProduct(p.model_kodu);ac.append(div);}
- const rc=el.getBoundingClientRect();ac.style.left=(rc.left+window.scrollX)+'px';ac.style.top=(rc.bottom+window.scrollY+2)+'px';ac.style.width=Math.max(rc.width,340)+'px';ac.classList.add('show');}
+ const rc=el.getBoundingClientRect(),margin=8,viewportWidth=document.documentElement.clientWidth||window.innerWidth;
+ const width=Math.min(Math.max(rc.width,340),Math.max(0,viewportWidth-margin*2));
+ const left=Math.max(margin,Math.min(rc.left,viewportWidth-width-margin));
+ ac.style.left=(left+window.scrollX)+'px';ac.style.top=(rc.bottom+window.scrollY+2)+'px';ac.style.width=width+'px';ac.classList.add('show');}
 function pickProduct(code){ if(acRow<0)return; fqSetCode(quoteRows[acRow],code); $("ac").classList.remove("show"); refetch(quoteRows[acRow]); }
 function hideAC(){ clearTimeout(acTimer);setTimeout(()=>$("ac").classList.remove("show"),180); }
 async function refetch(r){
@@ -2013,6 +2016,8 @@ function teklifDetayHTML(t){
  const money=v=>present(v)?fmt(Number(v))+' ₺':'Kaydedilmemiş';
  const actualMoney=v=>present(v)?Number(v).toLocaleString('tr-TR',{maximumFractionDigits:2})+' ₺':'Kaydedilmemiş';
  const pct=v=>present(v)?'%'+Number(v).toLocaleString('tr-TR',{maximumFractionDigits:2}):'Kaydedilmemiş';
+ const storedCommission=(typeof h.komis==='number'||typeof h.komis==='string'&&h.komis.trim()!=='')?Number(h.komis):NaN;
+ const profitLabel=Number.isFinite(storedCommission)&&storedCommission>=0&&storedCommission<100?(storedCommission>0?'Gerçek taksitli kâr':'Gerçek peşin kâr'):'Kayıtlı kâr';
  const field=(label,value)=>`<div class="detail-field"><span>${esc(label)}</span><strong>${esc(value===null||value===undefined||value===''?'Kaydedilmemiş':value)}</strong></div>`;
  const date=t.created_at&&Number.isFinite(Date.parse(t.created_at))?new Date(t.created_at).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'}):'Kaydedilmemiş';
  const sold=t.durum==='satildi',saleDate=typeof t.satis_tarihi==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(t.satis_tarihi)?t.satis_tarihi.split('-').reverse().join('.'):null;
@@ -2023,7 +2028,7 @@ function teklifDetayHTML(t){
  return `<p class="mut">Teklifin kaydedildiği bilgiler gösterilir.</p>${fqSavedQuoteActionsHTML(t.id)}${fqQuoteHistoryActionsHTML(t.id)}<div class="detail-grid">${field('Teklif no',s.no||t.teklif_no)}${field('Tarih',date)}${field('Mağaza',s.magaza)}${field('Satış personeli',s.personel)}${field('Müşteri',t.musteri_ad)}${field('Telefon',t.musteri_tel)}${field('Marka',t.marka)}${field('Durum',DURUM_AD[t.durum||s.durum]||t.durum||s.durum)}</div>
  ${fqValidityHTML(s.gecerlilik)}<h3>Ürünler</h3><p class="mut">${net?'Fiyatlar, indirimler sonrası satır toplamıdır.':'Bu eski kayıtta indirim sonrası satır dağılımı saklanmamış. Aşağıda kayıtlı birim fiyatlar, altta teklifin toplamı gösterilir.'}</p>
  <div class="detail-scroll"><table><thead><tr><th>Model</th><th>Ürün</th><th class="num">Adet</th><th class="num">${net?'Peşin satır toplamı':'Peşin birim fiyat'}</th><th class="num">${net?'Taksitli satır toplamı':'Taksitli birim fiyat'}</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Ürün bilgisi kaydedilmemiş.</td></tr>'}</tbody></table></div>
- <h3>Ödeme ve kampanyalar</h3><div class="detail-grid">${field('Banka',s.banka)}${field('Taksit sayısı',s.taksit)}${field('Banka komisyonu',pct(h.komis))}${field('Gerçek peşin kâr',pct(h.karPct))}${field('Hakediş',money(h.hakedis))}${field('Kampanya müşteri indirimi',money(h.musteriInd))}</div><ul>${campaigns}</ul>
+ <h3>Ödeme ve kampanyalar</h3><div class="detail-grid">${field('Banka',s.banka)}${field('Taksit sayısı',s.taksit)}${field('Banka komisyonu',pct(h.komis))}${field(profitLabel,pct(h.karPct))}${field('Hakediş',money(h.hakedis))}${field('Kampanya müşteri indirimi',money(h.musteriInd))}</div><ul>${campaigns}</ul>
  <div class="detail-grid detail-totals">${field('Kayıtlı peşin toplam',money(t.toplam))}${field('Kayıtlı taksitli toplam',money(h.finalTaksit))}</div>${saleInfo}`;
 }
 async function openTeklifDetay(id){
@@ -3860,7 +3865,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="10 Eyl 2026 · mobil satış düzeni v11.9.2";
+const FQ_SURUM="11 Eyl 2026 · ürün önerileri ve maliyet uyarısı v11.9.3";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
