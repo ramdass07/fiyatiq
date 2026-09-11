@@ -1,8 +1,8 @@
-# FiyatIQ v11.9.3 doğrulama
+# FiyatIQ v11.10 doğrulama
 
 `npm ci`, `npm run check`, `npm test` ile çalıştırılır. Node 20 ve üzeri gerekir.
 
-191 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; otomatik testler canlı hesaba e-posta göndermez veya canlı veritabanına yazmaz. Ayrıca yapılan canlı tarayıcı kontrolünün kapsamı aşağıda ayrı açıklanır.
+201 test, gerçek sayfanın JavaScript kodunu jsdom üzerinde çalıştırır. Supabase Auth ve veri yanıtları taklit edilir; otomatik testler canlı hesaba e-posta göndermez veya canlı veritabanına yazmaz. Ayrıca yapılan canlı tarayıcı kontrolünün kapsamı aşağıda ayrı açıklanır.
 
 Kapsam: müşteri değiştirirken eski teklifin korunması, yeni teklif numarası, hesap kapsamlı teklif arama, kayıt hataları, taslak saklama/geri yükleme, güncel fiyat onayı, manuel fiyatlar, geçersiz kurtarma bağlantıları, oturum yenileme ve ilk açılış verileri yüklenirken işlem koruması.
 
@@ -104,3 +104,15 @@ Yeni 2 satış entegrasyon testi Bosch ve Siemens için dört ürün, iki bundle
 191/191 test ve 15 JavaScript sözdizimi kontrolü geçti. Fiyat motoru ve veritabanı şeması değiştirilmedi.
 
 Kayıtlı teklif detayında h.karPct ödeme seçeneğinin kârını taşır; komisyonlu taksit kârına yanlışlıkla peşin deniyordu. Etiket kayıtlı komisyona göre düzeltilir; komisyon bilgisi belirsiz eski kayıtta nötr Kayıtlı kâr yazılır. Kayıtlı değerler değiştirilmez.
+
+## v11.10: yönetimde eksik ürün bilgileri
+
+Yönetim → Eksik ürün bilgileri, seçili markanın mağaza veya dış bayi fiyat listesini kontrol eder. Her kaynağın en son toptan dönemi esas alınır; toptan dönem bulunamazsa satış ekranındaki gibi içinde bulunulan ay kullanılır. Diğer kaynak ya da eski dönem fiyatları eksik maliyeti doldurmaz. Liste maliyeti BİP öncesidir; peşin perakende nakit_fiyat alanıdır. Maliyet ve perakende için boş, sıfır, negatif veya geçersiz değerler; katalog adı için boş veya yalnız model kodundan oluşan adlar işaretlenir. BİP bulunmaması eksik sayılmaz.
+
+İlk açılış güncel toptan/perakende listelerindeki ürünleri gösterir. Kullanıcı işareti kaldırınca fiyatı olmayan eski katalog ürünlerini de dahil edebilir. Katalog adı boşken satış ekranı stok kaydındaki adı gösterebilir; yeni panel stok verisini okumaz. Ürün kodu/adı araması ve eksik türü filtresi vardır. Özet sayıları ürün kapsamı ve aramaya aittir; eksik türleri aynı üründe birleşebilir. Sonuçlar 50 ürünlük sayfalarda gösterilir.
+
+Mevcut RLS ve korunan profil kullanılır; admin ve aktif/deneme merkez editörü her iki markayı okuyabilir. Bayi ve şube hesaplarına panel açılmaz. Veri okumadan önce güncel profil doğrulanır. Katalog ve iki fiyat tablosu sıralı 500'lük sayfalarda okunur; toplam sayısı, eksik sayfa, mükerrer kod ve değişen dönem kontrol edilir. Hata durumunda kısmi sonuç veya yanlış “eksik yok” mesajı gösterilmez. Geç gelen sonuçlar kapatılmış, marka/kaynak/hesap değiştirilmiş pencereye yazılmaz. İçe aktarma, marka değişimi ve çıkış eski sonuçları temizler.
+
+Yeni 10 test; fiyatı olmayan/perakende-only/katalog dışı ürünleri, kaynakların ayrı dönemlerini, 1.207 ürünün tam okunmasını, arama ve sayfalama, güvenli metin gösterimi, erişim ve güncel profil kontrolleri, hata/eksik sayfa/değişen sayı/mükerrer kod, geciken yanıtlar ve fiyat döneminin değişmesini kapsar. Mevcut satış sepeti ve hesapları korunur. Panel yalnız okur; ürün/fiyat değiştirmez, satış engeli eklemez. Yeni tablo, RPC, migration veya yetki değişikliği yoktur.
+
+v11.9.3 mobil satış görünümünü kullanıcı 11 Eylül 2026'da “çalıştı güzel” diyerek kabul etti. Bu kabul yeni yönetim penceresinin fiziksel telefon testi yerine geçmez. Ayrı bayi hesabında canlı teklif kaydetme/yeniden açma denemesi açık kalır.

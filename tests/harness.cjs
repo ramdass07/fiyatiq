@@ -21,6 +21,7 @@ function harness(t){
  run(fs.readFileSync(path.join(root,'js/kayitli-teklif.js'),'utf8'));
  run(fs.readFileSync(path.join(root,'js/yonetim-raporu.js'),'utf8'));
  run(fs.readFileSync(path.join(root,'js/teklif-gecmisi.js'),'utf8'));
+ run(fs.readFileSync(path.join(root,'js/eksik-urunler.js'),'utf8'));
  const calls=[];let response={data:[],error:null,count:0};
  function query(table){const methods=[];const q={};for(const method of ['select','eq','or','order','range','limit','update','upsert','insert','delete','not','lt','gte','is'])q[method]=(...args)=>{methods.push([method,...args]);return q;};q.single=q.maybeSingle=()=>{calls.push({table,methods});return Promise.resolve(response);};q.then=(yes,no)=>{calls.push({table,methods});return Promise.resolve(response).then(yes,no);};return q;}
  w.__sb={from:query,auth:{getUser:async()=>({data:{user:{id:'user-a'}}}),signOut:async()=>({error:null}),resetPasswordForEmail:async(...args)=>{calls.push({reset:args});return {error:null};},updateUser:async(...args)=>{calls.push({password:args});return {data:{user:{id:'user-a'}},error:null};}}};
