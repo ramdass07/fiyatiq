@@ -35,6 +35,21 @@ function fire(h,id,event){h.doc.getElementById(id).dispatchEvent(new h.w.Event(e
 function tableText(h){return h.doc.getElementById('fqCatalogRows').textContent;}
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 
+test('management heading and existing review button each open and load the catalog through a real click',async t=>{
+ const h=setup(t),dialog=h.doc.getElementById('fqCatalogDialog');h.seed();const before=h.run('JSON.stringify({quoteRows,lastTot})');
+ assert.equal(h.doc.getElementById('fqCatalogCard').nextElementSibling.id,'topluGuncelleme');
+ for(const id of ['fqCatalogHeadingOpen','fqCatalogOpen']){
+  const button=h.doc.getElementById(id),callsBefore=h.calls.length;
+  assert.equal(button.tagName,'BUTTON');assert.equal(button.type,'button');
+  assert.equal(button.getAttribute('aria-controls'),dialog.id);assert.equal(button.getAttribute('aria-haspopup'),'dialog');
+  button.click();assert.equal(dialog.open,true);await new Promise(setImmediate);
+  assert.equal(h.run('fqCatalogCheck.loaded'),true);assert.match(tableText(h),/35.600,15 ₺/);
+  assert.equal(h.calls.slice(callsBefore).filter(c=>c.table==='profiller').length,1,'One click starts one load');
+  h.doc.getElementById('fqCatalogClose').click();assert.equal(dialog.open,false);
+ }
+ assert.equal(h.run('JSON.stringify({quoteRows,lastTot})'),before);
+});
+
 test('catalog check includes retail-only and price-only rows, distinguishes old catalog and preserves the sale',async t=>{
  const h=setup(t);h.seed();const before=h.run('JSON.stringify({quoteRows,lastTot})');
  await h.run('fqCatalogOpen()');
