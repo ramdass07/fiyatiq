@@ -52,11 +52,14 @@ create or replace function public.fq_stok_net_depo(p_bayi uuid, p_kod text, p_ma
 returns table(depo text, foto_net int, satis_dusum int, rezerve int, net int)
 language sql stable security definer set search_path = public as $$
   with depolar as (select unnest(array['mars','horoz','kadikoy']) as depo),
+  -- stok.depo ve stok.tip enum tipindedir (depo_tipi / stok_tipi) → metinle
+  -- birleştirmeden önce ::text'e çevrilir (15 Eyl düzeltmesi: "operator does not
+  -- exist: depo_tipi = text" hatası buradan geliyordu).
   foto as (
-    select s.depo,
-           sum(case when s.tip = 'ayrilmis' then -s.adet else s.adet end)::int as foto_net,
-           max(case when s.tip <> 'ayrilmis' then s.stok_tarihi end)           as son_tarih,
-           count(*) filter (where s.tip <> 'ayrilmis')                          as mevcut_kayit
+    select s.depo::text as depo,
+           sum(case when s.tip::text = 'ayrilmis' then -s.adet else s.adet end)::int as foto_net,
+           max(case when s.tip::text <> 'ayrilmis' then s.stok_tarihi end)           as son_tarih,
+           count(*) filter (where s.tip::text <> 'ayrilmis')                          as mevcut_kayit
     from stok s
     where s.bayi_id = p_bayi and upper(s.model_kodu) = upper(p_kod) and s.marka::text = lower(p_marka)
     group by s.depo
