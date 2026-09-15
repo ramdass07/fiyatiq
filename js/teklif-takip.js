@@ -17,7 +17,7 @@ document.body.insertAdjacentHTML('beforeend',`<dialog id="fqFollowupDialog" clas
  <label>Teklif durumu<select id="fqFollowStatus" onchange="fqFollowStatusChanged()"><option value="teklif">Bekleyen teklif</option><option value="satildi">Satıldı</option><option value="kaybedildi">Kaybedildi</option></select></label>
  <label>Takip eden kişi<input id="fqFollowAssignee" maxlength="100" placeholder="Ad soyad"></label>
  <label>Sonraki arama · Türkiye saati<input id="fqFollowDate" type="datetime-local" step="60"></label>
- <p class="mut">Satıldı veya Kaybedildi seçildiğinde arama planı kapanır. Satıldı işareti stoktan düşmez; tahsilat kaydı değildir.</p>
+ <p class="mut">Satıldı veya Kaybedildi seçildiğinde arama planı kapanır. Satıldı kaydından sonra ürünlerin stoktan düşümü sorulur (v11.11); tahsilat kaydı değildir.</p>
  <label class="fq-follow-wide">Görüşme notu<textarea id="fqFollowNote" maxlength="2000" placeholder="Örn. Eşine danışacak, cuma tekrar görüşülecek."></textarea></label>
  <label id="fqFollowLossLabel" class="fq-follow-wide" hidden>Kayıp nedeni<textarea id="fqFollowLoss" maxlength="500" placeholder="Örn. Fiyat yüksek bulundu; başka mağazadan aldı."></textarea></label>
  <section id="fqSalePanel" class="fq-follow-wide fq-sale-panel" hidden aria-labelledby="fqSaleTitle"><h3 id="fqSaleTitle">Gerçekleşen satış</h3>
@@ -119,6 +119,9 @@ async function fqSaveFollowup(){
  const {data,error}=await q.select(FQ_FOLLOW_FIELDS).single();if(!current())return;
  if(error||!data){if(!data&&(!error||error.code==='PGRST116'))throw Error('conflict');throw error;}
  fqFillFollowup(data);msg.textContent='✓ Takip kaydedildi.';
+ // 🔒 v11.11 stok modülü: Satıldı'ya geçişte stoktan düşüm sorulur; Satıldı'dan
+ // çıkışta bu teklifin düşümleri geri alınır. Modül yüklü değilse hiçbir şey değişmez.
+ if(typeof fqStokTakipHook==='function')fqStokTakipHook(record,data);
  if($('fqMyQuotes').open)fqLoadMyQuotes();
  if(isEditor())loadTeklifler();
  }catch(e){if(current())msg.textContent=e.message==='conflict'?'Bu kayıt başka bir ekranda değişti veya erişimin değişti. Notunu kopyalayıp Yeniden yükle seçeneğini kullan; değişikliklerin gönderilmedi.':e.message==='session'?'Oturum doğrulanamadı. Notunu koruyup yeniden giriş yap.':e.code?'Takip kaydedilemedi. Yazdıkların bu pencerede duruyor; bağlantını kontrol edip tekrar dene.':e.message;

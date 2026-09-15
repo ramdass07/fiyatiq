@@ -653,7 +653,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
         <details id="fqSaleTools" open><summary>Teklif işlemleri</summary><div class="fq-sale-tool-items">
         <button class="ghost sm" onclick="openCustomerDialog('bilgi')">Müşteri bilgileri</button>
         <button class="ghost sm" id="gorunumBtn" onclick="toggleGorunum()">Detaylı görünüm</button>
-        <button class="ghost sm" onclick="fqShowCustomerView()">Müşteriye göster</button><button class="ghost sm" onclick="fqOpenMyQuotes(true)">Bugün aranacaklar</button><button class="ghost sm" onclick="fqOpenDrafts()">Taslaklar</button></div></details><button class="sm" id="fqNewQuote" onclick="fqRequestNew()">+ Yeni teklif</button>
+        <button class="ghost sm" onclick="fqShowCustomerView()">Müşteriye göster</button><button class="ghost sm" onclick="fqOpenMyQuotes(true)">Bugün aranacaklar</button><button class="ghost sm" onclick="fqOpenDrafts()">Taslaklar</button><button class="ghost sm" title="Havuzdaki süresi dolmamış rezerveler" onclick="fqRezervePanelAc()">🔒 Rezerveler</button></div></details><button class="sm" id="fqNewQuote" onclick="fqRequestNew()">+ Yeni teklif</button>
         <button class="sm" id="fqAddProduct" onclick="addRow(true)">+ Ürün satırı</button></div></div>
       <p id="fqDraftStatus" class="mut" role="status" style="font-size:13px"></p>
       <div id="fqReviewBox" class="msg warn" hidden>Geri yüklenen teklif güncel fiyatlarla hesaplandı. Banka, kampanya ve toplamları kontrol et. <button class="ghost sm" onclick="fqConfirmReview()">Güncel fiyatları kontrol ettim</button></div>
@@ -1550,12 +1550,18 @@ async function stokSorgula(){
     const depots=freshness.depots,hasExisting=depots.some(d=>d.mevcutRows>0);
     const netHam=hasExisting?depots.reduce((sum,d)=>sum+d.mevcut-d.ayrilmis,0):null;
     const dus=hasarliDusum(q,null);                     // 🚫 sorunlu adet
-    const net=netHam===null?null:netHam-dus;
+    let net=netHam===null?null:netHam-dus;
+    // 🔒 v11.11 stok modülü: fotoğraf sonrası gün içi satış + aktif rezerve düşümü
+    let hzSatis=0,hzRezerve=0;
+    if(typeof fqStokHareket==="function"){ const hrows=await fqStokHareket(q,mk); if(!current())return;
+      if(hrows){ const hz=fqHareketOzet(hrows,freshness); hzSatis=hz.toplamSatis; hzRezerve=hz.toplamRezerve; if(net!=null)net=net-hzSatis-hzRezerve; } }
     const depoSatiri=d=>`<tr><td>${esc(d.key==='mars'?'Mars':d.key==='horoz'?'Horoz':depoAdi())} ${d.key==='kadikoy'&&d.mevcut>0?'<span class="kd">KD</span>':''}</td><td class="num">${d.mevcutRows?stokCell(d.mevcut):'<span class="mut">Kayıt yok</span>'}</td><td class="num">${d.ayrilmisRows?stokCell(d.ayrilmis):'<span class="mut">Kayıt yok</span>'}</td></tr>`;
     stokHtml=`<table style="margin-top:6px;width:auto"><thead><tr><th>Depo</th><th class="num">Mevcut</th><th class="num">Ayrılan</th></tr></thead><tbody>
       ${depots.map(depoSatiri).join('')}
       </tbody><tfoot><tr><th>Kayıtlara göre NET satılabilir</th><th class="num ${net===null?'mut':net<=0?'bad':net<=3?'warn':'ok'}" colspan="2">${net===null?'Mevcut stok kaydı yok':net}</th></tr></tfoot></table>
       ${net!==null&&dus>0?`<div class="mut" style="margin-top:4px;font-size:12px">Görünen ${netHam} · <span style="color:var(--bad);font-weight:700">sorunlu ${dus}</span> → NET ${net}</div>`:''}
+      ${(hzSatis>0||hzRezerve>0)?`<div class="mut" style="margin-top:4px;font-size:12px">${hzSatis>0?`Gün içi satış düşümü <b style="color:var(--bad)">−${hzSatis}</b>`:''}${(hzSatis>0&&hzRezerve>0)?' · ':''}${hzRezerve>0?`<span style="color:#0ea5e9;font-weight:700">🔒 rezerve −${hzRezerve}</span> <button class="ghost sm" style="padding:1px 8px;font-size:11px" onclick="fqRezervePanelAc()">Rezerveler</button>`:''}</div>`:''}
+      ${net!==null&&net>0&&net<=(typeof FQ_AZ_STOK!=="undefined"?FQ_AZ_STOK:2)?`<div style="margin-top:4px;color:var(--warn);font-weight:800">⚠ SON ${net} ADET</div>`:''}
       ${stockFreshnessHTML({kod:q,stockFreshness:freshness})}
       ${net!==null&&net<=0?'<div class="nostock" style="margin-top:4px">⚠ KAYITLARA GÖRE KULLANILABİLİR STOK YOK</div>':''}`;
   }
@@ -1663,7 +1669,7 @@ function renderRows(){
       <td><input data-fq-row="${i}" data-fq-field="kod" value="${esc(r.kod)}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();codeBlur(${i},this.value)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();codeEnter(${i},this.value);}"></td>
-      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${saleCostBreakdownHTML(r,p,maliyetCell)}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
+      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${saleCostBreakdownHTML(r,p,maliyetCell)}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${typeof fqStokRozet==="function"?fqStokRozet(r):""}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" min="1" step="1" data-fq-row="${i}" data-fq-field="adet" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${fqSimpleSale()&&r.isET?fmt(maliyetL):maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -1673,7 +1679,7 @@ function renderRows(){
       <td class="num"><span class="raw-price">${taksitCell}</span><strong class="net-price" id="saleT${i}">—</strong>${r.isET?`<span class="manual-entry">${taksitCell}</span>`:""}</td>
       <td class="num" style="font-size:12px;line-height:1.3">${karCell}</td>
       <td class="num">${stokCell(r.marsMevcut)}</td><td class="num">${stokCell(r.horozMevcut)}</td><td class="num" data-label="${esc(depoAdi())}">${stokCell(r.kadikoyMevcut)}</td><td class="num">${ayrCell(r.marsAyrilan)}</td><td class="num">${ayrCell(r.horozAyrilan)}</td>
-      <td style="white-space:nowrap">${nakitBtn}<button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
+      <td style="white-space:nowrap">${nakitBtn}${r.kod?`<button class="ghost sm" title="Müşteriye ayır — süreli rezerve: diğer satıcılar bu adedi satamaz, süre dolunca kendiliğinden serbest kalır" onclick="fqRezerveDialog(${i})">🔒</button> `:''}<button class="ghost sm" title="Manuel toptan/satış fiyatı" onclick="toggleManuel(${i})">Manuel</button> <button class="ghost sm" onclick="delRow(${i})">✕</button></td>`;
     tb.appendChild(tr);
   });
   const ks=matchKampanyalar(); const matchIds=new Set(ks.map(k=>k.id));
@@ -1948,6 +1954,9 @@ async function refetch(r){
     r.netStokHam=depots.some(d=>d.mevcutRows>0)?depots.reduce((sum,d)=>sum+d.mevcut-d.ayrilmis,0):null;
     r.hasarliDus=hasarliDusum(r.kod,null);              // 🚫 sorunlu adet düşülür
     r.netStok=r.netStokHam===null?null:r.netStokHam-r.hasarliDus;
+    // 🔒 v11.11 stok modülü: fotoğraf sonrası gün içi satış düşümleri + aktif rezerveler.
+    // SQL kurulmadıysa fqStokDuzelt hiçbir şeye dokunmaz (eski davranış aynen sürer).
+    if(typeof fqStokDuzelt==="function"){ await fqStokDuzelt(r,kod,mk); if(stale())return; }
   }
   r.veriHata=null;
   renderRows();
@@ -3866,7 +3875,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="11 Eyl 2026 · v11.10.1";
+const FQ_SURUM="14 Eyl 2026 · stok modülü v11.11";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
@@ -3911,6 +3920,7 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSuru
 <script src="js/teklif-takip.js"></script>
 <script src="js/musteri-gorunumu.js"></script>
 <script src="js/stok-guncellik.js"></script>
+<script src="js/stok-modulu.js"></script>
 <script src="js/kayitli-teklif.js"></script>
 <script src="js/yonetim-raporu.js"></script>
 <script src="js/teklif-gecmisi.js"></script>

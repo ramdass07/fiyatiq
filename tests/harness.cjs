@@ -18,6 +18,7 @@ function harness(t){
  run(fs.readFileSync(path.join(root,'js/teklif-takip.js'),'utf8'));
  run(fs.readFileSync(path.join(root,'js/teklif-gecerlilik.js'),'utf8'));
  run(fs.readFileSync(path.join(root,'js/stok-guncellik.js'),'utf8'));
+ run(fs.readFileSync(path.join(root,'js/stok-modulu.js'),'utf8'));
  run(fs.readFileSync(path.join(root,'js/kayitli-teklif.js'),'utf8'));
  run(fs.readFileSync(path.join(root,'js/yonetim-raporu.js'),'utf8'));
  run(fs.readFileSync(path.join(root,'js/teklif-gecmisi.js'),'utf8'));
