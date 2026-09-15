@@ -4,7 +4,9 @@ const fqFollowup={record:null,request:0,saving:false,baseline:''};
 const FQ_SALE_FIELDS=['gercek_satis_tutari','satis_odeme_sekli','satis_banka','satis_taksit_sayisi','satis_tarihi'];
 const FQ_SALE_INPUTS=['fqSaleAmount','fqSalePayment','fqSaleBank','fqSaleInstallments','fqSaleDate'];
 const FQ_SALE_PAYMENTS={nakit:'Nakit',havale:'Havale / EFT',kart:'Kart',karma:'Karma ödeme',diger:'Diğer'};
-const FQ_FOLLOW_FIELDS='id,bayi_id,teklif_no,musteri_ad,musteri_tel,durum,takip_notu,sonraki_arama,takip_sorumlusu,kayip_nedeni,takip_surumu,takip_guncellendi_at,toplam,satirlar,'+FQ_SALE_FIELDS.join(',');
+// v11.11.1: 'marka' eklendi — stok düşüm penceresi (fqStokTakipHook) teklifin markasını
+// bilmek zorunda; eksikken depo stok sorgusu markasız gidip "Stok sorgulanamadı" veriyordu (15 Eyl).
+const FQ_FOLLOW_FIELDS='id,bayi_id,teklif_no,marka,musteri_ad,musteri_tel,durum,takip_notu,sonraki_arama,takip_sorumlusu,kayip_nedeni,takip_surumu,takip_guncellendi_at,toplam,satirlar,'+FQ_SALE_FIELDS.join(',');
 document.head.insertAdjacentHTML('beforeend',`<style>
  .fq-follow-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.fq-follow-grid label{display:flex;flex-direction:column;gap:6px}.fq-follow-grid input,.fq-follow-grid select,.fq-follow-grid textarea{width:100%}.fq-follow-wide{grid-column:1/-1}.fq-follow-grid textarea{min-height:100px;resize:vertical;background:var(--field);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit}.fq-call-due{color:var(--warn);font-weight:700}
  #fqFollowLossLabel[hidden],#fqSalePanel[hidden],#fqSaleClearingWarning[hidden],#fqSaleCashSuggestion[hidden],#fqSaleInstallmentSuggestion[hidden]{display:none}.fq-sale-panel{border:1px solid var(--line);border-radius:10px;padding:14px}.fq-sale-panel h3{margin-top:0}.fq-sale-panel .fq-actions{margin-bottom:14px}

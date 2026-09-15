@@ -15,7 +15,9 @@ document.head.insertAdjacentHTML('beforeend',`<style>
  .fq-stok-grid .mut{font-size:12px}
  .fq-rez-badge{background:#0ea5e9;color:#03222f}
  .fq-son-badge{background:var(--warn);color:#1a1300}
- #fqStokZorlaRow[hidden],#fqRezMsg:empty,#fqStokSatisMsg:empty{display:none}
+ #fqStokZorlaRow{display:block;margin-top:6px;color:var(--warn)}
+ #fqStokZorlaRow[hidden]{display:none!important}
+ #fqRezMsg:empty,#fqStokSatisMsg:empty{display:none}
  .fq-rez-table td,.fq-rez-table th{font-size:12.5px}
  </style>`);
 document.body.insertAdjacentHTML('beforeend',`
@@ -24,7 +26,7 @@ document.body.insertAdjacentHTML('beforeend',`
   <p class="mut">Satıldı işaretlenen teklifin ürünleri seçtiğin depodan düşülür. Sabah stok yüklemesi bu düşümleri silmez; dosya zaten gerçek sayımı getirdiği için düşümler yalnız dosya tarihinden sonraki satışlar için sayılır.</p>
   <div id="fqStokSatisList" class="fq-stok-grid"></div>
   <p id="fqStokSatisMsg" role="status" style="margin-top:10px"></p>
-  <label id="fqStokZorlaRow" hidden style="display:block;margin-top:6px;color:var(--warn)"><input type="checkbox" id="fqStokZorla"> Kayıtlar eski olabilir — yetersiz görünse de <b>yine de düş</b> (eksiye iner)</label>
+  <label id="fqStokZorlaRow" hidden><input type="checkbox" id="fqStokZorla"> Kayıtlar eski olabilir — yetersiz görünse de <b>yine de düş</b> (eksiye iner)</label>
   <div class="fq-actions"><button class="ghost" onclick="fqStokSatisKapat()">Stok düşmeden kapat</button><button id="fqStokSatisOnay" onclick="fqStokSatisOnayla()">✓ Stoktan düş</button></div>
  </dialog>
  <dialog id="fqRezerveDialog" class="fq-dialog" aria-labelledby="fqRezTitle" style="max-width:520px">
@@ -100,7 +102,7 @@ async function fqDepoNetleri(kod,mk){
     sb.from('stok').select('depo,tip,adet,stok_tarihi').eq('model_kodu',(kod||'').toUpperCase()).eq('marka',mk).eq('bayi_id',stokSahibi()),
     fqStokHareket(kod,mk)
   ]);
-  if(stRes.error)throw new Error('Stok sorgulanamadı.');
+  if(stRes.error)throw new Error('Stok sorgulanamadı'+(stRes.error.message?' — '+stRes.error.message:'')+'.');
   const fresh=stockFreshnessFromRows(stRes.data||[]);
   const hz=fqHareketOzet(hrows||[],fresh);
   return ['mars','horoz','kadikoy'].map(k=>{
@@ -126,13 +128,17 @@ async function fqStokSatisAc(record){
   const s=record.satirlar&&typeof record.satirlar==='object'&&!Array.isArray(record.satirlar)?record.satirlar:{};
   const items=(Array.isArray(s.items)?s.items:[]).filter(x=>x&&x.model).map(x=>({model:String(x.model).toUpperCase(),ad:x.ad||'',adet:Math.max(1,Math.round(+x.adet||1))}));
   if(!items.length)return;
-  fqStokM.satis={record,items,busy:false,zorla:false};
+  // Marka: takip kaydından; eksikse (eski kayıt/eksik alan) panelde seçili marka — asla boş gitmez
+  // (15 Eyl dersi: markasız stok sorgusu enum hatasıyla "Stok sorgulanamadı" veriyordu).
+  const mk=String(record.marka||brand||'').toLowerCase();
+  if(mk!=='bosch'&&mk!=='siemens')return;
+  fqStokM.satis={record,items,mk,busy:false,zorla:false};
   const list=$('fqStokSatisList'),msg=$('fqStokSatisMsg');
   list.innerHTML='<span class="mut">Depo stokları sorgulanıyor…</span>';msg.textContent='';
   $('fqStokZorlaRow').hidden=true;$('fqStokZorla').checked=false;$('fqStokSatisOnay').disabled=true;
   const d=$('fqStokSatisDialog');if(!d.open)d.showModal();
   try{
-    const netler=await Promise.all(items.map(x=>fqDepoNetleri(x.model,record.marka)));
+    const netler=await Promise.all(items.map(x=>fqDepoNetleri(x.model,mk)));
     if(!d.open)return;
     list.innerHTML='<b>Ürün</b><b>Adet</b><b>Depo</b>'+items.map((x,i)=>
       `<span><b>${esc(x.model)}</b><br><span class="mut">${esc(x.ad)}</span></span><span>×${x.adet}</span><span>${fqDepoSelectHTML('fqStokDepo'+i,netler[i])}</span>`).join('');
@@ -144,7 +150,7 @@ async function fqStokSatisOnayla(){
   const st=fqStokM.satis; if(!st.record||st.busy)return;
   st.busy=true;const msg=$('fqStokSatisMsg'),btn=$('fqStokSatisOnay');btn.disabled=true;msg.textContent='Düşülüyor…';
   try{
-    const satirlar=st.items.map((x,i)=>({model_kodu:x.model,marka:st.record.marka,depo:($('fqStokDepo'+i)||{}).value||'mars',adet:x.adet}));
+    const satirlar=st.items.map((x,i)=>({model_kodu:x.model,marka:st.mk,depo:($('fqStokDepo'+i)||{}).value||'mars',adet:x.adet}));
     const zorla=!$('fqStokZorlaRow').hidden&&$('fqStokZorla').checked;
     const {data,error}=await sb.rpc('fq_stok_satis_kaydet',{p_teklif_id:st.record.id,p_satirlar:satirlar,p_zorla:zorla});
     if(error){
