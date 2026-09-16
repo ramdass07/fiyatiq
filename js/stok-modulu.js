@@ -103,7 +103,8 @@ async function fqDepoNetleri(kod,mk){
     fqStokHareket(kod,mk)
   ]);
   if(stRes.error)throw new Error('Stok sorgulanamadı'+(stRes.error.message?' — '+stRes.error.message:'')+'.');
-  const fresh=stockFreshnessFromRows(stRes.data||[]);
+  const fresh=stockFreshnessFromRows(Array.isArray(stRes.data)?stRes.data:[]);
+  if(!fresh)throw new Error('Stok kayıtları doğrulanamadı.');
   const hz=fqHareketOzet(hrows||[],fresh);
   return ['mars','horoz','kadikoy'].map(k=>{
     const d=(fresh.depots||[]).find(x=>x.key===k)||{mevcut:0,ayrilmis:0};
@@ -115,6 +116,27 @@ function fqDepoSelectHTML(id,netler,disabled){
   return `<select id="${id}"${disabled?' disabled':''}>${netler.map(n=>`<option value="${n.depo}"${n.depo===enCok.depo?' selected':''}>${esc(n.ad)} (net ${n.net})</option>`).join('')}</select>`;
 }
 
+/* ---------- SİPARİŞ FORMU = SATIŞ (15 Eyl, Burak kararı) ----------
+   Sipariş formu alınınca teklif kendiliğinden SATILDI olur ve stok düşüm penceresi açılır.
+   Pencere "Stok düşmeden kapat" ile kapatılırsa düşüm yapılmaz ama Satıldı kalır —
+   gerekirse Müşteri takibi ekranından durum geri alınır (düşümler de otomatik geri gelir). */
+async function fqSiparisHook(teklifId){
+  try{
+    if(!teklifId||fqStokM.tabloYok||!authUid)return;
+    let q=sb.from('teklifler').select('id,bayi_id,marka,durum,satirlar,takip_surumu').eq('id',teklifId);
+    if(!isEditor())q=q.eq('bayi_id',authUid);
+    const {data,error}=await q.single(); if(error||!data)return;
+    if(data.durum!=='satildi'){
+      let u=sb.from('teklifler').update({durum:'satildi',sonraki_arama:null}).eq('id',teklifId).eq('takip_surumu',data.takip_surumu);
+      if(!isEditor())u=u.eq('bayi_id',authUid);
+      const r=await u.select('id').single();
+      if(r.error||!r.data)return;           // başka ekranda değişti — sessizce vazgeç, çakışma yaratma
+      if($('fqMyQuotes').open&&typeof fqLoadMyQuotes==='function')fqLoadMyQuotes();
+    }
+    fqStokSatisAc({...data,durum:'satildi'},'Sipariş formu alındı — teklif Satıldı olarak işaretlendi.');
+  }catch(e){}
+}
+
 /* ---------- SATIŞTA DÜŞÜM (Satıldı işaretinden sonra) ---------- */
 function fqStokTakipHook(prev,data){
   try{
@@ -124,7 +146,7 @@ function fqStokTakipHook(prev,data){
     else if(once==='satildi'&&data.durum!=='satildi')fqStokSatisGeriAl(data);
   }catch(e){}
 }
-async function fqStokSatisAc(record){
+async function fqStokSatisAc(record,kaynakNot){
   const s=record.satirlar&&typeof record.satirlar==='object'&&!Array.isArray(record.satirlar)?record.satirlar:{};
   const items=(Array.isArray(s.items)?s.items:[]).filter(x=>x&&x.model).map(x=>({model:String(x.model).toUpperCase(),ad:x.ad||'',adet:Math.max(1,Math.round(+x.adet||1))}));
   if(!items.length)return;
@@ -134,7 +156,7 @@ async function fqStokSatisAc(record){
   if(mk!=='bosch'&&mk!=='siemens')return;
   fqStokM.satis={record,items,mk,busy:false,zorla:false};
   const list=$('fqStokSatisList'),msg=$('fqStokSatisMsg');
-  list.innerHTML='<span class="mut">Depo stokları sorgulanıyor…</span>';msg.textContent='';
+  list.innerHTML='<span class="mut">Depo stokları sorgulanıyor…</span>';msg.textContent=kaynakNot||'';
   $('fqStokZorlaRow').hidden=true;$('fqStokZorla').checked=false;$('fqStokSatisOnay').disabled=true;
   const d=$('fqStokSatisDialog');if(!d.open)d.showModal();
   try{
@@ -143,7 +165,7 @@ async function fqStokSatisAc(record){
     list.innerHTML='<b>Ürün</b><b>Adet</b><b>Depo</b>'+items.map((x,i)=>
       `<span><b>${esc(x.model)}</b><br><span class="mut">${esc(x.ad)}</span></span><span>×${x.adet}</span><span>${fqDepoSelectHTML('fqStokDepo'+i,netler[i])}</span>`).join('');
     $('fqStokSatisOnay').disabled=false;
-  }catch(e){ list.innerHTML='';msg.textContent='Depo stokları okunamadı: '+e.message; }
+  }catch(e){ list.innerHTML='';msg.textContent=(kaynakNot?kaynakNot+' ':'')+'Depo stokları okunamadı: '+e.message; }
 }
 function fqStokSatisKapat(){ if(fqStokM.satis.busy)return; $('fqStokSatisDialog').close(); }
 async function fqStokSatisOnayla(){

@@ -14,7 +14,11 @@ const BOSCH_COMMON_EXCLUDED=["PBP6C2B80O", "PBP6C2B82O", "PBP6C2K80O", "PBP6C5B8
 // Scoped to brand, exact campaign period, type and published amounts; later months are untouched.
 function septemberPolicy(k){
  const start=String(k.baslangic_tarihi||k.baslangic||'').slice(0,10),end=String(k.bitis_tarihi||k.bitis||'').slice(0,10);
- if(start!=='2026-09-03'||end!=='2026-09-15'||!['siemens','bosch'].includes(k.marka))return k;
+ // 16 Eyl: BSH kampanyaları uzattı; panelden bitiş tarihi değiştirilince (ör. 30.09) bundle
+ // istisnaları (XL/XXL hariç, çamaşır+kurutma dışlama) SESSİZCE düşmesin diye tam-tarih
+ // kilidi aralığa çevrildi: 03.09 başlangıçlı kampanyada Eylül içi HER bitiş kabul edilir.
+ // Bitiş boş bırakılırsa (süresiz) politika uygulanmaz — uzatmada mutlaka tarih verilmeli.
+ if(start!=='2026-09-03'||end<'2026-09-15'||end>'2026-09-30'||!['siemens','bosch'].includes(k.marka))return k;
  const cats=(k.kategoriler||[]).map(katNorm),ind=+k.musteri_indirimi,hak=+k.hakedis;
  const pair=['any2','all'].includes(k.match_type),ank=cats.includes('ANKASTRE')||['FIRIN','OCAK','DAVLUMBAZ'].every(x=>cats.includes(x));
  let policy=null;
