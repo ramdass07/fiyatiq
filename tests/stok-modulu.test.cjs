@@ -65,3 +65,27 @@ test('SQL kurulu değilse modül sessizce devre dışı: net stok düzeltilmez, 
  assert.equal(sonuc.ok,false);assert.equal(sonuc.net,7);assert.equal(sonuc.rez,0);
  assert.equal(h.run('fqStokM.tabloYok'),true); // bir kez öğrenir, her üründe tekrar sormaz
 });
+
+test('Sipariş formu alınınca teklif Satıldı olur ve stok penceresi açılır',async t=>{
+ const h=harness(t);
+ h.respond({data:{id:'q7',bayi_id:'user-a',marka:'bosch',durum:'teklif',satirlar:{items:[{model:'WGB244A0TR',ad:'Çamaşır',adet:1}]},takip_surumu:2},error:null});
+ await h.run("fqSiparisHook('q7')");
+ await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));
+ const update=h.calls.find(c=>c.table==='teklifler'&&c.methods.some(m=>m[0]==='update'));
+ const payload=update.methods.find(m=>m[0]==='update')[1];
+ require('node:assert/strict').equal(payload.durum,'satildi');
+ require('node:assert/strict').ok(update.methods.some(m=>m[0]==='eq'&&m[1]==='takip_surumu'&&m[2]===2));
+ require('node:assert/strict').equal(h.run("$('fqStokSatisDialog').open"),true);
+ require('node:assert/strict').match(h.run("$('fqStokSatisMsg').textContent"),/Sipariş formu alındı/);
+});
+
+test('septemberPolicy: uzatılmış bitişte (16-30 Eyl) bundle istisnaları düşmez, Eylül dışına taşmaz',async t=>{
+ const h=harness(t);
+ const kamp=end=>({marka:'siemens',match_type:'any2',kategoriler:['CAMASIR','KURUTMA'],musteri_indirimi:10000,hakedis:8000,baslangic_tarihi:'2026-09-03',bitis_tarihi:end});
+ const politika=end=>JSON.parse(h.run(`JSON.stringify(FiyatIQCore.septemberPolicy(${JSON.stringify(kamp(end))}))`));
+ require('node:assert/strict').equal(politika('2026-09-15')._verifiedBundle,true);  // eski davranış korunur
+ require('node:assert/strict').equal(politika('2026-09-30')._verifiedBundle,true);  // uzatma: istisnalar düşmez
+ require('node:assert/strict').equal(politika('2026-09-22')._verifiedBundle,true);
+ require('node:assert/strict').equal(politika('2026-10-05')._verifiedBundle,undefined); // Ekim'e taşmaz
+ require('node:assert/strict').equal(politika('')._verifiedBundle,undefined);           // süresizde uygulanmaz
+});
