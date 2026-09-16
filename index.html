@@ -2343,6 +2343,9 @@ async function printDoc(kind){
   ${kind==='siparis'?'':fqValidityHTML()}${servis}${bilgi}${imza}<div class="foot">Fiyatlarımıza KDV dahildir. Teklifimiz kampanyaların devamlılığına bağlı olarak geçerlidir.</div>
   <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();
+  // 📋 SİPARİŞ FORMU = SATIŞ (15 Eyl, Burak kararı): form alınınca teklif otomatik
+  // Satıldı olur ve stok düşüm penceresi açılır. Stok modülü yüklü değilse hiçbir şey değişmez.
+  if(kind==="siparis"&&typeof fqSiparisHook==="function")fqSiparisHook(savedTeklifId);
 }
 
 
@@ -3875,7 +3878,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="14 Eyl 2026 · stok modülü v11.11";
+const FQ_SURUM="16 Eyl 2026 · v11.13 (sipariş=satış + kampanya uzatma)";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
