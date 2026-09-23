@@ -1137,6 +1137,7 @@ async function showApp(session){
   await loadPrimli();
   await loadBagimsizToptan();
   await loadKampFiyat();
+  await loadOnlineKamp();
   await loadHasarli();
   await loadPhaseOut();
   await loadIkili();
@@ -1249,7 +1250,7 @@ async function setBrand(b){
  if(!fqFlow.restoring&&!fqCanStartWork())return;
  if(!fqFlow.restoring){if(fqSaving||fqFlow.busy)return;if(fqHasWork()&&!confirm('Marka değiştirilsin mi? Mevcut çalışma taslakta tutulur; yeni markada boş teklif açılır.'))return;if(!fqDraftFlush())return;fqClearWorkspace();}
  hkExcelReset();brand=b;fqDataReady=false;fqPricingError="Marka verileri yükleniyor…";const epoch=++fqEpoch;secilenKampanya.clear();fqInvalidateCatalog();setManuelToplam('sifirla');
- primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};
+ primliMap={};kampFiyatMap={};onlineKampMap={};ikiliList=[];ikiliMap={};hasarliMap={};
  quoteRows.forEach(r=>{r.toptan=null;r.bip=0;r.etiket=null;r.kampFiyat=null;r.primliFiyat=null;r.netStok=null;r.stockFreshness=null;r.kadikoyTarih=null;r._fetchId=(r._fetchId||0)+1;});
  document.body.classList.toggle('brand-bosch',b==='bosch');document.body.classList.toggle('brand-siemens',b==='siemens');
  document.querySelectorAll('#brandSeg button').forEach(x=>x.classList.toggle('on',x.dataset.b===b));
@@ -1576,7 +1577,7 @@ async function stokSorgula(){
   const yok=(profil.rol!=="bayi" && row && row.toptan_fiyat==null && !pm)?' <span class="nostock">⚠ ürün/fiyat bulunamadı</span>':'';
   box.innerHTML=`<div class="card" style="background:var(--field);margin:0;padding:14px;position:relative">
     <button class="ghost sm" title="Sonucu kapat" style="position:absolute;top:8px;right:8px;padding:2px 9px;font-size:13px" onclick="stokSorguKapat()">✕</button>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:34px"><b style="font-size:16px">${ad}</b> <span class="badge" style="font-size:9px">${mk}</span>${primliRozet(q)}${kampRozet(q)}${yok}</div>${hasarliUyariKutu(q)}${fiyat}${stokHtml}</div>`;
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-right:34px"><b style="font-size:16px">${ad}</b> <span class="badge" style="font-size:9px">${mk}</span>${primliRozet(q)}${kampRozet(q)}${onlineRozet(q)}${yok}</div>${hasarliUyariKutu(q)}${fiyat}${stokHtml}</div>`;
 }
 function stokSorguKapat(){ const b=$("stokSorguSonuc"); if(b) b.innerHTML=""; const i=$("stokSorguInput"); if(i) i.value="";
 }
@@ -1669,7 +1670,7 @@ function renderRows(){
       <td><input data-fq-row="${i}" data-fq-field="kod" value="${esc(r.kod)}" placeholder="model kodu" autocomplete="off" style="width:118px"
            oninput="onCodeInput(${i},this.value,this)" onfocus="onCodeInput(${i},this.value,this)" onblur="hideAC();codeBlur(${i},this.value)"
            onkeydown="if(event.key==='Enter'){event.preventDefault();hideAC();codeEnter(${i},this.value);}"></td>
-      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${saleCostBreakdownHTML(r,p,maliyetCell)}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${ikiliRozet(i)}${typeof fqStokRozet==="function"?fqStokRozet(r):""}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
+      <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${saleCostBreakdownHTML(r,p,maliyetCell)}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${onlineRozet(r)}${ikiliRozet(i)}${typeof fqStokRozet==="function"?fqStokRozet(r):""}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" min="1" step="1" data-fq-row="${i}" data-fq-field="adet" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${fqSimpleSale()&&r.isET?fmt(maliyetL):maliyetCell}</td>
       <td class="num">${r.isET?'—':fmt(bipL)}</td>
@@ -2354,7 +2355,7 @@ async function fqReloadData(){const epoch=fqEpoch;for(const load of [loadAktifDo
 
 function fqLoadFail(e){fqPricingError='Veriler yüklenemedi: '+e.message;renderRows();}
 function fqInvalidateCatalog(){asKatalogCache=null;asKatalogMarka=null;if(typeof fqCatalogReset==='function')fqCatalogReset();}
-function fqResetSession(){if(typeof fqResetQuoteHistory==='function')fqResetQuoteHistory();if(typeof fqResetSavedOutputs==='function')fqResetSavedOutputs();if(typeof fqResetAdminReport==='function')fqResetAdminReport();if(typeof fqApprovalReset==='function')fqApprovalReset();if(typeof fqCloseCustomerView==='function')fqCloseCustomerView();fqResetFollowup();fqWorkflowEnd();hkExcelReset();closeTeklifDetay();const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
+function fqResetSession(){if(typeof fqResetQuoteHistory==='function')fqResetQuoteHistory();if(typeof fqResetSavedOutputs==='function')fqResetSavedOutputs();if(typeof fqResetAdminReport==='function')fqResetAdminReport();if(typeof fqApprovalReset==='function')fqApprovalReset();if(typeof fqCloseCustomerView==='function')fqCloseCustomerView();fqResetFollowup();fqWorkflowEnd();hkExcelReset();closeTeklifDetay();const tl=$('tekliflerList');if(tl)tl.innerHTML='';customerAction=null;const cd=$('customerDialog');if(cd&&cd.open)cd.close();profil={rol:'bayi',marka_erisimi:[],abonelik_durumu:'pasif',bayi_sahibi:null};for(const id of ['mAd','mTel','mGsm2','mTC','mEmail','mSevkAdres','mFaturaAdres','mSirket','mVergiNo','mVergiD']){const e=$(id);if(e)e.value='';}fqDataReady=false;fqEpoch++;authUid=null;quoteRows=[];savedTeklifId=null;currentTeklifNo=null;lastTot=null;primliMap={};kampFiyatMap={};onlineKampMap={};ikiliList=[];ikiliMap={};hasarliMap={};aktifKampanyalar=[];secilenKampanya.clear();asGecmis=[];fqInvalidateCatalog();}
 async function fqApiHeaders(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Oturum süresi doldu.');return {'content-type':'application/json',Authorization:'Bearer '+session.access_token};}
 async function fqAtomic(operations){
  const merged=new Map();for(const op of operations){const scope=Object.fromEntries(Object.entries(op.scope).sort(([a],[b])=>a.localeCompare(b))),key=op.table+'|'+op.mode+'|'+JSON.stringify(scope);
@@ -3312,6 +3313,22 @@ async function kampFiyatUzat(id){
 // Kampanya fiyatı haritası — o markanın BUGÜN geçerli özel fiyatları (kod->fiyat). Satışta peşin olarak gelir.
 let kampFiyatMap={};
 async function loadKampFiyat(){const epoch=fqEpoch,mk=brand;const {data,error}=await sb.from('kampanya_fiyat').select('model_kodu,kampanya_fiyat,kampanya_nakit,baslangic,bitis').eq('marka',mk);if(epoch!==fqEpoch)return;if(error)throw Error('Özel fiyatlar okunamadı: '+error.message);kampFiyatMap={};for(const x of data||[])if(FiyatIQCore.campaignActive(x,_bugun())&&+x.kampanya_fiyat>0)kampFiyatMap[x.model_kodu.toUpperCase()]={fiyat:+x.kampanya_fiyat,nakit:+x.kampanya_nakit||null,bitis:x.bitis};}
+// 🌐 ONLINE KAMPANYA (23 Eyl 2026, BSH maili): online tavsiye PEŞİN fiyat — yalnız BİLGİ rozeti,
+// satış fiyatını EZMEZ. Online fiyat mağaza toptanının altındaysa kırmızı uyarı: müşteri
+// bosch-home.com.tr'den 7000'li şube koduyla sipariş verirse satış DİVA'ya düşer (5 günde onay).
+let onlineKampMap={};
+async function loadOnlineKamp(){const epoch=fqEpoch,mk=brand;try{
+  const {data,error}=await sb.from('online_kampanya').select('model_kodu,online_fiyat,baslangic,bitis').eq('marka',mk);
+  if(epoch!==fqEpoch)return; if(error)return;
+  onlineKampMap={};
+  for(const x of data||[])if(FiyatIQCore.campaignActive(x,_bugun())&&+x.online_fiyat>0)onlineKampMap[x.model_kodu.toUpperCase()]={fiyat:+x.online_fiyat,bitis:x.bitis};
+}catch(e){onlineKampMap={};}}
+function onlineRozet(r){
+  const kod=typeof r==='string'?r:(r&&r.kod); const o=onlineKampMap[(kod||"").toUpperCase()]; if(!o) return "";
+  const toptan=(typeof r==='object'&&r&&+r.toptan>0)?+r.toptan:null; const ucuz=toptan!=null&&o.fiyat<toptan;
+  if(ucuz)return ` <span class="prim-badge" style="background:var(--bad);box-shadow:0 0 8px rgba(239,68,68,.55)" title="Online kampanya fiyatı (${fmt(o.fiyat)} ₺) mağaza toptanının (${fmt(toptan)} ₺) ALTINDA — mağazadan kârla satılamaz. Müşteriye bosch-home.com.tr'den 7000'li şube kodunla sipariş verdir; satış DİVA'na düşer, 5 gün içinde onayla.${o.bitis?' Bitiş '+o.bitis+'.':''}">🌐 ONLINE ${fmt(o.fiyat)}₺ — TOPTANIN ALTINDA</span>`;
+  return ` <span class="prim-badge" style="background:#0891b2;box-shadow:0 0 8px rgba(8,145,178,.5)" title="BSH online kampanya tavsiye peşin fiyatı — müşteri bu fiyatı internette görüyor; pazarlıkta tavan olarak dikkate al.${o.bitis?' Bitiş '+o.bitis+'.':''}">🌐 Online ${fmt(o.fiyat)}₺</span>`;
+}
 function kampRozet(kod){ const k=kampFiyatMap[(kod||"").toUpperCase()]; if(!k) return "";
   const nk = (+k.nakit>0) ? ` <span class="prim-badge" style="background:#16a34a;box-shadow:0 0 8px rgba(22,163,74,.55)" title="Nakit / havale fiyatı ${fmt(k.nakit)} ₺ — bilgi amaçlı; uygulamak için satırdaki 💵 butonuna bas">💵 NAKİT ${fmt(k.nakit)}₺</span>` : "";
   return ` <span class="prim-badge" style="background:var(--acc);box-shadow:0 0 8px rgba(59,130,246,.55)" title="Kampanya TAKSİTLİ fiyatı ${fmt(k.fiyat)} ₺${k.nakit?' · NAKİT '+fmt(k.nakit)+' ₺':''}${k.bitis?' · bitiş '+k.bitis:''}. Peşin karşılığı komisyon düşülerek hesaplanır.">🎯 KAMPANYA ${fmt(k.fiyat)}₺ taksitli</span>`+nk; }
@@ -3898,7 +3915,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="16 Eyl 2026 · v11.14 (kampanya fiyatı uzatma)";
+const FQ_SURUM="23 Eyl 2026 · v11.15 (🌐 online kampanya rozeti)";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
