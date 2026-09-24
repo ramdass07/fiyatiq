@@ -848,6 +848,16 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
       <div id="asoSonuc" style="margin-top:12px"></div>
     </div>
 
+    <div class="card" id="stkCard" style="border:2px solid #0891b2">
+      <h2>📥 Satış Takip Exceli <span class="badge" style="background:#0891b2;color:#fff">Satıldı kayıtlarından</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Seçilen ayın <b>Satıldı</b> tekliflerinden mağazanın AYLIK SATIŞ KASA TAKİP FÖYÜ'nü üretir (EMAAR formatı): DATA satırları + maliyet/BİP/komisyon/kâr formülleri + Kodlar ve Bip sayfaları sistemden dolu iner. Tahsilat sütunu satış tutarına eşitlenir; kalan ödeme, kasa devri ve elle satırları mağaza dosyada tamamlar.</p>
+      <div class="row">
+        <div class="fld"><label>Ay</label><input id="stkAy" type="month"></div>
+        <div class="fld"><label>Mağaza</label><select id="stkMagaza"><option value="hepsi">Hepsi (seçili marka)</option></select></div>
+        <button id="stkBtn" onclick="fqSatisTakipIndir()">📥 İndir</button><span id="stkMsg" class="msg"></span>
+      </div>
+    </div>
+
     <div class="card" id="hizliKampCard" style="border:2px solid var(--acc)">
       <h2>⚡ Hızlı Kampanya <span class="badge">2-3 günlük özel fiyat</span></h2>
       <p class="mut" style="font-size:13px;margin:4px 0 10px">Bir ürüne kısa süreli <b>özel satış fiyatı</b> tanımla. Yazdığın rakam <b>TAKSİTLİ</b> fiyattır — mağazalara ilan ettiğin fiyat (ör. <code>KD86NAID1N → 76.999</code>). Peşin karşılığı, seçilen bankanın komisyonu düşülerek otomatik bulunur. <b>Nakit/havale</b> fiyatı da girersen satırda yeşil <b>💵 NAKİT</b> rozeti çıkar ve tek tuşla uygulanır. Marka: <b id="hkMarka">—</b></p>
@@ -1144,6 +1154,7 @@ async function showApp(session){
   await loadBanks();
   await loadAktifKampanyalar();
   if(typeof hkInit==="function" && (isEditor() || disBayiMi())) hkInit();
+  if(typeof fqStkBayiListesi==="function" && isEditor()){ fqStkBayiListesi(); const se=$('stkAy'); if(se&&!se.value) se.value=String(aktifDonem||_donem()).slice(0,7); }
   if(typeof hsInit==="function") hsInit();
   if(sessionEpoch!==fqEpoch||authUid!==session.user.id||fqRecoveryMode)return;
   fqPricingError="";fqDataReady=true;if(!quoteRows.some(r=>r.kod)) quoteRows=Array.from({length:5},bosSatir);renderRows();fqWorkflowReady();
@@ -1282,7 +1293,7 @@ function toggleAdmin(){
 function applyAdminAccess(){
   const ed=isEditor();
   if(typeof fqCatalogAccess==='function')fqCatalogAccess();
-  ["aySonuCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
+  ["aySonuCard","stkCard","kampSihirbazCard","kampIceCard","kampElleCard","bankaCard","tekliflerCard","merkeziBaslik","merkeziAciklama"].forEach(id=>{ const el=$(id); if(el) el.style.display=ed?"":"none"; });
   // ⚡🤝 Hızlı + İkili kampanya: merkez personeli VE dış bayi girebilir (dış bayi kendi havuzuna).
   // Şube mağazalarım zaten Yönetim'e giremiyor, onlara ulaşmıyor.
   { const kampYetki = ed || (typeof disBayiMi==="function" && disBayiMi());
@@ -3915,7 +3926,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="23 Eyl 2026 · v11.15 (🌐 online kampanya rozeti)";
+const FQ_SURUM="23 Eyl 2026 · v11.16 (📥 satış takip exceli)";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
@@ -3961,6 +3972,7 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSuru
 <script src="js/musteri-gorunumu.js"></script>
 <script src="js/stok-guncellik.js"></script>
 <script src="js/stok-modulu.js"></script>
+<script src="js/satis-takip-excel.js"></script>
 <script src="js/kayitli-teklif.js"></script>
 <script src="js/yonetim-raporu.js"></script>
 <script src="js/teklif-gecmisi.js"></script>
