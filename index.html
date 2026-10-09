@@ -302,6 +302,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
 .sale-cost-breakdown .sale-cost-net{border-top:1px solid var(--line);margin-top:3px;padding-top:5px}.sale-cost-net dt,.sale-cost-net dd{color:var(--acc);font-weight:750}
 .sale-cost-breakdown .sale-cost-retail dt,.sale-cost-breakdown .sale-cost-retail dd{color:var(--warn);font-weight:750}
 .sale-cost-breakdown input{width:110px!important;max-width:100%}
+.sale-cost-note.is-bip-warn{margin-top:4px;color:var(--warn);font-weight:650}.bip-warn{color:var(--warn)}
 #grid td input{min-height:30px;padding:5px 7px;border-radius:5px;font-size:14px;box-sizing:border-box}
 #grid td:nth-child(3) input{width:54px!important}
 #grid td:last-child{min-width:100px;white-space:nowrap!important}#grid td:last-child button{padding:5px 7px;margin:0;min-height:29px;font-size:12px}
@@ -1607,10 +1608,14 @@ function saleCostBreakdownHTML(r,p,manualInput){
   const retail=retailPriceValue(r.etiket),showRetail=!pending&&!known&&retail!==null;
   const retailHTML=showRetail?`<div class="sale-cost-retail"><dt>Perakende fiyatı</dt><dd data-cost="retail">${money(retail)}</dd></div>`:'';
   const cost=pending?'—':r.isET?manualInput:known?money(p.unitToptan):'Girilmedi';
-  const bip=pending?'—':r.isET?'Uygulanmıyor':known&&Number.isFinite(p.unitBip)?money(p.unitBip):'—';
+  // 7 Eki (Burak): toptandan kalkan ama BİP alan ürünlerde BİP sessizce kayboluyordu. Otomatik düşmüyoruz —
+  // tutarı uyarı olarak gösteriyoruz, maliyeti girerken karar satıcıda.
+  const bipVar=!pending&&r.isET&&+r.bip>0;
+  const bip=pending?'—':r.isET?(bipVar?money(+r.bip)+' · düşülmedi':'Uygulanmıyor'):known&&Number.isFinite(p.unitBip)?money(p.unitBip):'—';
   const net=known&&Number.isFinite(p.unitBipli)?money(p.unitBipli):'—';
   const note=pending?'Fiyat bilgisi doğrulanamadı.':showRetail?'Perakende fiyatı listeden alınmıştır. Maliyet girilmeden kâr hesaplanamaz.':r.isET?'Manuel maliyet kullanılır; BİP ayrıca düşülmez.':'Net maliyet = maliyet − BİP. Hakediş ayrıca hesaplanır.';
-  return `<div class="sale-cost-breakdown${r.isET?' is-manual':''}" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl>${retailHTML}<div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip">${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note${!pending&&!showRetail&&!r.isET?' is-default':''}">${note}</span></div>`;
+  const bipNote=bipVar?`<span class="sale-cost-note is-bip-warn" data-cost="bip-uyari">⚠ Bu üründe ${money(+r.bip)} BİP desteği var. Maliyeti girerken dikkate alın.</span>`:'';
+  return `<div class="sale-cost-breakdown${r.isET?' is-manual':''}" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl>${retailHTML}<div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip"${bipVar?' class="bip-warn"':''}>${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note${!pending&&!showRetail&&!r.isET?' is-default':''}">${note}</span>${bipNote}</div>`;
 }
 function renderRows(){
   applyGorunum();
@@ -1684,7 +1689,7 @@ function renderRows(){
       <td><span class="product-name" tabindex="0" title="${esc(r.ad||'')}">${esc(r.ad||"")}</span>${saleCostBreakdownHTML(r,p,maliyetCell)}${FiyatIQCore.isBoschSoloHob(r.kod)&&brand==="bosch"?'<span class="stock-summary">Set üstü ocak · ankastre set dışında</span>':""}<span class="stock-summary stock-total">${r.kod?(r.netStok==null?(r.stockFreshness?"Stok: mevcut kayıt bulunamadı":"Stok: sorgu bekleniyor"):"Kayıtlı kullanılabilir: "+fmt(r.netStok)+" adet"):""}</span>${stockFreshnessHTML(r)}${hasarliRozet(r.kod)}${phaseOutRozet(r.kod)}${primliRozet(r.kod)}${kampRozet(r.kod)}${onlineRozet(r)}${ikiliRozet(i)}${typeof fqStokRozet==="function"?fqStokRozet(r):""}${r.isET?' <span class="badge" style="font-size:9px">Manuel</span>':''}${(r.sKadikoy>0)?` <span class="kd" title="${depoAdi()}: ${r.sKadikoy} adet${r.kadikoyTarih?' · sayım '+fmtTarih(r.kadikoyTarih):''} — ÖNCELİK buradan ver">KD ${r.sKadikoy}${r.kadikoyTarih?' · '+fmtTarih(r.kadikoyTarih):''}</span>`:''}${(valid&&!r.isET&&r.netStok!=null&&r.netStok<=0)?' <span class="nostock" title="Kayıtlara göre kullanılabilir stok yok">⚠ KAYITLARDA STOK YOK</span>':''}</td>
       <td><input style="width:54px" type="number" min="1" step="1" data-fq-row="${i}" data-fq-field="adet" value="${r.adet}" onchange="quoteRows[${i}].adet=+this.value;recalc()"></td>
       <td class="num">${fqSimpleSale()&&r.isET?fmt(maliyetL):maliyetCell}</td>
-      <td class="num">${r.isET?'—':fmt(bipL)}</td>
+      <td class="num">${r.isET?(+r.bip>0?`<span class="bip-warn" title="Listede BİP var; manuel maliyetten düşülmedi">⚠ ${fmt((+r.bip)*p.adet)}</span>`:'—'):fmt(bipL)}</td>
       <td class="num" title="Maliyet − BİP">${(valid&&Number.isFinite(p.unitBipli))?fmt(p.unitBipli*p.adet):'<span class="mut">—</span>'}</td>
       <td class="num" title="BSH resmi perakende (etiket) fiyatı">${(+r.etiket>0)?fmt((+r.etiket)*p.adet):'<span class="mut">—</span>'}</td>
       <td class="num"><span class="raw-price">${pesinCell}</span><strong class="net-price" id="saleP${i}">—</strong>${r.isET?`<span class="manual-entry">${pesinCell}</span>`:""}</td>
@@ -3926,7 +3931,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="23 Eyl 2026 · v11.16 (📥 satış takip exceli)";
+const FQ_SURUM="7 Eki 2026 · v11.17 (⚠ manuel maliyette BİP uyarısı)";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
