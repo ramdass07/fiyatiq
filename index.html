@@ -2390,6 +2390,8 @@ function colLetter(i){ return XLSX.utils.encode_col(i); }
 window.topluItems=[];
 function _donem(){ return _bugun().slice(0,7)+"-01"; }
 function _bugun(){ return FiyatIQCore.businessDate(); }
+const FQ_PRIMLI_RED="⛔ Bu bir PRİMLİ listesi (dosya adında 'primli' var) — fiyat/BİP olarak ALINMAZ. Primli listeyi Yönetim'deki 'Primli Ürün Listesi' kutusuna bırak.";
+function fqPrimliDosyaVar(files){ return [...(files||[])].some(f=>tkey(f&&f.name).includes("primli")); }
 function tclassify(name){
   const n=tkey(name);
   const brand = n.includes("bosch")?"bosch": n.includes("siemens")?"siemens": null;
@@ -2397,6 +2399,9 @@ function tclassify(name){
   const da=tkey(depoAdi()); // bayinin kendi depo adı da dosya adından tanınır (Kadıköy, Maltepe...)
   const depo = n.includes("mars")?"mars": n.includes("horoz")?"horoz": (n.includes("kadikoy")||n.includes("kadkoy")||(da&&da.length>=3&&n.includes(da)))?"kadikoy": null;
   if(depo) return {brand, kind:"stok", depo, tip};
+  // ⛔ 9 Eki (Burak): adında "primli" geçen dosya fiyat/BİP olarak ASLA alınmaz. Primli liste BİP kutusuna
+  //    düşünce Ekim BİP'lerini ezmişti (EK 67). Primli liste yalnız kendi kutusundan (primliYukle) yüklenir.
+  if(n.includes("primli")) return {brand, kind:"primli"};
   // ⛔ 5 Eyl: Phase-out listesi dosya adından tanınır. Tanınmazsa "fiyat" sanılıp
   //    ham BİP ayrıştırıcısına düşüyor ve fiyat sütunu BİP diye yazılıyordu (tehlike).
   if(n.includes("phase")) return {brand, kind:"phaseout"};
@@ -2560,6 +2565,7 @@ async function topluTara(files){
         // Eskiden sadece "N stok" yazıyordu ve adet sanılıyordu (30 Ağu, Burak fark etti).
         res.detay=rows.length+" ürün · "+fmt(toplamAdet)+" adet · "+c.depo+"/"+c.tip+" · 📅 sayım "+fmtTarih(bugun)
                  +(atlanan?` · <span style="color:var(--warn)">${atlanan} ürün atlandı (bloke ≥ satılabilir)</span>`:""); }
+      else if(c.kind==="primli"){ res.detay=FQ_PRIMLI_RED; }
       else if(!isEditor()){ // bayi rolü: fiyat/kampanya dosyası yükleyemez — merkezden gelir
         res.detay="Bu bir fiyat listesi görünüyor — fiyatlar MERKEZDEN yüklenir. Sen sadece STOK dosyası yükleyebilirsin (dosya adında Mars, Horoz ya da '"+depoAdi()+"' geçsin)."; }
       else if(c.kind==="phaseout"){ // ⛔ 5 Eyl: phase-out dosyası — kodlar phase_out tablosuna yazılır
@@ -2582,9 +2588,9 @@ async function topluTara(files){
 function topluRender(){
   const box=$("topluSonuc"); if(!box) return;
   box.innerHTML=window.topluItems.map((r,i)=>{
-    const aiBtn=(!r.ok && r.kind!=="stok" && r.kind!=="phaseout" && r._f && isEditor())
+    const aiBtn=(!r.ok && r.kind!=="stok" && r.kind!=="phaseout" && r.kind!=="primli" && r._f && isEditor())
       ? ` <button class="ghost sm" style="padding:2px 9px;font-size:12px" onclick="aiListeOku(${i})">🤖 AI ile Oku</button>` : "";
-    return `<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b>${aiBtn}<br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind==="stok"?"stok":(r.kind==="phaseout"?"phase-out listesi":"fiyat listesi")} — ${r.detay}</span></div>`;
+    return `<div style="padding:7px 2px;border-bottom:1px solid #ffffff14;font-size:13px">${r.ok?"✅":"⚠️"} <b>${r.name}</b>${aiBtn}<br><span class="mut" style="font-size:12px">${r.brand?(r.brand==="bosch"?"Bosch":"Siemens")+" · ":""}${r.kind==="stok"?"stok":(r.kind==="phaseout"?"phase-out listesi":(r.kind==="primli"?"primli listesi":"fiyat listesi"))} — ${r.detay}</span></div>`;
   }).join("");
   const okcount=window.topluItems.filter(r=>r.ok).length;
   const btn=$("topluYaz"); if(!btn) return;
@@ -2868,6 +2874,7 @@ async function smartScan(k){
   try{
     const cfg=IMPORTERS[k]; const files=$(k+"_file").files;
     if(!files||!files.length){ impMsg(k,"Dosya seç.","bad"); return; }
+    if(fqPrimliDosyaVar(files)){ impMsg(k,FQ_PRIMLI_RED,"bad"); return; }
     impMsg(k, (files.length>1?files.length+" dosya · ":"")+"tüm sayfalar taranıyor...");
     const valCols=cfg.cols.slice(1);
     const all=[]; const seen=new Set(); const detail=[]; let lastWb=null;
@@ -2908,6 +2915,7 @@ async function smartScan(k){
 async function impRead(k){
   const cfg=IMPORTERS[k]; const f=$(k+"_file").files[0];
   if(!f){ impMsg(k,"Dosya seç.","bad"); return; }
+  if(fqPrimliDosyaVar([f])){ impMsg(k,FQ_PRIMLI_RED,"bad"); return; }
   impMsg(k,"Okunuyor...");
   impState[k]={ wb: XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true}) };
   impState[k].sheet=null;
@@ -3367,6 +3375,7 @@ async function bpTara(files){
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
       if(!c.brand){ c.brand = detectBrandWb(wb) || brand; res.brand=c.brand; }
       if(c.kind==="stok"){ res.detay="⚠ Bu bir STOK dosyası — bayi paneline stok yüklenmez. Dış bayi kendi stoğunu kendi yükler."; window.bpItems.push(res); continue; }
+      if(c.kind==="primli"){ res.detay=FQ_PRIMLI_RED; window.bpItems.push(res); continue; }
       if(c.kind==="phaseout"){ res.detay="⚠ Bu bir PHASE-OUT listesi — bayi paneline değil, yukarıdaki 🚀 Aylık Veri Güncelleme kutusuna bırak (rozet + %3 oradan beslenir)."; window.bpItems.push(res); continue; }
       const r=parsePriceWb(wb,c.brand,donem);
       res.topRows=r.topRows; res.perRows=r.perRows; res.bipRows=r.bipRows;
@@ -3931,7 +3940,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="7 Eki 2026 · v11.17 (⚠ manuel maliyette BİP uyarısı)";
+const FQ_SURUM="9 Eki 2026 · v11.18 (⛔ primli dosya BİP/fiyat olarak alınmaz)";
 try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
 
 // ===== YENİ SÜRÜM UYARISI =====
