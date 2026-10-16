@@ -403,8 +403,9 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
   <h1 class="brand">fiyat<span class="q">iq</span></h1>
   <div class="card">
     <p>Kaydın alındı. ✓</p>
-    <p class="mut">Hesabın <b>yönetici onayı</b> bekliyor. Onaylandığında fiyat ve teklif ekranını kullanabileceksin.</p>
-    <button class="ghost" onclick="signOut()">Çıkış</button>
+    <p class="mut">Hesabın <b>yönetici onayı</b> bekliyor. Onaylandığında bu sayfa <b>kendiliğinden</b> satış ekranına geçer (yarım dakikada bir kontrol edilir).</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button id="pendingCheckBtn" onclick="fqPendingCheck(true)">🔄 Onay durumunu kontrol et</button><button class="ghost" onclick="signOut()">Çıkış</button></div>
+    <div id="pendingMsg" class="msg" style="margin-top:8px"></div>
   </div>
 </div>
 
@@ -1111,7 +1112,27 @@ async function init(){
   }catch(e){fqAuthMessage('Bağlantı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.');show('loginView');}
   buildImporters();
 }
-function show(id){ ["loginView","appView","pendingView"].forEach(v=> $(v).style.display = v===id?"block":"none"); }
+function show(id){ ["loginView","appView","pendingView"].forEach(v=> $(v).style.display = v===id?"block":"none"); if(id==="pendingView") fqPendingStart(); else fqPendingStop(); }
+// 16 Eki (Burak): onay bekleyen mağaza, yönetici onaylayınca sayfayı yenilemeden satış ekranına geçsin.
+// Bekleme ekranı açıkken 30 sn'de bir, sekmeye dönüldüğünde ve düğmeyle profil durumu yeniden okunur.
+let fqPendingTimer=null, fqPendingBusy=false;
+function fqPendingStart(){ fqPendingStop(); fqPendingTimer=setInterval(()=>fqPendingCheck(false),30000); }
+function fqPendingStop(){ if(fqPendingTimer){ clearInterval(fqPendingTimer); } fqPendingTimer=null; }
+async function fqPendingCheck(manual){
+  if(fqPendingBusy) return; const view=$("pendingView"); if(!view||view.style.display!=="block") return;
+  const msg=$("pendingMsg"), btn=$("pendingCheckBtn"); fqPendingBusy=true; if(btn) btn.disabled=true;
+  if(manual&&msg){ msg.className="msg"; msg.textContent="Kontrol ediliyor…"; }
+  try{
+    const {data,error}=await sb.auth.getSession(); const session=data&&data.session;
+    if(error||!session){ if(manual&&msg){ msg.className="msg bad"; msg.textContent="Oturum bulunamadı. Çıkış yapıp yeniden giriş yap."; } return; }
+    const r=await sb.from("profiller").select("rol,abonelik_durumu").eq("id",session.user.id).single();
+    if(r.error||!r.data) throw r.error||Error("profil yok");
+    if(r.data.rol==="admin"||r.data.abonelik_durumu!=="pasif"){ fqPendingStop(); if(msg){ msg.className="msg ok"; msg.textContent="✓ Hesabın onaylandı, satış ekranı açılıyor…"; } await fqStartSession(session); return; }
+    if(manual&&msg){ msg.className="msg"; msg.textContent="Henüz onaylanmadı. Onaylanınca bu sayfa kendiliğinden açılacak."; }
+  }catch(e){ if(manual&&msg){ msg.className="msg bad"; msg.textContent="Bağlantı kurulamadı, biraz sonra tekrar dene."; } }
+  finally{ fqPendingBusy=false; if(btn) btn.disabled=false; }
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) fqPendingCheck(false); });
 function showSignup(){ $("loginCard").style.display="none"; $("signupCard").style.display="flex"; }
 function showLogin(){ $("signupCard").style.display="none"; $("loginCard").style.display="flex"; }
 
@@ -1137,6 +1158,7 @@ async function showApp(session){
   applyBrandAccess();
   $("adminBtn").style.display = subeMagaza() ? "none" : ""; // Yönetim: şube mağazalarım giremez; dış bayi girer.
   applyAdminAccess();
+  fqSurumGoster();
   const bsc=$("bayiStokCard"); if(bsc) bsc.style.display = "none";
   $("thStok1").textContent="Mars"; $("thStok2").textContent="Horoz"; $("thStok3").textContent=depoAdi(); $("thStok4").textContent="Ayr.M"; $("thStok5").textContent="Ayr.H";
   { let stored=null; try{stored=localStorage.getItem("fq_sade_v10");}catch(e){} basitMod = stored!=null ? (stored==="1") : true; applyGorunum(); } // bayi varsayılan basit, admin detaylı; düğmeyle değişir
@@ -3940,8 +3962,10 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="9 Eki 2026 · v11.18 (⛔ primli dosya BİP/fiyat olarak alınmaz)";
-try{ const el=document.getElementById("fqSurum"); if(el) el.textContent="v · "+FQ_SURUM; }catch(e){}
+const FQ_SURUM="16 Eki 2026 · v11.19 (🔄 onay gelince bekleme ekranı kendiliğinden açılır)";
+// 16 Eki (Burak): sürüm notu (parantez içi açıklama) yalnız admin'de görünür; mağazalar sadece tarih · sürüm numarasını görür.
+function fqSurumGoster(){ try{ const el=document.getElementById("fqSurum"); if(!el) return; const admin=typeof profil!=="undefined"&&profil&&profil.rol==="admin"; el.textContent="v · "+(admin?FQ_SURUM:FQ_SURUM.replace(/\s*\(.*\)\s*$/,"")); }catch(e){} }
+fqSurumGoster();
 
 // ===== YENİ SÜRÜM UYARISI =====
 // Mağaza ekranı günlerce açık kalabiliyor; yeni index yüklendiğinde eski sürümü
