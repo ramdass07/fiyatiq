@@ -254,6 +254,44 @@ h2 .badge{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 .login .brand{font-size:46px}
 </style>
 <style>
+/* ===== v11.20 AÇIK TEMA (varsayılan) — koyu tema body.fq-dark ile aynen korunur ===== */
+body:not(.fq-dark){--bg:#f1f4f9;--panel:#ffffff;--line:#d6dde8;--txt:#0f172a;--mut:#5b6b82;--acc:#0284c7;--ok:#15803d;--warn:#b45309;--bad:#dc2626;--field:#ffffff;--brand:#0891b2;--brand2:#0e7490;--brandink:#ffffff}
+body.brand-bosch:not(.fq-dark){--brand:#e11d48;--brand2:#be123c;--brandink:#ffffff}
+body.brand-siemens:not(.fq-dark){--brand:#0891b2;--brand2:#0e7490;--brandink:#ffffff}
+body:not(.fq-dark){background:radial-gradient(1100px 520px at 85% -10%,color-mix(in srgb,var(--brand) 10%,transparent),transparent 62%),linear-gradient(180deg,#eef2f8,#f1f4f9 40%);background-attachment:fixed;color:var(--txt)}
+body:not(.fq-dark) header{background:rgba(255,255,255,.88);box-shadow:0 1px 0 rgba(15,23,42,.04),0 6px 20px rgba(15,23,42,.06)}
+body:not(.fq-dark) .card{background:#ffffff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 28px -18px rgba(15,23,42,.18)}
+body:not(.fq-dark) .card:hover{border-color:#c3ccda}
+body:not(.fq-dark) .card h2{color:var(--txt)}
+body:not(.fq-dark) th{color:#64748b}
+body:not(.fq-dark) #grid th{background:#eef2f7}
+body:not(.fq-dark) #gridWrap{background:#ffffff;border-color:var(--line)}
+body:not(.fq-dark) tbody tr:hover,body:not(.fq-dark) #grid tbody tr:hover td{background:color-mix(in srgb,var(--brand) 7%,transparent)}
+body:not(.fq-dark) #grid tbody tr:nth-child(even) td{background:rgba(15,23,42,.02)}
+body:not(.fq-dark) button.ghost{background:#ffffff;color:var(--txt);border:1px solid var(--line)}
+body:not(.fq-dark) button.ghost:hover{background:#f1f5f9;border-color:var(--brand)}
+body:not(.fq-dark) select,body:not(.fq-dark) input,body:not(.fq-dark) textarea{background:#ffffff;color:var(--txt);border-color:#c6cfdc}
+body:not(.fq-dark) .seg{background:#e6ebf3;border-color:var(--line)}
+body:not(.fq-dark) .seg button{color:#475569}body:not(.fq-dark) .seg button.on{color:#fff}
+body:not(.fq-dark) .badge{background:#eef2f7;color:var(--txt);border:1px solid var(--line)}
+body:not(.fq-dark) .totalsCard,body:not(.fq-dark) #salesWorkspace #altPanelCard{background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 6%,#ffffff),#ffffff);border:1px solid color-mix(in srgb,var(--brand) 40%,var(--line));box-shadow:0 18px 40px -22px rgba(15,23,42,.35)}
+body:not(.fq-dark) #sumNakit,body:not(.fq-dark) #karPct{background:none;color:var(--brand2);-webkit-text-fill-color:var(--brand2)}
+body:not(.fq-dark) #customerDialog,body:not(.fq-dark) #quoteDetailDialog{background:#ffffff;color:var(--txt)}
+body:not(.fq-dark) #cfgWarn,body:not(.fq-dark) .pill.pasif{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+body:not(.fq-dark) .uyari-kritik{background:#fee2e2;color:#991b1b}body:not(.fq-dark) .uyari-kritik .big-red{color:#b91c1c}
+body:not(.fq-dark) .uyari-sari{background:#fef3c7;color:#92400e}
+body:not(.fq-dark) .chip.pesin{color:var(--brand2)}body:not(.fq-dark) .chip.toptan{color:#92400e;border-color:#f59e0b}
+body:not(.fq-dark) #stokOneri,body:not(.fq-dark) #ac{background:#ffffff!important;border-color:var(--line)!important;box-shadow:0 8px 24px rgba(15,23,42,.18)!important}
+body:not(.fq-dark) .ac-item:hover,body:not(.fq-dark) #stokOneri>div:hover,body:not(.fq-dark) .oner-item:hover{background:#eef2f7}
+body:not(.fq-dark) #yardimPanel .yHead{background:#f8fafc}
+body:not(.fq-dark) ::-webkit-scrollbar-thumb{background:#c6cfdc;border-color:#f1f4f9}
+body:not(.fq-dark) .sale-cost-breakdown{background:#f8fafc}
+@media(max-width:700px){body:not(.fq-dark) #salesWorkspace.simple-sale #grid tr{background:#f8fafc}body:not(.fq-dark) #salesWorkspace.simple-sale #grid td:nth-child(n+11):nth-child(-n+13){background:#eef2f7}}
+body:not(.fq-dark) .fq-retail-line{color:var(--txt)}
+#fqTemaBtn{font-size:15px;padding:4px 8px;line-height:1}
+.fq-retail-line{display:none}.simple-sale .fq-retail-line{display:block;margin:4px 0 2px;font-size:13px;font-weight:700;color:var(--txt)}
+</style>
+<style>
 @media(max-width:600px){
  .simple-sale #grid{min-width:0;display:block}.simple-sale #grid thead{display:none}.simple-sale #grid tbody{display:block}
  .simple-sale #grid tr{display:grid;grid-template-columns:1fr 1fr;gap:8px;border-bottom:1px solid var(--line);padding:10px 0}
@@ -620,6 +658,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
     <details id="fqHeaderMenu" open><summary>Menü</summary><div class="fq-header-menu-items">
     <button id="adminBtn" class="ghost sm" style="display:none" onclick="toggleAdmin()">⚙ Yönetim</button>
     <button id="yardimBtn" class="ghost sm" onclick="yardimAc()" title="Nasıl kullanılır">❓ Nasıl kullanılır</button>
+    <button id="fqTemaBtn" class="ghost sm" onclick="fqTemaDegistir()" title="Açık / koyu tema">🌙</button>
     <span class="mut" id="fqSurum" title="Yüklü sürüm — eski sürümde çalışıyorsan altta 🔄 yenile şeridi çıkar" style="font-size:10px;align-self:center"></span>
     <button class="ghost sm" onclick="fqOpenMyQuotes()">Tekliflerim</button>
     <div class="grow"></div>
@@ -1083,7 +1122,8 @@ const IMPORTERS = {
           {key:"toptan_fiyat_bagimsiz",label:"Toptan Fiyat (zamsız/ham)",type:"num",skw:["toptan"],sneg:["kampanyasiz"]}] },
   perakende:{ title:"Perakende Fiyat (1.seçenek peşin)", target:"perakende_fiyatlar", conflict:"model_kodu,marka,donem", donem:true, skipSheetRe:/toptan/i,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
-          {key:"nakit_fiyat",label:"Peşin Fiyat (1.seçenek)",type:"num",skw:["pesin"],sneg:["kampanyasiz"]}] },
+          {key:"nakit_fiyat",label:"Peşin Fiyat (1.seçenek)",type:"num",skw:["pesin"],sneg:["kampanyasiz"]},
+          {key:"taksit_fiyat",label:"5 Taksit Toplam (2.seçenek, ops.)",type:"num",optional:true,skw:["toplam"]}] },
   bip:{ title:"BİP (KDV dahil)", target:"bip", conflict:"model_kodu,marka,donem", donem:true,
     cols:[{key:"model_kodu",label:"Ürün Kodu",type:"text"},
           {key:"bip_tutar",label:"BİP (kdv li)",type:"num",skw:["kdv","bip"],sneg:["haric"]}] },
@@ -1285,7 +1325,7 @@ async function setBrand(b){
  if(!fqFlow.restoring){if(fqSaving||fqFlow.busy)return;if(fqHasWork()&&!confirm('Marka değiştirilsin mi? Mevcut çalışma taslakta tutulur; yeni markada boş teklif açılır.'))return;if(!fqDraftFlush())return;fqClearWorkspace();}
  hkExcelReset();brand=b;fqDataReady=false;fqPricingError="Marka verileri yükleniyor…";const epoch=++fqEpoch;secilenKampanya.clear();fqInvalidateCatalog();setManuelToplam('sifirla');
  primliMap={};kampFiyatMap={};onlineKampMap={};ikiliList=[];ikiliMap={};hasarliMap={};
- quoteRows.forEach(r=>{r.toptan=null;r.bip=0;r.etiket=null;r.kampFiyat=null;r.primliFiyat=null;r.netStok=null;r.stockFreshness=null;r.kadikoyTarih=null;r._fetchId=(r._fetchId||0)+1;});
+ quoteRows.forEach(r=>{r.toptan=null;r.bip=0;r.etiket=null;r.etiketTaksit=null;r.kampFiyat=null;r.primliFiyat=null;r.netStok=null;r.stockFreshness=null;r.kadikoyTarih=null;r._fetchId=(r._fetchId||0)+1;});
  document.body.classList.toggle('brand-bosch',b==='bosch');document.body.classList.toggle('brand-siemens',b==='siemens');
  document.querySelectorAll('#brandSeg button').forEach(x=>x.classList.toggle('on',x.dataset.b===b));
  const am=$('aktifMarka');if(am)am.textContent='Aktif: '+markaAd(b);syncAdminBrand();topluTemizle();renderRows();
@@ -1525,7 +1565,7 @@ async function bayiStokYukle(){
 
 // ===== TEKLİF / ÜRÜN =====
 let komisOran=0, lastTot=null;
-function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,ikiliEsIdx:null,nakitSecili:false,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,stockFreshness:null,netStok:null}; }
+function bosSatir(){ return {kod:"",ad:"",adet:1,toptan:null,bip:0,etiket:null,etiketTaksit:null,net_stok:null,isET:false,etToptan:null,manuelFiyat:null,manuelTaksit:null,kampFiyat:null,ikiliFiyat:null,ikiliNakit:null,ikiliEksik:null,ikiliBilgi:null,ikiliEsIdx:null,nakitSecili:false,nakit:null,taksit:null,maliyet:null,kar:null,marsMevcut:null,horozMevcut:null,kadikoyMevcut:null,marsAyrilan:null,horozAyrilan:null,sKadikoy:0,kadikoyTarih:null,stockFreshness:null,netStok:null}; }
 function addRow(focus=false){
   const empty=fqIsMobileSales()?quoteRows.findIndex(r=>!r.kod):-1;
   if(empty>=0){if(focus)focusCodeRow(empty);return;}
@@ -1628,7 +1668,10 @@ function saleCostBreakdownHTML(r,p,manualInput){
   const known=!pending&&Number.isFinite(p.unitToptan)&&p.unitToptan>0;
   const money=n=>Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₺';
   const retail=retailPriceValue(r.etiket),showRetail=!pending&&!known&&retail!==null;
-  const retailHTML=showRetail?`<div class="sale-cost-retail"><dt>Perakende fiyatı</dt><dd data-cost="retail">${money(retail)}</dd></div>`:'';
+  const retailT=retailPriceValue(r.etiketTaksit);
+  const retailHTML=showRetail?`<div class="sale-cost-retail"><dt>Perakende fiyatı</dt><dd data-cost="retail">${money(retail)}</dd></div>${retailT!==null?`<div class="sale-cost-retail"><dt>Perakende 5 taksit</dt><dd data-cost="retail-taksit">${money(retailT)}</dd></div>`:''}`:'';
+  // v11.20: perakende (etiket) + 5 taksit her zaman görünür (mağaza eleştirisi: "perakende fiyatları gözükmüyor")
+  const retailLine=(!showRetail&&retail!==null)?`<span class="fq-retail-line" data-retail-line>Perakende ${money(retail)}${retailT!==null?` · 5 taksit ${money(retailT)}`:''}</span>`:'';
   const cost=pending?'—':r.isET?manualInput:known?money(p.unitToptan):'Girilmedi';
   // 7 Eki (Burak): toptandan kalkan ama BİP alan ürünlerde BİP sessizce kayboluyordu. Otomatik düşmüyoruz —
   // tutarı uyarı olarak gösteriyoruz, maliyeti girerken karar satıcıda.
@@ -1637,7 +1680,7 @@ function saleCostBreakdownHTML(r,p,manualInput){
   const net=known&&Number.isFinite(p.unitBipli)?money(p.unitBipli):'—';
   const note=pending?'Fiyat bilgisi doğrulanamadı.':showRetail?'Perakende fiyatı listeden alınmıştır. Maliyet girilmeden kâr hesaplanamaz.':r.isET?'Manuel maliyet kullanılır; BİP ayrıca düşülmez.':'Net maliyet = maliyet − BİP. Hakediş ayrıca hesaplanır.';
   const bipNote=bipVar?`<span class="sale-cost-note is-bip-warn" data-cost="bip-uyari">⚠ Bu üründe ${money(+r.bip)} BİP desteği var. Maliyeti girerken dikkate alın.</span>`:'';
-  return `<div class="sale-cost-breakdown${r.isET?' is-manual':''}" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl>${retailHTML}<div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip"${bipVar?' class="bip-warn"':''}>${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note${!pending&&!showRetail&&!r.isET?' is-default':''}">${note}</span>${bipNote}</div>`;
+  return `${retailLine}<div class="sale-cost-breakdown${r.isET?' is-manual':''}" aria-label="Ürün maliyeti ve BİP desteği"><span class="sale-cost-basis">Birim tutarlar · 1 adet</span><dl>${retailHTML}<div><dt>${r.isET?'Manuel maliyet':'Maliyet'}</dt><dd data-cost="cost">${cost}</dd></div><div><dt>BİP desteği</dt><dd data-cost="bip"${bipVar?' class="bip-warn"':''}>${bip}</dd></div><div class="sale-cost-net"><dt>Net maliyet</dt><dd data-cost="net">${net}</dd></div></dl><span class="sale-cost-note${!pending&&!showRetail&&!r.isET?' is-default':''}">${note}</span>${bipNote}</div>`;
 }
 function renderRows(){
   applyGorunum();
@@ -1713,7 +1756,7 @@ function renderRows(){
       <td class="num">${fqSimpleSale()&&r.isET?fmt(maliyetL):maliyetCell}</td>
       <td class="num">${r.isET?(+r.bip>0?`<span class="bip-warn" title="Listede BİP var; manuel maliyetten düşülmedi">⚠ ${fmt((+r.bip)*p.adet)}</span>`:'—'):fmt(bipL)}</td>
       <td class="num" title="Maliyet − BİP">${(valid&&Number.isFinite(p.unitBipli))?fmt(p.unitBipli*p.adet):'<span class="mut">—</span>'}</td>
-      <td class="num" title="BSH resmi perakende (etiket) fiyatı">${(+r.etiket>0)?fmt((+r.etiket)*p.adet):'<span class="mut">—</span>'}</td>
+      <td class="num" title="BSH resmi perakende (etiket) fiyatı · altta 5 taksit toplamı">${(+r.etiket>0)?fmt((+r.etiket)*p.adet)+(+r.etiketTaksit>0?`<br><span class="mut fq-per-taksit" style="font-size:11px" title="Perakende 5 taksit (peşinat + 4 taksit toplamı)">5T ${fmt((+r.etiketTaksit)*p.adet)}</span>`:''):'<span class="mut">—</span>'}</td>
       <td class="num"><span class="raw-price">${pesinCell}</span><strong class="net-price" id="saleP${i}">—</strong>${r.isET?`<span class="manual-entry">${pesinCell}</span>`:""}</td>
       <td class="num"><span class="raw-price">${taksitCell}</span><strong class="net-price" id="saleT${i}">—</strong>${r.isET?`<span class="manual-entry">${taksitCell}</span>`:""}</td>
       <td class="num" style="font-size:12px;line-height:1.3">${karCell}</td>
@@ -1973,10 +2016,10 @@ async function refetch(r){
   r.primliFiyat = (pr && pr.fiyat) ? pr.fiyat : null; // belirlenen primli satış fiyatı (varsayılan peşin)
   { const kf=kampFiyatMap[(r.kod||"").toUpperCase()]; r.kampFiyat = kf ? kf.fiyat : null; } // kısa süreli kampanya fiyatı (primliyi ezer)
   if(row && (row.urun_adi || row.toptan_fiyat!=null || retailPriceValue(row.nakit_fiyat)!==null)){
-    r.ad=row.urun_adi||r.kod; r.toptan=toptanGoster(row.toptan_fiyat,r.kod); r.bip=row.bip_tutar||0; r.etiket=retailPriceValue(row.nakit_fiyat); r.net_stok=row.net_stok;
+    r.ad=row.urun_adi||r.kod; r.toptan=toptanGoster(row.toptan_fiyat,r.kod); r.bip=row.bip_tutar||0; r.etiket=retailPriceValue(row.nakit_fiyat); r.etiketTaksit=retailPriceValue(row.taksit_fiyat); r.net_stok=row.net_stok;
     if(row.toptan_fiyat!=null) r.isET=false;
     else if(!(+r.etToptan>0)) r.isET=true; // üründe TOPTAN YOK → otomatik Manuel moda geç, maliyet elle girilsin
-  } else { r.ad = pr ? r.kod : "— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; if(!r.isET) r.isET=true; } // primli ama listede yoksa: kodu göster, manuel toptan
+  } else { r.ad = pr ? r.kod : "— bulunamadı —"; r.toptan=null; r.bip=0; r.etiket=null; r.etiketTaksit=null; if(!r.isET) r.isET=true; } // primli ama listede yoksa: kodu göster, manuel toptan
   r.marsMevcut=r.horozMevcut=r.kadikoyMevcut=r.marsAyrilan=r.horozAyrilan=null; r.sKadikoy=0; r.netStok=null;
   {
     // Her bayi YALNIZCA kendi stok havuzunu görür (Mars/Horoz/kendi deposu + ayrılan).
@@ -2500,7 +2543,7 @@ function parseBipFarkWb(wb, marka, donem){
   return Object.keys(bip).filter(k=>bip[k]>0).map(k=>({model_kodu:k,marka,donem,bip_tutar:bip[k]}));
 }
 function parsePriceWb(wb, marka, donem){
-  const top={}, per={}, bip={};
+  const top={}, per={}, bip={}, t5={};
   wb.SheetNames.forEach(sn=>{
     const nm=tkc(sn); if(nm.includes("bundle")||nm.includes("launch")||nm.includes("baglant")) return; // Launch / Bağlantı sayfalarını atla
     const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
@@ -2520,10 +2563,12 @@ function parsePriceWb(wb, marka, donem){
     else { // sayfa adı belirsiz: temiz dosya (Toptan/BİP) — toptan sütununa bak
       pc=H.findIndex((h,j)=>j>cc&&h==="toptan"); if(pc>=0) tgt=top;
     }
+    // v11.20: 2. seçenek (peşinat + 4 taksit) TOPLAM sütunu = 5 taksit toplamı → perakende_fiyatlar.taksit_fiyat
+    const t5c=(isP&&pc>=0)?H.findIndex((h,j)=>j>pc&&h.startsWith("toplam")):-1;
     const bc=H.findIndex((h,j)=>j>cc&&h==="bip");
     if(pc>=0 && tgt){
       for(let i=hr+1;i<aoa.length;i++){ const row=aoa[i]||[]; const kod=(""+(row[cc]==null?"":row[cc])).trim().toUpperCase();
-        if(!isCode(kod)) continue; const v=row[pc]; if(isNum(v)&&+v>0) tgt[kod]=Math.round(+v*100)/100; }
+        if(!isCode(kod)) continue; const v=row[pc]; if(isNum(v)&&+v>0){ tgt[kod]=Math.round(+v*100)/100; if(t5c>=0){ const t=row[t5c]; if(isNum(t)&&+t>0) t5[kod]=Math.round(+t*100)/100; } } }
     }
     if(bc>=0){
       for(let i=hr+1;i<aoa.length;i++){ const row=aoa[i]||[]; const kod=(""+(row[cc]==null?"":row[cc])).trim().toUpperCase();
@@ -2544,7 +2589,7 @@ function parsePriceWb(wb, marka, donem){
   }
   return {
     topRows: Object.keys(top).map(k=>({model_kodu:k,marka,donem,toptan_fiyat:top[k]})),
-    perRows: Object.keys(per).map(k=>({model_kodu:k,marka,donem,nakit_fiyat:per[k]})),
+    perRows: Object.keys(per).map(k=>({model_kodu:k,marka,donem,nakit_fiyat:per[k],taksit_fiyat:t5[k]??null})),
     bipRows, bipHam, bipSayfa, bipAtlanan
   };
 }
@@ -2887,7 +2932,7 @@ function autodetect(aoa,cols){
   const mapped=cols.map((c,ci)=>{
     if(ci===0) return codeCol;
     let idx=-1; if(hr>=0){ const row=aoa[hr]||[]; for(let j=0;j<row.length;j++){ if(colMatches(row[j],c)){ idx=j; break; } } }
-    if(idx<0 && c.type==="num") idx=numFallback(aoa,dataStart,codeCol);
+    if(idx<0 && c.type==="num" && !c.optional) idx=numFallback(aoa,dataStart,codeCol);
     return idx>=0?idx:(c.optional?-1:ci);
   });
   return {hr, cols:mapped};
@@ -2913,7 +2958,7 @@ async function smartScan(k){
         const codeCol=detectCodeCol(aoa,dataStart);
         const vmap={}; valCols.forEach(c=>{ let idx=-1; if(hr>=0&&c.skw){ const row=aoa[hr]||[]; for(let j=0;j<row.length;j++){ if(colMatches(row[j],c)){ idx=j; break; } } }
           if(c.type==="num" && (idx===codeCol || !colHasNums(aoa,dataStart,idx))) idx=-1;
-          if(idx<0&&c.type==="num") idx=numFallback(aoa,dataStart,codeCol); vmap[c.key]=idx; });
+          if(idx<0&&c.type==="num"&&!c.optional) idx=numFallback(aoa,dataStart,codeCol); vmap[c.key]=idx; });
         let cnt=0;
         for(let i=dataStart;i<aoa.length;i++){ const r=aoa[i]||[]; if(!isCode(r[codeCol])) continue; const kod=(""+r[codeCol]).trim().toUpperCase(); if(seen.has(kod)) continue;
           const obj={model_kodu:kod}; let has=false;
@@ -3962,7 +4007,11 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="16 Eki 2026 · v11.19 (🔄 onay gelince bekleme ekranı kendiliğinden açılır)";
+const FQ_SURUM="20 Eki 2026 · v11.20 (☀ açık tema + perakende 5 taksit)";
+// v11.20: tema — varsayılan AÇIK; koyu tema cihazda hatırlanır (fq_tema=dark)
+function fqTemaUygula(koyu){ document.body.classList.toggle("fq-dark",!!koyu); const b=document.getElementById("fqTemaBtn"); if(b){ b.textContent=koyu?"☀":"🌙"; b.title=koyu?"Açık temaya geç":"Koyu temaya geç"; } }
+function fqTemaDegistir(){ const koyu=!document.body.classList.contains("fq-dark"); try{localStorage.setItem("fq_tema",koyu?"dark":"light");}catch(e){} fqTemaUygula(koyu); }
+(function(){ let koyu=false; try{ koyu=localStorage.getItem("fq_tema")==="dark"; }catch(e){} if(document.body) fqTemaUygula(koyu); else document.addEventListener("DOMContentLoaded",()=>fqTemaUygula(koyu)); })();
 // 16 Eki (Burak): sürüm notu (parantez içi açıklama) yalnız admin'de görünür; mağazalar sadece tarih · sürüm numarasını görür.
 function fqSurumGoster(){ try{ const el=document.getElementById("fqSurum"); if(!el) return; const admin=typeof profil!=="undefined"&&profil&&profil.rol==="admin"; el.textContent="v · "+(admin?FQ_SURUM:FQ_SURUM.replace(/\s*\(.*\)\s*$/,"")); }catch(e){} }
 fqSurumGoster();
