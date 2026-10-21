@@ -25,7 +25,7 @@ test('the mobile manual cost editor stays singular and returns to the desktop co
  const h=setup(t);h.run('quoteRows[0].bip=2000;toggleManuel(0)');
  let fields=h.w.document.querySelectorAll('[data-fq-field="etToptan"]');
  assert.equal(fields.length,1);assert.ok(fields[0].closest('.sale-cost-breakdown.is-manual'));
- assert.equal(cost(h,'bip'),'Uygulanmıyor');assert.equal(cost(h,'net'),'10.000,00 ₺');
+ assert.equal(cost(h,'bip'),'2.000,00 ₺ · düşülmedi');assert.equal(cost(h,'net'),'10.000,00 ₺');
  const before=financialState(h);h.setMobile(false);h.run('fqMobileLayoutChanged()');
  fields=h.w.document.querySelectorAll('[data-fq-field="etToptan"]');
  assert.equal(simple(h),false);assert.equal(fields.length,1);assert.equal(fields[0].closest('.sale-cost-breakdown'),null);

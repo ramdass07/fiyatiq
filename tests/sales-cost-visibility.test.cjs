@@ -16,7 +16,8 @@ test('the ordinary store screen shows unit cost, BIP and net cost with cents for
 test('manual unit cost remains a single editable field and moves safely between views',t=>{
  const h=setup(t);h.run("quoteRows[0].bip=2000;toggleManuel(0)");
  let inputs=h.w.document.querySelectorAll('[data-fq-field="etToptan"]');assert.equal(inputs.length,1);
- assert.ok(inputs[0].closest('.sale-cost-breakdown'));assert.equal(field(h,'bip'),'Uygulanmıyor');assert.equal(field(h,'net'),'10.000,00 ₺');
+ assert.ok(inputs[0].closest('.sale-cost-breakdown'));assert.equal(field(h,'bip'),'2.000,00 ₺ · düşülmedi');assert.equal(field(h,'net'),'10.000,00 ₺');
+ assert.match(field(h,'bip-uyari'),/Bu üründe 2\.000,00 ₺ BİP desteği var/);
  assert.match(h.w.document.querySelector('.sale-cost-note').textContent,/BİP ayrıca düşülmez/);
  inputs[0].value='8.750,25';h.run("quoteRows[0].etToptan=trSayi(document.querySelector('[data-fq-field=etToptan]').value);recalc()");
  assert.equal(field(h,'net'),'8.750,25 ₺');assert.equal(h.run('lastTot.dip'),8750.25);
@@ -85,4 +86,15 @@ test('a refreshed missing retail field clears the earlier reference and leaves a
  await h.run('refetch(quoteRows[0])');
  assert.equal(h.run('quoteRows[0].etiket'),null);assert.equal(h.w.document.querySelector('[data-cost="retail"]'),null);
  assert.equal(h.run('quoteRows[0].manuelFiyat'),12000);assert.equal(h.run('lastTot.finalNakit'),12000);
+});
+
+test('a product without list cost keeps its BIP visible as a warning and never deducts it',t=>{
+ const h=setup(t);h.run('quoteRows[0].toptan=null;quoteRows[0].etToptan=null;quoteRows[0].isET=true;quoteRows[0].bip=6503.27;quoteRows[0].etiket=61600;renderRows()');
+ assert.equal(field(h,'bip'),'6.503,27 ₺ · düşülmedi');assert.equal(field(h,'net'),'—');
+ assert.match(field(h,'bip-uyari'),/Bu üründe 6\.503,27 ₺ BİP desteği var\. Maliyeti girerken dikkate alın\./);
+ h.run('quoteRows[0].etToptan=58342.09;quoteRows[0].adet=2;renderRows()');
+ assert.equal(field(h,'net'),'58.342,09 ₺');assert.equal(h.run('lastTot.tMaliyet'),116684.18);assert.equal(h.run('lastTot.dip'),116684.18);
+ h.run('toggleGorunum()');const cell=h.w.document.querySelector('#rows .bip-warn');assert.match(cell.textContent,/13\.007/);assert.match(cell.title,/düşülmedi/);
+ h.run('toggleGorunum();quoteRows[0].bip=0;renderRows()');
+ assert.equal(field(h,'bip'),'Uygulanmıyor');assert.equal(h.w.document.querySelector('[data-cost="bip-uyari"]'),null);
 });
