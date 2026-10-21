@@ -906,6 +906,12 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
       <div id="asoSonuc" style="margin-top:12px"></div>
     </div>
 
+    <div class="card" id="hakedisCard" style="display:none;border:2px solid #7c3aed">
+      <h2>🧾 Hakediş Mutabakatı <span class="badge" style="background:#7c3aed;color:#fff">BSH · yalnız yönetici</span></h2>
+      <p class="mut" style="font-size:13px;margin:4px 0 10px">Diva kampanya/fatura raporları, fiyat fark dosyaları ve BSH hakediş detayı yüklenir; beklenen hakediş BSH'nin ödediğiyle satır satır karşılaştırılır. İtiraz formu ve ileri teslim listesi çıkar. Diva'ya hiçbir şey girilmez.</p>
+      <div class="row"><button onclick="hkmAc()">🧾 Hakediş Mutabakatını Aç</button></div>
+    </div>
+
     <div class="card" id="stkCard" style="border:2px solid #0891b2">
       <h2>📥 Satış Takip Exceli <span class="badge" style="background:#0891b2;color:#fff">Satıldı kayıtlarından</span></h2>
       <p class="mut" style="font-size:13px;margin:4px 0 10px">Seçilen ayın <b>Satıldı</b> tekliflerinden mağazanın AYLIK SATIŞ KASA TAKİP FÖYÜ'nü üretir (EMAAR formatı): DATA satırları + maliyet/BİP/komisyon/kâr formülleri + Kodlar ve Bip sayfaları sistemden dolu iner. Tahsilat sütunu satış tutarına eşitlenir; kalan ödeme, kasa devri ve elle satırları mağaza dosyada tamamlar.</p>
@@ -1383,6 +1389,7 @@ function applyAdminAccess(){
   const imp=$("importers"); if(imp) imp.style.display="none";
   const mo=$("merkeziOk"); if(mo) mo.textContent="▶";
   const bc=$("bayilerCard"); if(bc) bc.style.display=profil.rol==="admin"?"":"none";
+  const hk=$("hakedisCard"); if(hk) hk.style.display=profil.rol==="admin"?"":"none";  // 🧾 hakediş mutabakatı: yalnız admin
   const bp=$("bayiPanelCard"); if(bp) bp.style.display=profil.rol==="admin"?"":"none";  // 🏪 dış bayi fiyatları: yalnız admin
   { const bm=$("bpMarka"); if(bm) bm.textContent=markaAd(brand); }
   // Satış Asistanı: yalnızca admin. Mağaza/personel hesaplarında ne kart ne panel açılır.
@@ -4062,7 +4069,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="21 Eki 2026 · v11.21 (🛒 Satıcı Modu: tek arama + hızlı WhatsApp)";
+const FQ_SURUM="21 Eki 2026 · v11.22 (🧾 Hakediş Mutabakatı — yönetici)";
 // v11.20: tema — varsayılan AÇIK; koyu tema cihazda hatırlanır (fq_tema=dark)
 function fqTemaUygula(koyu){ document.body.classList.toggle("fq-dark",!!koyu); const b=document.getElementById("fqTemaBtn"); if(b){ b.textContent=koyu?"☀":"🌙"; b.title=koyu?"Açık temaya geç":"Koyu temaya geç"; } }
 function fqTemaDegistir(){ const koyu=!document.body.classList.contains("fq-dark"); try{localStorage.setItem("fq_tema",koyu?"dark":"light");}catch(e){} fqTemaUygula(koyu); }
@@ -4119,5 +4126,7 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) _fqSuru
 <script src="js/yonetim-raporu.js"></script>
 <script src="js/teklif-gecmisi.js"></script>
 <script src="js/eksik-urunler.js"></script>
+<script src="js/hakedis-core.js"></script>
+<script src="js/hakedis-ekran.js"></script>
 </body>
 </html>
