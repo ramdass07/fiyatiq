@@ -289,6 +289,17 @@ body:not(.fq-dark) .sale-cost-breakdown{background:#f8fafc}
 @media(max-width:700px){body:not(.fq-dark) #salesWorkspace.simple-sale #grid tr{background:#f8fafc}body:not(.fq-dark) #salesWorkspace.simple-sale #grid td:nth-child(n+11):nth-child(-n+13){background:#eef2f7}}
 body:not(.fq-dark) .fq-retail-line{color:var(--txt)}
 #fqTemaBtn{font-size:15px;padding:4px 8px;line-height:1}
+/* v11.21 SATICI MODU: tek arama kutusu, perakende satırı büyük (kâr % satıcıda kalır — Burak kararı) */
+.fq-ara-kutu{position:relative;margin:4px 0 10px}
+#fqAra{width:100%;font-size:17px;padding:13px 16px;border-radius:12px;border:2px solid color-mix(in srgb,var(--brand) 55%,var(--line));box-shadow:0 2px 10px rgba(15,23,42,.06)}
+#fqAra:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 20%,transparent)}
+.fq-ara-sonuc{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:12px;max-height:340px;overflow:auto;box-shadow:0 12px 32px rgba(15,23,42,.22)}
+.fq-ara-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
+.fq-ara-item:last-child{border-bottom:0}.fq-ara-item:hover,.fq-ara-item.on{background:color-mix(in srgb,var(--brand) 10%,transparent)}
+.fq-ara-item .k{font-weight:800;font-family:ui-monospace,Consolas,monospace;min-width:110px}.fq-ara-item .a{flex:1;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fq-ara-item .m{font-size:10px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:6px;color:#fff;text-transform:uppercase}.fq-ara-item .m.bosch{background:#e11d48}.fq-ara-item .m.siemens{background:#0891b2}
+.fq-ara-bos{padding:12px 14px;color:var(--mut);font-size:13px}
+.simple-sale .fq-retail-line{font-size:15px}
 .fq-retail-line{display:none}.simple-sale .fq-retail-line{display:block;margin:4px 0 2px;font-size:13px;font-weight:700;color:var(--txt)}
 </style>
 <style>
@@ -675,7 +686,7 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
       <div class="row"><input id="bsFile" type="file" accept=".xlsx,.xls,.csv"><button onclick="bayiStokYukle()">Stoğumu Yükle</button><span id="bsMsg" class="msg"></span></div>
     </div>
     <div id="salesWorkspace" class="simple-sale">
-    <section class="card" id="saleControls" aria-label="Satış ayarları">      <div class="fld"><label for="karOrani">Hedef kâr %</label><input id="karOrani" type="number" step="0.5" value="4" style="width:100px" oninput="recalc()"></div>
+    <section class="card" id="saleControls" aria-label="Satış ayarları">      <div class="fld" id="karFld"><label for="karOrani">Hedef kâr %</label><input id="karOrani" type="number" step="0.5" value="4" style="width:100px" oninput="recalc()"></div>
       <div class="fld"><label for="banka">Banka</label><select id="banka" onchange="onBankChange()"></select>
         <div id="ticariUyari" style="display:none;margin-top:4px;padding:4px 8px;border-radius:6px;background:#fef2f2;border:1px solid #dc2626;color:#dc2626;font-size:11px;font-weight:700;max-width:230px">⚠ Bu, TİCARİ kart oranıdır — müşterinin kartı bireyselse bireysel satırı seçin.</div></div>
       <div class="fld"><label for="taksit">Taksit</label><select id="taksit" onchange="onTaksitChange()"></select></div>
@@ -693,9 +704,15 @@ header .brand{font-size:22px}header .seg button{padding:8px 20px}
       <div class="sale-heading"><h2>Satış teklifi</h2><div class="sale-tools">
         <details id="fqSaleTools" open><summary>Teklif işlemleri</summary><div class="fq-sale-tool-items">
         <button class="ghost sm" onclick="openCustomerDialog('bilgi')">Müşteri bilgileri</button>
-        <button class="ghost sm" id="gorunumBtn" onclick="toggleGorunum()">Detaylı görünüm</button>
+        <button class="ghost sm" id="gorunumBtn" onclick="toggleGorunum()" title="Satıcı görünümü: ara → kart → gönder · Yönetici görünümü: tüm sütunlar">Yönetici görünümü</button>
         <button class="ghost sm" onclick="fqShowCustomerView()">Müşteriye göster</button><button class="ghost sm" onclick="fqOpenMyQuotes(true)">Bugün aranacaklar</button><button class="ghost sm" onclick="fqOpenDrafts()">Taslaklar</button><button class="ghost sm" title="Havuzdaki süresi dolmamış rezerveler" onclick="fqRezervePanelAc()">🔒 Rezerveler</button></div></details><button class="sm" id="fqNewQuote" onclick="fqRequestNew()">+ Yeni teklif</button>
         <button class="sm" id="fqAddProduct" onclick="addRow(true)">+ Ürün satırı</button></div></div>
+      <div id="fqAraKutu" class="fq-ara-kutu">
+        <input id="fqAra" type="search" placeholder="Model kodu ya da ürün adı yaz" autocomplete="off" inputmode="search"
+               oninput="fqAraYaz(this.value)" onfocus="fqAraYaz(this.value)" onblur="fqAraKapat()"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();fqAraEnter();}else if(event.key==='Escape'){this.value='';fqAraKapat(true);}">
+        <div id="fqAraSonuc" class="fq-ara-sonuc" style="display:none"></div>
+      </div>
       <p id="fqDraftStatus" class="mut" role="status" style="font-size:13px"></p>
       <div id="fqReviewBox" class="msg warn" hidden>Geri yüklenen teklif güncel fiyatlarla hesaplandı. Banka, kampanya ve toplamları kontrol et. <button class="ghost sm" onclick="fqConfirmReview()">Güncel fiyatları kontrol ettim</button></div>
       <p class="sale-hint" id="salePriceHint">Fiyatlar satır toplamıdır; uygulanan hakediş ve varsa toplam pazarlık fiyatı dahildir. Tutarlar TL.</p>
@@ -1076,7 +1093,8 @@ function applyGorunum(){
   const g=$("grid"); if(g)g.classList.toggle("basit",simple);
   const w=$("salesWorkspace"); if(w)w.classList.toggle("simple-sale",simple);
   const hint=$("salePriceHint");if(hint)hint.textContent=mobile?"Satış fiyatları satır toplamıdır; hakediş ve pazarlık dahildir. Maliyetler birim tutardır. Net maliyet = maliyet − BİP; hakediş ayrıca hesaplanır.":simple?"Fiyatlar satır toplamıdır; uygulanan hakediş ve varsa toplam pazarlık fiyatı dahildir. Tutarlar TL.":"Detaylı tabloda satış fiyatları hakediş öncesidir. Kampanya sonrası fiyatlar Ödeme ve toplam bölümünde ve Net fiyat dökümündedir.";
-  const b=$("gorunumBtn");if(b)b.textContent=simple?"Detaylı görünüm":"Sade görünüm";
+  const b=$("gorunumBtn");if(b)b.textContent=simple?"Yönetici görünümü":"Satıcı görünümü";
+  const ak=$("fqAraKutu");if(ak)ak.style.display=simple?"":"none";
   if(fqMobileLayout!==mobile){
     for(const id of ['fqHeaderMenu','fqSaleTools']){const el=$(id);if(el)el.open=!mobile;}
     fqMobileLayout=mobile;
@@ -1988,6 +2006,37 @@ function toggleKampanya(id){
 async function onCode(i,val){const r=quoteRows[i];if(!r)return;fqSetCode(r,val);r._codePending=true;try{await refetch(r);}finally{r._codePending=false;}}
 function codeBlur(i,value){const r=quoteRows[i];setTimeout(()=>{if(r&&quoteRows[i]===r&&r.kod===value&&r.kod&&!r._codePending&&(r.veriHata||(!r.isET&&r.toptan==null)))onCode(i,value);},250);}
 let acRow=-1, acTimer=null;
+// ===== v11.21 SATICI MODU — tek arama kutusu (iki markada arar, seçince satıra ekler) =====
+let fqAraTimer=null, fqAraEpoch=0, fqAraListe=[], fqAraSecili=-1;
+function fqAraKapat(hemen){ clearTimeout(fqAraTimer); const k=()=>{const e=$("fqAraSonuc"); if(e)e.style.display="none";}; hemen?k():setTimeout(k,200); }
+function fqAraYaz(val){ clearTimeout(fqAraTimer); const q=String(val||"").trim(); if(q.length<2){fqAraKapat(true);return;} fqAraTimer=setTimeout(()=>fqAraSorgula(q),180); }
+async function fqAraSorgula(q){
+  const my=++fqAraEpoch, box=$("fqAraSonuc"); if(!box||!sb)return;
+  const safe=q.replace(/[,%()]/g,''), markalar=allowedBrands();
+  const {data,error}=await sb.from("urunler").select("model_kodu,urun_adi,marka").in("marka",markalar).or(`model_kodu.ilike.%${safe}%,urun_adi.ilike.%${safe}%`).order("marka").limit(20);
+  if(my!==fqAraEpoch)return;
+  if(error||!data||!data.length){ fqAraListe=[]; box.innerHTML=`<div class="fq-ara-bos">Bulunamadı. Kod ya da ürün adının bir parçasını yaz.</div>`; box.style.display=""; return; }
+  // Seçili marka önce, sonra kodu q ile başlayanlar
+  const Q=q.toUpperCase();
+  fqAraListe=data.slice().sort((a,b)=>(a.marka===brand?0:1)-(b.marka===brand?0:1)||(String(a.model_kodu).startsWith(Q)?0:1)-(String(b.model_kodu).startsWith(Q)?0:1));
+  fqAraSecili=0; box.replaceChildren();
+  fqAraListe.forEach((p,i)=>{ const d=document.createElement('div'); d.className='fq-ara-item'+(i===0?' on':''); d.dataset.i=i;
+    const k=document.createElement('span'); k.className='k'; k.textContent=p.model_kodu;
+    const a=document.createElement('span'); a.className='a'; a.textContent=p.urun_adi||'';
+    const m=document.createElement('span'); m.className='m '+p.marka; m.textContent=p.marka;
+    d.append(k,a,m); d.onmousedown=e=>{e.preventDefault();fqAraSec(i);}; box.append(d); });
+  box.style.display="";
+}
+function fqAraEnter(){ if(fqAraListe.length)fqAraSec(Math.max(0,fqAraSecili)); else { const v=($("fqAra")||{}).value||""; if(v.trim().length>=2)fqAraSorgula(v.trim()); } }
+async function fqAraSec(i){
+  const p=fqAraListe[i]; if(!p)return; fqAraKapat(true);
+  if(p.marka!==brand){ if(!allowedBrands().includes(p.marka))return; await setBrand(p.marka); if(brand!==p.marka)return; }
+  if(!fqCanStartWork())return;
+  let idx=quoteRows.findIndex(r=>!r.kod); if(idx<0){ quoteRows.push(bosSatir()); idx=quoteRows.length-1; }
+  const r=quoteRows[idx]; fqSetCode(r,p.model_kodu); renderRows(); await refetch(r);
+  const inp=$("fqAra"); if(inp){ inp.value=""; }
+  const tr=document.querySelectorAll('#rows>tr')[idx]; if(tr&&tr.scrollIntoView)tr.scrollIntoView({block:"center",behavior:"smooth"});
+}
 function fqSetCode(r,val){const kod=String(val||'').toUpperCase().replace(/[^A-Z0-9._/-]/g,'');if(r.kod!==kod){document.querySelectorAll('#rows>tr')[quoteRows.indexOf(r)]?.querySelector('.sale-cost-breakdown')?.remove();const adet=r.adet,rid=(r._fetchId||0)+1;Object.assign(r,bosSatir(),{kod,adet,_fetchId:rid,veriHata:kod?'Ürün verisi yükleniyor':null});}return kod;}
 function onCodeInput(i,val,el){val=fqSetCode(quoteRows[i],val);if(el)el.value=val;clearTimeout(acTimer);if(el)acTimer=setTimeout(()=>showAC(i,val,el),150);}
 
@@ -2144,22 +2193,27 @@ function magazaPrefix(){ const m=((profil&&(profil.magaza||profil.ad))||"MGZ").t
 function genTeklifNo(){ const d=new Date(),yy=String(d.getFullYear()).slice(2),mm=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'),rnd=Math.random().toString(36).slice(2,6).toUpperCase(); return magazaPrefix()+"-"+yy+mm+dd+"-"+rnd; }
 function getTeklifNo(){ if(!currentTeklifNo) currentTeklifNo=genTeklifNo(); return currentTeklifNo; }
 // Çıktı alınmadan önce müşteri adı + GSM ŞART: her basılan teklifin sahibi kayıtta görünsün
-let customerAction=null;
-function customerMissing(){
+let customerAction=null, fqQuickShare=false;
+// v11.21 (Burak kararı): WhatsApp paylaşımında TEK zorunlu alan müşteri telefonu; ad ve personel isteğe bağlı.
+// Yazdırma / sipariş formu / elle kayıtta eski 3 alan kuralı sürer.
+function fqQuickAction(action){ return action==='whatsapp' || (action==='save' && fqQuickShare); }
+function customerMissing(action){
+ if(String(($("mTel")||{}).value||"").replace(/\D/g,"").length<10)return ['mTel','Müşteri telefonunu en az 10 hane olarak yaz.'];
+ if(fqQuickAction(action))return null;
  if(!String(($("satisPersonel")||{}).value||"").trim()||String($("satisPersonel").value).trim().length<2)return ['satisPersonel','Satış personelinin adını yaz.'];
  if(String(($("mAd")||{}).value||"").trim().length<2)return ['mAd','Müşteri adını yaz.'];
- if(String(($("mTel")||{}).value||"").replace(/\D/g,"").length<10)return ['mTel','Müşteri telefonunu en az 10 hane olarak yaz.'];
  return null;
 }
 function openCustomerDialog(action='bilgi'){
  customerAction=action;const d=$("customerDialog");$("customerError").textContent='';
  $("customerContinue").textContent=({save:'Teklifi kaydet',teklif:'Kaydet ve yazdır',siparis:'Sipariş formunu hazırla',whatsapp:'WhatsApp için hazırla',bilgi:'Tamam'})[action]||'Devam et';
- if(!d.open)d.showModal();const missing=customerMissing();$(missing?missing[0]:'mAd').focus();
+ const hint=$("customerDialogHint");if(hint)hint.textContent=action==='whatsapp'?'WhatsApp için yalnız müşteri telefonu zorunlu; ad ve personel isteğe bağlı.':'Kaydetmek veya çıktı almak için bu bilgileri tamamla.';
+ if(!d.open)d.showModal();const missing=customerMissing(action);$(missing?missing[0]:(action==='whatsapp'?'mTel':'mAd')).focus();
 }
 function closeCustomerDialog(){customerAction=null;$("customerDialog").close();}
-function musteriKontrol(action='save'){if(!customerMissing())return true;openCustomerDialog(action);return false;}
+function musteriKontrol(action='save'){if(!customerMissing(action))return true;openCustomerDialog(action);return false;}
 function completeCustomerAction(){
- const action=customerAction,missing=customerMissing();
+ const action=customerAction,missing=customerMissing(action);
  if(action!=='bilgi'&&missing){$("customerError").textContent=missing[1];$(missing[0]).focus();return;}
  closeCustomerDialog();if(action==='save')return saveQuote();if(action==='teklif'||action==='siparis')return printDoc(action);if(action==='whatsapp')return shareWhatsApp();
 }
@@ -2280,7 +2334,8 @@ async function shareWhatsApp(){
   if(!musteriKontrol("whatsapp")) return;
   const outputFingerprint=fqFingerprint(fqCapture()),outputEpoch=fqEpoch,outputUser=authUid;
   const shareWindow=window.open("","_blank");if(!shareWindow){alert("Açılır pencere engellendi.");return;}shareWindow.opener=null;
-  if(!await saveQuote(true)){shareWindow.close();return;}
+  fqQuickShare=true;let kaydedildi=false;try{kaydedildi=await saveQuote(true);}finally{fqQuickShare=false;}
+  if(!kaydedildi){shareWindow.close();return;}
   if(outputEpoch!==fqEpoch||outputUser!==authUid||fqFlow.baseline!==outputFingerprint||fqFingerprint(fqCapture())!==outputFingerprint){shareWindow.close();alert("Teklif hazırlanırken bilgiler değişti. Güncel hali göndermek için WhatsApp düğmesine tekrar bas.");return;}
   const items=teklifItems();
   const tk=+$("taksit").value, bk=bankaAdi();
@@ -4007,7 +4062,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="20 Eki 2026 · v11.20 (☀ açık tema + perakende 5 taksit)";
+const FQ_SURUM="21 Eki 2026 · v11.21 (🛒 Satıcı Modu: tek arama + hızlı WhatsApp)";
 // v11.20: tema — varsayılan AÇIK; koyu tema cihazda hatırlanır (fq_tema=dark)
 function fqTemaUygula(koyu){ document.body.classList.toggle("fq-dark",!!koyu); const b=document.getElementById("fqTemaBtn"); if(b){ b.textContent=koyu?"☀":"🌙"; b.title=koyu?"Açık temaya geç":"Koyu temaya geç"; } }
 function fqTemaDegistir(){ const koyu=!document.body.classList.contains("fq-dark"); try{localStorage.setItem("fq_tema",koyu?"dark":"light");}catch(e){} fqTemaUygula(koyu); }
