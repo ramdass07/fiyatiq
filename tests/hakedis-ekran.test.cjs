@@ -32,7 +32,7 @@ function dbTaklit(){
       if(op==='select'){ let r=T[t].filter(uy); if(ord)r=r.slice().sort((a,b)=>a[ord]<b[ord]?-1:a[ord]>b[ord]?1:0); if(rng)r=r.slice(rng[0],rng[1]+1); return {data:JSON.parse(JSON.stringify(r)),error:null}; }
       if(op==='update'){ T[t].filter(uy).forEach(r=>Object.assign(r,yuk)); return {data:null,error:null}; }
       if(op==='delete'){ T[t]=T[t].filter(r=>!uy(r)); return {data:null,error:null}; }
-      const anah=(ops.onConflict||'').split(',').filter(k=>k!=='isletme_id');
+      const anah=(ops.onConflict||'').split(',').filter(k=>k&&k!=='isletme_id');
       for(const r of [].concat(yuk)){ const var_=anah.length&&T[t].find(x=>anah.every(k=>x[k]===r[k]));
         if(var_){ if(!ops.ignoreDuplicates)Object.assign(var_,r); } else T[t].push({id:yeniId(),...JSON.parse(JSON.stringify(r))}); }
       return {data:null,error:null}; }
@@ -54,8 +54,15 @@ function kur(t,rol='admin'){
   h.run(fs.readFileSync(path.join(root,'js/hakedis-core.js'),'utf8'));
   h.run(fs.readFileSync(path.join(root,'js/hakedis-ekran.js'),'utf8'));
   h.run(`sb=__db;profil.rol='${rol}';`);
+  h.w.confirm=()=>{ throw new Error('confirm() kullanılmamalı — panel içi onay olmalı'); };
   const dosya=ad=>new TextEncoder().encode(ad).buffer;
   return {...h,x,db,dosya};
+}
+// panel içi onay penceresini bekleyip seçer (v11.23: confirm() yok)
+async function onayla(k,ifade,secim='1'){
+  const p=k.run(ifade); let d=null;
+  for(let i=0;i<200&&!(d=k.w.document.getElementById('hkmOnay'));i++) await new Promise(r=>setImmediate(r));
+  assert.ok(d,'panel içi onay penceresi açılmalı'); const metin=d.textContent; d.querySelector(`button[data-c="${secim}"]`).click(); await p; return metin;
 }
 const tumDosyalar=()=>Object.values(FX.dosyaSirasi).flat();
 
@@ -92,7 +99,7 @@ async function yukleVeTanimla(k){
   await k.run('hkmAc()');
   for(const ad of tumDosyalar()) k.run('fqHkm.hazir').push(await k.run(`hkmDosyaHazirla(${JSON.stringify(ad)},new TextEncoder().encode(${JSON.stringify(ad)}).buffer)`));
   await k.run('hkmKaydet()');
-  await k.run(`hkmTanimIceAl({arrayBuffer:async()=>new TextEncoder().encode('KAMPANYA_TANIMLARI.xlsx').buffer})`);
+  await onayla(k,`hkmTanimIceAl({arrayBuffer:async()=>new TextEncoder().encode('KAMPANYA_TANIMLARI.xlsx').buffer})`);
   k.db.T.hakedis_sube.push({id:'s1',marka:'bosch',anahtar:'TSTSUBE2',magaza:'TEST SUBE IKI',oncelik:0},{id:'s2',marka:'bosch',anahtar:'TSTMRKZ',magaza:'TEST MERKEZ',oncelik:1});
   await k.run('hkmTanimYukle()');
 }
@@ -148,8 +155,51 @@ test('objection form and control report are written without colour, form has mer
 test('marking the form as sent stores each objection once and removes it from the next form',async t=>{
   const k=kur(t); await yukleVeTanimla(k); await k.run('hkmHesapla()');
   const n=k.run("fqHkm.sonuc.kayip.filter(x=>x.DURUM==='İTİRAZ').length");
-  await k.run('hkmGonderildi()'); assert.equal(k.db.T.hakedis_itiraz.length,n);
+  await onayla(k,'hkmGonderildi()'); assert.equal(k.db.T.hakedis_itiraz.length,n);
   const i=k.db.T.hakedis_itiraz[0]; assert.equal(i.kampanya_norm,H.norm(i.kampanya_adi)); assert.match(i.gonderim_tarihi,/^\d{4}-\d{2}-\d{2}$/);
   assert.equal(k.run("fqHkm.sonuc.kayip.filter(x=>x.DURUM==='İTİRAZ').length"),0,'gönderilen kalem forma tekrar girmez');
   await k.run('hkmGonderildi()'); assert.equal(k.db.T.hakedis_itiraz.length,n,'ikinci işaretleme kopya üretmez');
+});
+
+test('v11.23: confirmations are shown inside the panel; cancelling writes nothing',async t=>{
+  const k=kur(t); await k.run('hkmAc()');
+  const metin=await onayla(k,`hkmTanimIceAl({arrayBuffer:async()=>new TextEncoder().encode('KAMPANYA_TANIMLARI.xlsx').buffer})`,'0');
+  assert.match(metin,/İçe aktarılacak: \d+ paket/); assert.equal(k.db.T.hakedis_paket.length,0,'vazgeçince yazılmaz');
+  assert.equal(k.w.document.getElementById('hkmOnay'),null,'pencere kapanır');
+  k.db.T.hakedis_sube.push({id:'s9',marka:'bosch',anahtar:'X',magaza:'Y',oncelik:10}); await k.run('hkmTanimYukle()');
+  await onayla(k,"hkmSubeSil('s9')",'0'); assert.equal(k.db.T.hakedis_sube.length,1);
+  await onayla(k,"hkmSubeSil('s9')",'1'); assert.equal(k.db.T.hakedis_sube.length,0);
+});
+
+test('v11.23: the import control is a real button and a definitions file dropped on Dosyalar is redirected, not saved',async t=>{
+  const k=kur(t); await k.run('hkmAc()'); k.run("hkmSekme('tanim')");
+  const b=[...k.w.document.querySelectorAll('#hkmGovde button')].find(x=>/KAMPANYA_TANIMLARI\.xlsx içe al/.test(x.textContent));
+  assert.ok(b,'içe al bir <button>'); assert.ok(k.w.document.getElementById('hkmTanimDosya'));
+  k.run("hkmSekme('dosya')");
+  const h=await k.run(`hkmDosyaHazirla('KAMPANYA_TANIMLARI.xlsx',new TextEncoder().encode('KAMPANYA_TANIMLARI.xlsx').buffer)`);
+  assert.equal(h.tur,'TANIM'); assert.match(h.durum,/2 · Kampanya tanımları/);
+  k.run('fqHkm.hazir').push(h); k.run('hkmCiz()'); await k.run('hkmKaydet()');
+  assert.equal(k.db.log.filter(l=>l.rpc==='fq_hakedis_yukle').length,0,'tanım dosyası rapor olarak kaydedilmez');
+});
+
+test('v11.23: the save button is usable again after a save, and the result message stays on screen',async t=>{
+  const k=kur(t); await k.run('hkmAc()'); const ad=tumDosyalar()[0];
+  k.run('fqHkm.hazir').push(await k.run(`hkmDosyaHazirla(${JSON.stringify(ad)},new TextEncoder().encode(${JSON.stringify(ad)}).buffer)`)); k.run('hkmCiz()');
+  await k.run('hkmKaydet()'); assert.match(k.w.document.getElementById('hkmMsg').textContent,/1 dosya kaydedildi/);
+  const ad2=tumDosyalar()[1]; k.run('fqHkm.hazir').push(await k.run(`hkmDosyaHazirla(${JSON.stringify(ad2)},new TextEncoder().encode(${JSON.stringify(ad2)}).buffer)`));
+  const b=k.w.document.getElementById('hkmKaydetBtn'); if(b) assert.equal(b.disabled,false);
+  k.run('hkmCiz()'); assert.equal(k.w.document.getElementById('hkmKaydetBtn').disabled,false,'ikinci kayıt için düğme açık');
+  assert.match(k.w.document.getElementById('hkmMsg').textContent,/1 dosya kaydedildi/,'yeniden çizimde mesaj kaybolmaz');
+});
+
+test('v11.23: a branch mapping row can be added from the panel, at the end or at a given order; duplicates are refused',async t=>{
+  const k=kur(t); await k.run('hkmAc()'); k.db.T.hakedis_sube.push({id:'s1',marka:'bosch',anahtar:'TSTMRKZ',magaza:'TEST MERKEZ',oncelik:30}); await k.run('hkmTanimYukle()'); k.run("hkmSekme('tanim')");
+  const d=k.w.document, yaz=(id,v)=>{ d.getElementById(id).value=v; };
+  yaz('hkmYeniAnahtar','TSTSUBE2'); yaz('hkmYeniMagaza','TEST SUBE IKI'); await k.run('hkmSubeEkle()');
+  const e=k.db.T.hakedis_sube.find(s=>s.anahtar==='TSTSUBE2'); assert.equal(e.magaza,'TEST SUBE IKI'); assert.equal(e.oncelik,40); assert.equal(e.marka,'bosch');
+  yaz('hkmYeniAnahtar','TSTSUBE3'); yaz('hkmYeniMagaza','X'); yaz('hkmYeniSira','5'); await k.run('hkmSubeEkle()');
+  assert.equal(k.db.T.hakedis_sube.find(s=>s.anahtar==='TSTSUBE3').oncelik,5);
+  yaz('hkmYeniAnahtar','tstmrkz'); yaz('hkmYeniMagaza','Y'); await k.run('hkmSubeEkle()');
+  assert.equal(k.db.T.hakedis_sube.length,3,'aynı anahtar ikinci kez eklenmez'); assert.match(d.getElementById('hkmMsg').textContent,/zaten eşlemede var/);
+  yaz('hkmYeniAnahtar',''); yaz('hkmYeniMagaza',''); await k.run('hkmSubeEkle()'); assert.equal(k.db.T.hakedis_sube.length,3);
 });

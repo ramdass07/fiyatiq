@@ -21,6 +21,6 @@ test('checks stop when the waiting screen is not shown',async t=>{
 
 test('the version note is shown only to the admin; stores see only date and version',t=>{
  const h=harness(t);const el=()=>h.w.document.getElementById('fqSurum').textContent;
- h.run("profil.rol='bayi';fqSurumGoster()");assert.equal(el(),'v · '+h.run('FQ_SURUM').replace(/\s*\(.*\)\s*$/,''));assert.doesNotMatch(el(),/\(/);assert.match(el(),/v11\.22$/);
+ h.run("profil.rol='bayi';fqSurumGoster()");assert.equal(el(),'v · '+h.run('FQ_SURUM').replace(/\s*\(.*\)\s*$/,''));assert.doesNotMatch(el(),/\(/);assert.match(el(),/v11\.23$/);
  h.run("profil.rol='admin';fqSurumGoster()");assert.equal(el(),'v · '+h.run('FQ_SURUM'));assert.match(el(),/\(/);
 });
