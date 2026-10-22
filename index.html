@@ -4069,7 +4069,7 @@ async function kampEkle(i){
 // ===== SÜRÜM GÖSTERGESİ (5 Eyl) =====
 // Her teslimde Claude bu sabiti günceller; üst çubukta görünür. "Ekranımda hangi
 // sürüm var?" sorusu böylece tek bakışta cevaplanır (F5 tuzağı teşhisi).
-const FQ_SURUM="21 Eki 2026 · v11.22 (🧾 Hakediş Mutabakatı — yönetici)";
+const FQ_SURUM="22 Eki 2026 · v11.23 (🧾 Hakediş: panel içi onay + şube ekleme)";
 // v11.20: tema — varsayılan AÇIK; koyu tema cihazda hatırlanır (fq_tema=dark)
 function fqTemaUygula(koyu){ document.body.classList.toggle("fq-dark",!!koyu); const b=document.getElementById("fqTemaBtn"); if(b){ b.textContent=koyu?"☀":"🌙"; b.title=koyu?"Açık temaya geç":"Koyu temaya geç"; } }
 function fqTemaDegistir(){ const koyu=!document.body.classList.contains("fq-dark"); try{localStorage.setItem("fq_tema",koyu?"dark":"light");}catch(e){} fqTemaUygula(koyu); }
