@@ -2,13 +2,24 @@
    Veritabanı: hakedis_* tabloları + fq_hakedis_yukle / fq_hakedis_yukleme_durum (migration 20261021190000).
    Fiyat/kampanya/stok motoruna DOKUNMAZ. Excel çıktıları renksiz (SheetJS). */
 'use strict';
-const fqHkm={marka:'bosch',hazir:[],yuklemeler:[],paketler:[],ekOranlar:[],subeler:[],ayar:{},itirazlar:[],bshFaturalar:[],sonuc:null,mesgul:false,filtre:'',arama:'',sekme:'dosya'};
-const HKM_TUR_AD={DIVA_KAMPANYA:'Diva kampanya raporu',DIVA_FATURA:'Diva fatura raporu (şube)',BSH_DETAY:'BSH hakediş detayı',FIYAT_FARK:'Fiyat fark dosyası',TANINMADI:'Tanınmadı'};
+const fqHkm={msg:null,onay:null,marka:'bosch',hazir:[],yuklemeler:[],paketler:[],ekOranlar:[],subeler:[],ayar:{},itirazlar:[],bshFaturalar:[],sonuc:null,mesgul:false,filtre:'',arama:'',sekme:'dosya'};
+const HKM_TUR_AD={TANIM:'Kampanya tanım dosyası',DIVA_KAMPANYA:'Diva kampanya raporu',DIVA_FATURA:'Diva fatura raporu (şube)',BSH_DETAY:'BSH hakediş detayı',FIYAT_FARK:'Fiyat fark dosyası',TANINMADI:'Tanınmadı'};
 const HKM_TUR_DB={DIVA_KAMPANYA:'diva_kampanya',DIVA_FATURA:'diva_fatura',BSH_DETAY:'bsh_detay',FIYAT_FARK:'fiyat_fark'};
 const HKM_TUR_SECENEK=['TEKİL','FIRSAT','AİLE','KEA','BUNDLE','HARİÇ','BİLİNMİYOR'];
 function hkmYetkili(){ return typeof profil!=='undefined'&&profil&&profil.rol==='admin'; }
 function hkmPara(n){ return n===null||n===undefined||Number.isNaN(+n)?'—':Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function hkmMsg(t,kotu){ const m=document.getElementById('hkmMsg'); if(m){ m.textContent=t||''; m.className='msg'+(kotu?' bad':''); } }
+function hkmMsg(t,kotu){ fqHkm.msg=t?{t,kotu:!!kotu}:null; const m=document.getElementById('hkmMsg'); if(m){ m.textContent=t||''; m.className='msg'+(kotu?' bad':''); } }
+// v11.23: tarayıcının confirm() penceresi yerine panel içi onay (Claude uygulamasının tarayıcısı confirm göstermiyor)
+function hkmOnay(metin,evet='Evet, devam'){
+  return new Promise(coz=>{ const p=document.getElementById('hkmPanel'); if(!p){ coz(false); return; }
+    const eski=document.getElementById('hkmOnay'); if(eski){ eski.remove(); if(fqHkm.onay)fqHkm.onay(false); }
+    const d=document.createElement('div'); d.id='hkmOnay'; d.setAttribute('role','alertdialog'); d.setAttribute('aria-modal','true');
+    d.innerHTML=`<div class="hkm-onay-kutu"><p>${esc(metin).replace(/\n/g,'<br>')}</p><div class="row" style="justify-content:flex-end"><button class="ghost" data-c="0">Vazgeç</button><button data-c="1">${esc(evet)}</button></div></div>`;
+    const bitir=c=>{ d.remove(); fqHkm.onay=null; coz(c); };
+    fqHkm.onay=bitir; d.addEventListener('click',e=>{ const b=e.target.closest('button[data-c]'); if(b)bitir(b.dataset.c==='1'); else if(e.target===d)bitir(false); });
+    d.addEventListener('keydown',e=>{ if(e.key==='Escape')bitir(false); });
+    p.appendChild(d); const ok=d.querySelector('button[data-c="1"]'); if(ok)ok.focus(); });
+}
 async function hkmSha256(buf){ const h=await crypto.subtle.digest('SHA-256',buf); return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
 
 // ------------------------------------------------------------------ panel
@@ -21,7 +32,10 @@ function hkmStil(){ if(document.getElementById('hkmStil'))return; const s=docume
 #hkmPanel .hkm-kart>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel)}
 #hkmPanel .hkm-kart b{display:block;font-size:20px}#hkmPanel .hkm-kaydir{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:10px}
 #hkmPanel .hkm-uyari{border-left:4px solid var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent);padding:8px 12px;border-radius:8px;margin:8px 0;font-size:13px}
-#hkmPanel input.hkm-h,#hkmPanel select.hkm-h{padding:3px 5px;font-size:12px;max-width:150px}`; document.head.appendChild(s); }
+#hkmPanel input.hkm-h,#hkmPanel select.hkm-h{padding:3px 5px;font-size:12px;max-width:150px}
+#hkmOnay{position:fixed;inset:0;z-index:310;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+#hkmOnay .hkm-onay-kutu{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:14px;padding:16px 18px;max-width:520px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+#hkmOnay p{margin:0 0 14px;font-size:14px;line-height:1.5}`; document.head.appendChild(s); }
 async function hkmAc(){
   if(!hkmYetkili()){ alert('Hakediş mutabakatı şimdilik yalnız yönetici hesabına açık.'); return; }
   hkmStil(); let p=document.getElementById('hkmPanel');
@@ -29,14 +43,14 @@ async function hkmAc(){
   p.style.display='block'; hkmCiz(); await hkmTanimYukle(); hkmCiz();
 }
 function hkmKapat(){ const p=document.getElementById('hkmPanel'); if(p)p.style.display='none'; }
-function hkmSekme(s){ fqHkm.sekme=s; hkmCiz(); }
+function hkmSekme(s){ fqHkm.sekme=s; fqHkm.msg=null; hkmCiz(); }
 function hkmCiz(){
   const p=document.getElementById('hkmPanel'); if(!p)return; const S=fqHkm.sekme;
   const btn=(k,ad)=>`<button class="ghost sm${S===k?' on':''}" onclick="hkmSekme('${k}')">${ad}</button>`;
   p.innerHTML=`<div class="hkm-ust"><h2 style="margin:0">🧾 Hakediş Mutabakatı · BSH</h2>
     <select id="hkmMarka" onchange="fqHkm.marka=this.value;fqHkm.sonuc=null;hkmTanimYukle().then(hkmCiz)"><option value="bosch"${fqHkm.marka==='bosch'?' selected':''}>Bosch</option><option value="siemens" disabled>Siemens (Faz 3)</option></select>
     <span class="hkm-sekme">${btn('dosya','1 · Dosyalar')}${btn('tanim','2 · Kampanya tanımları')}${btn('sonuc','3 · Sonuç')}${btn('itiraz','4 · İtiraz ve ileri teslim')}</span>
-    <div class="grow"></div><span id="hkmMsg" class="msg"></span><button class="ghost sm" onclick="hkmKapat()">✕ Kapat</button></div>
+    <div class="grow"></div><span id="hkmMsg" class="msg${fqHkm.msg&&fqHkm.msg.kotu?' bad':''}">${esc(fqHkm.msg?fqHkm.msg.t:'')}</span><button class="ghost sm" onclick="hkmKapat()">✕ Kapat</button></div>
     <div id="hkmGovde">${S==='dosya'?hkmDosyaHTML():S==='tanim'?hkmTanimHTML():S==='sonuc'?hkmSonucHTML():hkmItirazHTML()}</div>`;
 }
 
@@ -82,6 +96,9 @@ function hkmEksikSubeler(){
 async function hkmDosyaHazirla(dosyaAdi,buf){
   const H=FiyatIQHakedis, wb=XLSX.read(buf,{type:'array',raw:true,cellDates:false});
   const sayfalar=wb.SheetNames.map(ad=>({ad,aoa:XLSX.utils.sheet_to_json(wb.Sheets[ad],{header:1,raw:true,defval:null,blankrows:true})}));
+  const adlar=sayfalar.map(s=>H.norm(s.ad));
+  if(adlar.includes('PAKETLER')&&(adlar.includes('AYARLAR')||adlar.includes('EK ORANLAR')))
+    return {dosyaAdi,tur:'TANIM',hash:null,kapsam:{},satirlar:[],durum:'Bu kampanya tanım dosyası — 2 · Kampanya tanımları sekmesindeki “içe al” düğmesiyle yükle'};
   const tur=H.dosyaTuru(sayfalar), hash=await hkmSha256(buf), kapsam={}; let satirlar=[];
   const tarihler=[];
   if(tur==='DIVA_KAMPANYA'||tur==='DIVA_FATURA'){
@@ -123,7 +140,7 @@ async function hkmKaydet(){
     fqHkm.hazir=fqHkm.hazir.filter(h=>h.durum!=='kaydedildi'&&h.durum!=='Bu dosya zaten kayıtlı'); fqHkm.sonuc=null;
     await hkmTanimYukle(); hkmCiz(); hkmMsg(`${n} dosya kaydedildi${ayni?`, ${ayni} dosya zaten kayıtlıydı`:''}${pas?`, ${pas} eski yükleme pasifleşti`:''}.`);
   }catch(e){ hkmCiz(); hkmMsg('Kayıt yarıda kaldı: '+(e.message||e)+' — kaydedilenler korunur, kalanları tekrar kaydedebilirsin.',true); }
-  finally{ fqHkm.mesgul=false; }
+  finally{ fqHkm.mesgul=false; const b=document.getElementById('hkmKaydetBtn'); if(b)b.disabled=false; }
 }
 async function hkmYuklemeDurum(id,aktif){
   const {error}=await sb.rpc('fq_hakedis_yukleme_durum',{p_id:id,p_aktif:aktif});
@@ -146,7 +163,7 @@ function hkmTanimHTML(){
   const inp=(id,alan,deger,tip='text',w=90)=>`<input class="hkm-h" type="${tip}" style="width:${w}px" value="${esc(deger??'')}" onchange="hkmPaketAlan('${id}','${alan}',this.value)">`;
   return `<div class="card"><h3 style="margin-top:0">Kampanya (paket) tanımları <span class="badge">${P.length}</span></h3>
     <p class="mut" style="font-size:13px">Paket adı Diva'daki ve BSH'deki kampanya adıyla aynıdır. Bundle hakediş tutarı uygulama yazısından (KDV dahil) girilir. <b>KONTROL ET</b> satırlarını gözden geçirip ONAYLI yap.</p>
-    <div class="row"><label class="ghost sm" style="cursor:pointer">📂 KAMPANYA_TANIMLARI.xlsx içe al<input type="file" accept=".xlsx" style="display:none" onchange="hkmTanimIceAl(this.files[0])"></label>
+    <div class="row"><button type="button" class="sm" onclick="document.getElementById('hkmTanimDosya').click()">📂 KAMPANYA_TANIMLARI.xlsx içe al</button><input id="hkmTanimDosya" type="file" accept=".xlsx" style="display:none" onchange="hkmTanimIceAl(this.files[0]);this.value=''">
     ${yeni.length?`<button class="sm" onclick="hkmYeniPaketEkle()">+ Diva'da çıkan ${yeni.length} yeni paketi ekle</button>`:''}</div>
     <div class="hkm-kaydir" style="margin-top:8px"><table><thead><tr><th>Paket adı</th><th>Tür</th><th>Oran sayfası</th><th class="num">Bundle (KDV dahil)</th><th>Set ürün</th><th>Başlangıç</th><th>Bitiş</th><th>Hakediş son</th><th>Adet limiti</th><th>Durum</th><th>Not</th></tr></thead><tbody>
     ${P.map(p=>`<tr><td title="${esc(p.paket_adi)}">${esc(p.paket_adi)}</td><td>${sec(p.id,'tur',p.tur,HKM_TUR_SECENEK)}</td><td>${sec(p.id,'oran_sayfasi',p.oran_sayfasi||'',['','ANA','FIRSAT','AİLE'])}</td>
@@ -160,7 +177,7 @@ function hkmTanimHTML(){
     </tbody></table></div></div>
     <div class="card"><h3 style="margin-top:0">Şube → mağaza eşlemesi <span class="badge">${fqHkm.subeler.length}</span></h3>
     <p class="mut" style="font-size:13px">Diva şube kodu ya da şube adındaki bir parça → rapordaki mağaza adı. Üstteki satır önce denenir.</p>
-    <div class="row"><button class="ghost sm" onclick="hkmSubeOner()">Diva'dan öner</button></div>
+    <div class="row"><input id="hkmYeniAnahtar" class="hkm-h" placeholder="Anahtar (ör. şube kodu)" style="max-width:190px"><input id="hkmYeniMagaza" class="hkm-h" placeholder="Mağaza adı" style="max-width:170px"><input id="hkmYeniSira" class="hkm-h" type="number" placeholder="Sıra" style="max-width:70px" title="Küçük sıra önce denenir; boşsa en sona eklenir"><button type="button" class="sm" onclick="hkmSubeEkle()">+ Ekle</button><button class="ghost sm" onclick="hkmSubeOner()">Diva'dan öner</button></div>
     <div class="hkm-kaydir" style="margin-top:6px"><table><thead><tr><th>Sıra</th><th>Anahtar (kod/ad parçası)</th><th>Mağaza</th><th></th></tr></thead><tbody>
     ${fqHkm.subeler.map(s=>`<tr><td>${s.oncelik}</td><td>${esc(s.anahtar)}</td><td><input class="hkm-h" value="${esc(s.magaza)}" onchange="hkmSubeAlan('${s.id}',this.value)"></td><td><button class="ghost sm" onclick="hkmSubeSil('${s.id}')">✕</button></td></tr>`).join('')||'<tr><td colspan="4" class="mut">Yok.</td></tr>'}
     </tbody></table></div></div>
@@ -182,7 +199,7 @@ async function hkmTanimIceAl(file){
     const bf=sayfa('BSH_FATURALAR').filter(r=>r['FATURA NO']).map(r=>({marka:fqHkm.marka,fatura_no:H.fno(r['FATURA NO']),fatura_tarihi:H.tarih(r['FATURA TARİHİ']),tur:r['TÜR']||null,
       tutar_kdv_haric:H.sayi(r['TUTAR (KDV HARİÇ)']),hakedis_donemi:r['HAKEDİŞ DÖNEMİ (YYYYAA)']?Math.trunc(+r['HAKEDİŞ DÖNEMİ (YYYYAA)']):null,not_:r.NOT||null}));
     const ay=sayfa('AYARLAR').filter(r=>r.AYAR&&['MİLAT','EŞLEŞME GÜN ARALIĞI'].includes(String(r.AYAR).trim())).map(r=>({marka:fqHkm.marka,anahtar:String(r.AYAR).trim(),deger:String(r['DEĞER'])}));
-    if(!confirm(`İçe aktarılacak: ${paket.length} paket, ${ek.length} elle oran, ${bf.length} BSH faturası, ${ay.length} ayar.\nAynı adlı paketlerin tanımı güncellenir. Devam edilsin mi?`))return;
+    if(!await hkmOnay(`İçe aktarılacak: ${paket.length} paket, ${ek.length} elle oran, ${bf.length} BSH faturası, ${ay.length} ayar.\nAynı adlı paketlerin tanımı güncellenir. Devam edilsin mi?`,'İçe al'))return;
     for(const [t,rows,on] of [['hakedis_paket',paket,'isletme_id,marka,paket_norm'],['hakedis_oran_ek',ek,'isletme_id,marka,urun_kodu,oran_sayfasi,gecerlilik_bas'],['hakedis_bsh_fatura',bf,'isletme_id,marka,fatura_no'],['hakedis_ayar',ay,'isletme_id,marka,anahtar']])
       if(rows.length){ const {error}=await sb.from(t).upsert(rows,{onConflict:on}); if(error)throw new Error(t+': '+error.message); }
     fqHkm.sonuc=null; await hkmTanimYukle(); hkmCiz(); hkmMsg(`${paket.length} paket içe alındı.`);
@@ -202,8 +219,16 @@ async function hkmSubeOner(){
   const {error}=await sb.from('hakedis_sube').insert(rows); if(error){ hkmMsg(error.message,true); return; }
   await hkmTanimYukle(); hkmCiz(); hkmMsg(`${rows.length} anahtar eklendi — mağaza adlarını kısalt (ör. rapordaki kısa ad).`);
 }
+async function hkmSubeEkle(){
+  const v=id=>String(document.getElementById(id)?.value||'').trim(), anahtar=v('hkmYeniAnahtar'), magaza=v('hkmYeniMagaza'), sira=v('hkmYeniSira');
+  if(!anahtar||!magaza){ hkmMsg('Anahtar ve mağaza adı ikisi de gerekli.',true); return; }
+  if(fqHkm.subeler.some(s=>FiyatIQHakedis.norm(s.anahtar)===FiyatIQHakedis.norm(anahtar))){ hkmMsg(`"${anahtar}" zaten eşlemede var.`,true); return; }
+  const oncelik=sira&&Number.isFinite(+sira)?Math.trunc(+sira):Math.max(0,...fqHkm.subeler.map(s=>s.oncelik||0))+10;
+  const {error}=await sb.from('hakedis_sube').insert({marka:fqHkm.marka,anahtar,magaza,oncelik});
+  if(error){ hkmMsg(error.message,true); return; } fqHkm.sonuc=null; await hkmTanimYukle(); hkmCiz(); hkmMsg(`"${anahtar}" → ${magaza} eklendi.`);
+}
 async function hkmSubeAlan(id,magaza){ const {error}=await sb.from('hakedis_sube').update({magaza}).eq('id',id); if(error)hkmMsg(error.message,true); else{ const s=fqHkm.subeler.find(x=>x.id===id); if(s)s.magaza=magaza; fqHkm.sonuc=null; } }
-async function hkmSubeSil(id){ if(!confirm('Bu eşleme silinsin mi?'))return; const {error}=await sb.from('hakedis_sube').delete().eq('id',id); if(error)hkmMsg(error.message,true); else{ await hkmTanimYukle(); hkmCiz(); } }
+async function hkmSubeSil(id){ if(!await hkmOnay('Bu şube eşlemesi silinsin mi?','Sil'))return; const {error}=await sb.from('hakedis_sube').delete().eq('id',id); if(error)hkmMsg(error.message,true); else{ await hkmTanimYukle(); hkmCiz(); } }
 async function hkmAyar(anahtar,deger){ const {error}=await sb.from('hakedis_ayar').upsert({marka:fqHkm.marka,anahtar,deger},{onConflict:'isletme_id,marka,anahtar'}); if(error)hkmMsg(error.message,true); else{ fqHkm.ayar[anahtar]=deger; fqHkm.sonuc=null; } }
 
 // ------------------------------------------------------------------ 3 · HESAP ve SONUÇ
@@ -276,7 +301,7 @@ function hkmItirazHTML(){
 async function hkmGonderildi(){
   const S=fqHkm.sonuc; if(!S)return; const it=S.kayip.filter(k=>k.DURUM==='İTİRAZ'); if(!it.length)return;
   const H=FiyatIQHakedis, bugun=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul'}).format(new Date());
-  if(!confirm(`${it.length} itiraz kalemi "BSH'ye gönderildi" olarak işaretlenecek. Bir sonraki hesapta forma tekrar girmezler; BSH dosyalarında ödenip ödenmedikleri izlenir. Devam edilsin mi?`))return;
+  if(!await hkmOnay(`${it.length} itiraz kalemi "BSH'ye gönderildi" olarak işaretlenecek. Bir sonraki hesapta forma tekrar girmezler; BSH dosyalarında ödenip ödenmedikleri izlenir. Devam edilsin mi?`,'Gönderildi olarak işaretle'))return;
   const rows=it.map(k=>({marka:fqHkm.marka,fatura_no:k['FATURA NO'],degisen_fatura_no:k['DEĞİŞEN FATURA NO']||null,urun_kodu:k['ÜRÜN'],kampanya_adi:k.KAMPANYA,kampanya_norm:H.norm(k.KAMPANYA),
     tutar_kdv_haric:k['TUTAR (KDV HARİÇ)'],kaynak:k.KAYNAK,form_adi:fqHkm.sonFormAdi||null,gonderim_tarihi:bugun}));
   const {error}=await sb.from('hakedis_itiraz').upsert(rows,{onConflict:'isletme_id,marka,fatura_no,urun_kodu,kampanya_norm',ignoreDuplicates:true});
